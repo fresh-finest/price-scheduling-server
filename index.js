@@ -62,6 +62,38 @@ const getListingsItem = async (sku) => {
   }
 };
 
+const fetchProductPricing = async (asin) => {
+  const endpoint = 'https://sellingpartnerapi-na.amazon.com';
+  const path = `/products/pricing/v0/price`;
+  const accessToken = await fetchAccessToken();
+
+  const request = {
+    method: 'GET',
+    url: `${endpoint}${path}`,
+    headers: {
+      'x-amz-access-token': accessToken,
+      'content-type': 'application/json',
+    },
+    params: {
+      MarketplaceId: 'ATVPDKIKX0DER',
+      Asins: asin,
+      ItemType: 'Asin',
+    },
+  };
+
+  console.log('Fetching product pricing with ASIN:', asin);
+
+  try {
+    const response = await axios(request);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching product pricing:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+
+
 
 const patchListingsItem = async (sku, price) => {
   if (!price) {
@@ -136,6 +168,17 @@ app.get('/product/:sku/price', async (req, res) => {
     res.json(listingData);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product price' });
+  }
+});
+
+// fetch product using asin
+app.get('/product/:asin', async (req, res) => {
+  const { asin } = req.params;
+  try {
+    const productPricing = await fetchProductPricing(asin);
+    res.json(productPricing);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch product pricing' });
   }
 });
 

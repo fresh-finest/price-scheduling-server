@@ -1,11 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-
+const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-
+app.use(cors());
 
 const credentials = {
   refresh_token: process.env.REFRESH_TOKEN,
@@ -150,6 +150,7 @@ const patchListingsItem = async (sku, price) => {
 
   try {
     const response = await axios(request);
+    console.log("response",response);
     return response.data;
   } catch (error) {
     console.error('Error updating listings item:', error.response ? error.response.data : error.message);

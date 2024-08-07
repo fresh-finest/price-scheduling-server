@@ -17,3 +17,22 @@ exports.createPriceSchedule = async(req,res,next)=>{
         })
     }
 }
+
+
+exports.getPriceSchedule = async(req,res,next)=>{
+    try {
+        const result = await getPriceScheduleService();
+
+        res.status(200).json({
+            status:"Success",
+            message:"Get Schedule",
+            result,
+        })
+    } catch (error) {
+        res.status(400).json({
+            status:"Fails",
+            message:"Couldn't fetch data",
+            error:error.message   
+        })
+    }
+}

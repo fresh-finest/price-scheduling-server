@@ -2,11 +2,25 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-
+const colors = require("colors");
+const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 app.use(cors());
 
+
+
+const MONGO="mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db"
+
+mongoose
+  .connect(MONGO)
+  .then(() => {
+    console.log(`Connected to MongoDB!`.green.bold);
+  })
+  .catch((err) => {
+    console.log(err);
+  });
+  
 const credentials = {
   refresh_token: process.env.REFRESH_TOKEN,
   lwa_app_id: process.env.LWA_APP_ID,

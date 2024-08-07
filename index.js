@@ -20,7 +20,7 @@ mongoose
   .catch((err) => {
     console.log(err);
   });
-  
+
 const credentials = {
   refresh_token: process.env.REFRESH_TOKEN,
   lwa_app_id: process.env.LWA_APP_ID,
@@ -215,4 +215,20 @@ app.patch('/product/:sku/price', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+
+
+const scheduleRoute = require("./src/route/Schedule");
+
+app.use("/api/schedule",scheduleRoute);
+
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  return res.status(statusCode).json({
+    success: false,
+    statusCode,
+    message,
+  });
 });

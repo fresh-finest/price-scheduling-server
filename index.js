@@ -220,8 +220,12 @@ app.listen(PORT, () => {
 
 
 const scheduleRoute = require("./src/route/Schedule");
+const authRoute = require("./src/route/auth");
+const userRoute = require("./src/route/user");
 
 app.use("/api/schedule",scheduleRoute);
+app.use("/api/auth",authRoute);
+app.use("/api/user",userRoute);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

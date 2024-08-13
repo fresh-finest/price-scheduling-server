@@ -29,3 +29,12 @@ exports.signin = async(req,res,next)=>{
         next(error);
     }
 }
+
+exports.logOut = async(req,res,next)=>{
+    try {
+        res.clearCookie('access_token');
+        res.status(200).json('User has been logged out1.')
+    } catch (error) {
+        next(error);
+    }
+}

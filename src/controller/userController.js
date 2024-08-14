@@ -2,30 +2,40 @@ const bcrypt = require('bcryptjs');
 const { createUserService, getAllUserService } = require('../service/userService');
 
 
-
-exports.createUser = async(req,res,next)=>{
+exports.createUser = async (req, res, next) => {
     try {
-        const hashedPassword = await bcrypt.hash(req.body.password,10);
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
         const newUser = {
             ...req.body,
             password: hashedPassword
-        }
-        const result = createUserService(newUser);
+        };
+
+        const result = await createUserService(newUser);
 
         res.status(201).json({
-            status:"Success",
-            message:"Successfully added new user!",
+            status: "Success",
+            message: "Successfully added new user!",
             result
-        })
+        });
     } catch (error) {
-        res.status(400).json({
-            status:"Fails",
-            message:"Couldn't create data.",
-            error:error.message
-        })
+        if (error.code === 11000) {
+            // Duplicate key error
+            res.status(409).json({
+                status: "Fail",
+                message: "User with this username already exists.",
+                error: error.message
+            });
+        } else {
+            res.status(400).json({
+                status: "Fail",
+                message: "Couldn't create data.",
+                error: error.message
+            });
+        }
     }
-}
+};
+
 
 exports.getAllUser=async(req,res,next)=>{
     try {

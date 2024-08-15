@@ -145,6 +145,8 @@ const patchListingsItem = async (sku, price) => {
   };
 
 
+
+
   const request = {
     method: 'PATCH',
     url: `${endpoint}${path}`,
@@ -172,6 +174,40 @@ const patchListingsItem = async (sku, price) => {
   }
 };
 
+
+// Function to fetch product details from Amazon SP-API
+const fetchProductDetails = async (asin) => {
+  const endpoint = 'https://sellingpartnerapi-na.amazon.com';
+  const path = `/catalog/v0/items/${asin}`;
+  const accessToken = await fetchAccessToken();
+
+  const request = {
+    method: 'GET',
+    url: `${endpoint}${path}`,
+    headers: {
+      'x-amz-access-token': accessToken,
+      'content-type': 'application/json',
+    },
+    params: {
+      MarketplaceId: credentials.marketplace_id,
+    },
+    timeout: 10000,
+  };
+
+  const response = await axios(request);
+  return response.data;
+};
+
+// Express.js route to fetch product details
+app.get('/details/:asin', async (req, res) => {
+  const { asin } = req.params;
+  try {
+    const productDetails = await fetchProductDetails(asin);
+    res.json(productDetails);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch product details' });
+  }
+});
 
 // Endpoint to get product price by SKU
 app.get('/product/:sku/price', async (req, res) => {

@@ -5,7 +5,7 @@ const priceScheduleSchema = mongoose.Schema({
   sku: { type: String },
   price: { type: Number },
   startDate: { type: Date, required: true },
-  endDate: { type: Date, required: true },
+  endDate: { type: Date, required: false },
 })
 
 const PriceSchedule = mongoose.model("Schedule", priceScheduleSchema);

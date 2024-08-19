@@ -19,20 +19,61 @@ exports.createPriceSchedule = async(req,res,next)=>{
 }
 
 
-exports.getPriceSchedule = async(req,res,next)=>{
+// exports.getPriceSchedule = async(req,res,next)=>{
+//     try {
+//         const result = await getPriceScheduleService();
+
+//         res.status(200).json({
+//             status:"Success",
+//             message:"Get Schedule",
+//             result,
+//         })
+//     } catch (error) {
+//         res.status(400).json({
+//             status:"Fails",
+//             message:"Couldn't fetch data",
+//             error:error.message   
+//         })
+//     }
+// }
+
+
+// exports.getPriceSchedule = async (req, res, next) => {
+//     try {
+//         const { startDate, endDate } = req.query;
+
+//         const result = await getPriceScheduleService({ startDate, endDate });
+
+//         res.status(200).json({
+//             status: "Success",
+//             message: "Get Schedule",
+//             result,
+//         });
+//     } catch (error) {
+//         res.status(400).json({
+//             status: "Fail",
+//             message: "Couldn't fetch data",
+//             error: error.message
+//         });
+//     }
+// };
+
+exports.getPriceSchedule = async (req, res, next) => {
     try {
-        const result = await getPriceScheduleService();
+        const { startDate } = req.query;
+
+        const result = await getPriceScheduleService({ startDate });
 
         res.status(200).json({
-            status:"Success",
-            message:"Get Schedule",
+            status: "Success",
+            message: "Get Schedule",
             result,
-        })
+        });
     } catch (error) {
         res.status(400).json({
-            status:"Fails",
-            message:"Couldn't fetch data",
-            error:error.message   
-        })
+            status: "Fail",
+            message: "Couldn't fetch data",
+            error: error.message
+        });
     }
-}
+};

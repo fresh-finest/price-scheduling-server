@@ -51,3 +51,9 @@ exports.getPriceScheduleService = async({ startDate }) => {
     return result;
 };
 
+
+
+exports.getPriceScheduleServiceByAsin = async(asin)=>{
+    const products = await PriceSchedule.find({asin:asin});
+    return products;
+}

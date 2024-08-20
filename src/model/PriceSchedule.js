@@ -4,6 +4,7 @@ const priceScheduleSchema = mongoose.Schema({
   asin:{type: String},
   sku: { type: String },
   price: { type: Number },
+  originalPrice: {type:Number},
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
 })

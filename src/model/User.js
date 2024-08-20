@@ -35,9 +35,6 @@ const userSchema = mongoose.Schema({
     permissions:{
     read: { type: Boolean, default: true },
     write: { type: Boolean, default: false },
-    update:{type:Boolean, default: false},
-    delete: { type: Boolean, default: false },
-    analysis:{type: Boolean, default: false}
     }
 }, { timestamps: true });
 

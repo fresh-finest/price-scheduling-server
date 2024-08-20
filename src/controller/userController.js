@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { createUserService, getAllUserService } = require('../service/userService');
+const { createUserService, getAllUserService, updateUserRoleService } = require('../service/userService');
 
 
 exports.createUser = async (req, res, next) => {
@@ -56,6 +56,32 @@ exports.getAllUser=async(req,res,next)=>{
         res.status(404).json({
             status:"Fails",
             message:"Couldn't fetch data.",
+            error:error.message
+        })
+    }
+}
+
+exports.updateUserRole = async(req,res,next)=>{
+    try {
+        const {userId}  = req.params;
+        const {role,permissions} = req.body;
+        const updateUser = await updateUserRoleService(userId,role,permissions);
+
+        if(!updateUser){
+            return res,status(404).json({
+                status:"Fail",
+                message:"User not found"
+            })
+        }
+        res.status(200).json({
+            status:"Success",
+            message:"Successfully updated data.",
+            result: updateUser
+           })
+    } catch (error) {
+        res.status(404).json({
+            status:"Fails",
+            message:"Couldn't updated data.",
             error:error.message
         })
     }

@@ -1,10 +1,16 @@
 const mongoose = require('mongoose');
 
 const userSchema = mongoose.Schema({
-    userName:{
-        type:String,
-        unique:true,
-        required:true
+    userName: {
+        type: String,
+        unique: true,
+        required: true,
+        validate: {
+            validator: function(v) {
+                return /^\S*$/.test(v); // Regex to check for no spaces
+            },
+            message: props => `${props.value} contains spaces, which are not allowed!`
+        }
     },
     email:{
         type:String,

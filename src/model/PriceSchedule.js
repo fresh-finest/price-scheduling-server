@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const priceScheduleSchema = mongoose.Schema({
+  userName:{type: String},
   asin:{type: String},
   sku: { type: String },
   price: { type: Number },

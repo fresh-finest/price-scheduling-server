@@ -57,3 +57,8 @@ exports.getPriceScheduleServiceByAsin = async(asin)=>{
     const products = await PriceSchedule.find({asin:asin});
     return products;
 }
+
+exports.getPriceScheduleServiceByUser = async(userName)=>{
+    const schedules = await PriceSchedule.find({userName:userName});
+    return schedules;
+}

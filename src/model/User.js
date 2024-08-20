@@ -33,7 +33,7 @@ const userSchema = mongoose.Schema({
         type: Date
     },
     permissions:{
-    read: { type: Boolean, default: false },
+    read: { type: Boolean, default: true },
     write: { type: Boolean, default: false },
     update:{type:Boolean, default: false},
     delete: { type: Boolean, default: false },

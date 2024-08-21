@@ -62,3 +62,14 @@ exports.getPriceScheduleServiceByUser = async(userName)=>{
     const schedules = await PriceSchedule.find({userName:userName});
     return schedules;
 }
+
+exports.updatePriceScheduleServiceById= async(id,data)=>{
+    const schedule = await PriceSchedule.updateOne(
+        {_id:id},
+        {
+            $set:data,
+        },
+        { runValidators: true }
+    );
+    return schedule;
+}

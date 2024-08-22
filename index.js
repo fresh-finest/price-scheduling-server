@@ -6,7 +6,28 @@ const colors = require("colors");
 const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+const allowedOrigins = [
+  'http://localhost:5173',
+ 
+  'https://dps-fresh-finest.netlify.app',
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests) or if the origin is in the allowedOrigins array
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, // If you need to send cookies or other credentials
+  allowedHeaders: 'Content-Type,Authorization',
+};
+
+app.use(cors(corsOptions));
 
 
 

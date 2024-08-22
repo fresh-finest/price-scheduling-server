@@ -1,13 +1,14 @@
 const express = require("express");
 
-const { createPriceSchedule, getPriceSchedule, createPriceScheduleByAsin, getPriceScheduleByUser, updatePriceScheduleById, getPriceScheduleById } = require("../controller/PriceScheduleController")
+const { createPriceSchedule, getPriceSchedule, createPriceScheduleByAsin, getPriceScheduleByUser, updatePriceScheduleById, getPriceScheduleById } = require("../controller/PriceScheduleController");
+
 
 const router = express.Router();
 
 
 
-router.route("/:id").get(getPriceScheduleById).put(updatePriceScheduleById);
-
+router.route("/:id").put(updatePriceScheduleById);
+router.route("/:id/single-schedule").get(getPriceScheduleById);
 router.route("/").post(createPriceSchedule);
 router.route("/").get(getPriceSchedule);
 router.route("/:asin").get(createPriceScheduleByAsin);

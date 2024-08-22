@@ -52,7 +52,10 @@ exports.getPriceScheduleService = async({ startDate }) => {
 };
 
 
-
+exports.getPriceScheduleServiceId = async(id)=>{
+    const schedule = await PriceSchedule.findOne({_id:id});
+    return schedule;
+}
 exports.getPriceScheduleServiceByAsin = async(asin)=>{
     const products = await PriceSchedule.find({asin:asin});
     return products;

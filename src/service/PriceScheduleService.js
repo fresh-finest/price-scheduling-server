@@ -76,3 +76,8 @@ exports.updatePriceScheduleServiceById= async(id,data)=>{
     );
     return schedule;
 }
+
+exports.deletePriceScheduleServiceById = async (id) => {
+    const deletedSchedule = await PriceSchedule.deleteOne({ _id: id });
+    return deletedSchedule;
+  };

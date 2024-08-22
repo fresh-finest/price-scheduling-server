@@ -1,4 +1,4 @@
-const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByAsin, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId } = require("../service/PriceScheduleService")
+const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByAsin, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId, deletePriceScheduleServiceById } = require("../service/PriceScheduleService")
 
 exports.createPriceSchedule = async(req,res,next)=>{
     try {
@@ -149,6 +149,27 @@ exports.updatePriceScheduleById = async(req,res,next)=>{
         res.status(400).json({
             status:"Fails",
             message:"Couldn't updated schdeule",
+            error:error.message
+        })
+    }
+}
+
+exports.deletePriceScheduleById = async(req,res,next)=>{
+    try {
+
+        const {id} = req.params;
+        
+        await deletePriceScheduleServiceById(id);
+
+        res.status(200).json({
+            status:"Success",
+            message:"Successfully deleted data.",
+        })
+        
+    } catch (error) {
+        res.status(400).json({
+            status:"Fails",
+            message:"Couldn't deleted data",
             error:error.message
         })
     }

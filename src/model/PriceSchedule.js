@@ -8,6 +8,7 @@ const priceScheduleSchema = mongoose.Schema({
   price: { type: Number },
   currentPrice: {type:Number},
   imageURL:{type: String},
+  firstChange:{type: Boolean, default:true},
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
 }, { timestamps: true })

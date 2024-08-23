@@ -7,8 +7,8 @@ const router = express.Router();
 
 
 router.route("/:userName/list").get(getPriceScheduleByUser);
-router.route("/:id").put(updatePriceScheduleById);
-router.route("/:id").delete(deletePriceScheduleById);
+// router.route("/:id").put(updatePriceScheduleById);
+// router.route("/:id").delete(deletePriceScheduleById);
 router.route("/:id/single-schedule").get(getPriceScheduleById);
 router.route("/:asin").get(createPriceScheduleByAsin);
 router.route("/").post(createPriceSchedule);

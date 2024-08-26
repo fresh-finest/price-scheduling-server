@@ -477,19 +477,7 @@ app.get('/details/:asin', async (req, res) => {
   }
 });
 
-app.get('/api/history/:scheduleId', async (req, res) => {
-  const { scheduleId } = req.params;
 
-  try {
-    
-    const history = await History.find({ scheduleId }).sort({ createdAt: -1 });
-
-    
-    res.json(history);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch history' });
-  }
-});
 app.get('/api/history/:schdeuleId', async (req, res) => {
   const { scheduleId } = req.params;
 
@@ -507,14 +495,23 @@ app.get('/api/history/', async (req, res) => {
   
   try {
     
-    const history = await History.find().sort({ createdAt: -1 });
-
+    const result = await History.find().sort({ createdAt: -1 });
     
-    res.json(history);
+    res.status(200).json({
+      status: "Success",
+      message: "Successfully fetch data.",
+      result,
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch history' });
+    res.status(400).json({
+      status: "Fail",
+      message: "Couldn't fetch data.",
+      error: error.message
+  });
   }
 });
+
+
 
 
 

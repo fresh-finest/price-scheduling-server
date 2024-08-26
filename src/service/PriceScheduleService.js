@@ -1,5 +1,5 @@
 const PriceSchedule = require("../model/PriceSchedule")
-
+const History = require("../model/HistorySchedule");
 exports.createPriceScheduleService = async(data)=>{
     const schedule = await PriceSchedule.create(data);
     return schedule;
@@ -62,7 +62,7 @@ exports.getPriceScheduleServiceByAsin = async(asin)=>{
 }
 
 exports.getPriceScheduleServiceByUser = async(userName)=>{
-    const schedules = await PriceSchedule.find({userName:userName});
+    const schedules = await History.find({userName:userName});
     return schedules;
 }
 

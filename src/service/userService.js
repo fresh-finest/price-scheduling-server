@@ -18,3 +18,8 @@ exports.getAllUserService = async()=>{
     );
     return updateUser;
  }
+
+ exports.deleteUserServiceById = async(id)=>{
+    const deletedUser = await User.deleteOne({_id:id});
+    return deletedUser;
+ }

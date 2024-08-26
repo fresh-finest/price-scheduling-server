@@ -1,4 +1,4 @@
-const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByAsin, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId, deletePriceScheduleServiceById } = require("../service/PriceScheduleService")
+const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByAsin, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId, deletePriceScheduleServiceById, getDeletedHistoryService } = require("../service/PriceScheduleService")
 
 exports.createPriceSchedule = async(req,res,next)=>{
     try {
@@ -170,6 +170,23 @@ exports.deletePriceScheduleById = async(req,res,next)=>{
         res.status(400).json({
             status:"Fails",
             message:"Couldn't deleted data",
+            error:error.message
+        })
+    }
+}
+
+exports.deletedHistory = async(req,res,next)=>{
+    try {
+        const result = await getDeletedHistoryService();
+        res.status(200).json({
+            status:"Success",
+            message:"Successfully get data.",
+            result
+        })
+    } catch (error) {
+        res.status(400).json({
+            status:"Fails",
+            message:"Couldn't fetched data",
             error:error.message
         })
     }

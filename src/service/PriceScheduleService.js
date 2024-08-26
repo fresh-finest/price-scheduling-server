@@ -81,3 +81,8 @@ exports.deletePriceScheduleServiceById = async (id) => {
     const deletedSchedule = await PriceSchedule.deleteOne({ _id: id });
     return deletedSchedule;
   };
+
+  exports.getDeletedHistoryService = async()=>{
+    const history = await PriceSchedule.find({}).lean();
+    return history;
+  }

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const priceScheduleSchema = mongoose.Schema({
+const deletedPriceScheduleSchema = mongoose.Schema({
+  originalId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Reference to the original schedule ID
   userName: { type: String },
   asin: { type: String },
   sku: { type: String },
@@ -11,8 +12,8 @@ const priceScheduleSchema = mongoose.Schema({
   firstChange: { type: Boolean, default: true },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
-  status: { type: String, enum: ['created', 'updated', 'deleted'], default: 'created' }, // New field for status
+  deletedAt: { type: Date, default: Date.now }, // Timestamp when the schedule was deleted
 }, { timestamps: true });
 
-const PriceSchedule = mongoose.model("Schedule", priceScheduleSchema);
-module.exports = PriceSchedule;
+const DeletedPriceSchedule = mongoose.model("DeletedPriceSchedule", deletedPriceScheduleSchema);
+module.exports = DeletedPriceSchedule;

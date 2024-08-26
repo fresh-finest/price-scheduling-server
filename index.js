@@ -114,17 +114,18 @@ agenda.define('revert price update', async (job) => {
 })();
 
 // API to save the schedule and queue the jobs
+/*
 app.post('/api/schedule/change', async (req, res) => {
   const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
 
   try {
-    // Schedule the price update job
+    
     await agenda.schedule(new Date(startDate), 'schedule price update', {
       sku,
       newPrice: price,
     });
 
-    // Schedule the price revert job, if endDate is provided
+   
     if (endDate) {
       await agenda.schedule(new Date(endDate), 'revert price update', {
         sku,
@@ -132,7 +133,7 @@ app.post('/api/schedule/change', async (req, res) => {
       });
     }
 
-    // Save the schedule details to MongoDB (you can extend this part as per your schema)
+  
     const schedule = new PriceSchedule({ userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate });
     await schedule.save();
 
@@ -142,8 +143,10 @@ app.post('/api/schedule/change', async (req, res) => {
     res.status(500).json({ error: 'Failed to save schedule' });
   }
 });
+*/
 
 // API to update a schedule
+/*
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
   const { startDate, endDate, price, currentPrice } = req.body;
@@ -154,15 +157,15 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       return res.status(404).json({ error: 'Schedule not found' });
     }
 
-    // Update the schedule with the new details
+    
     schedule.startDate = startDate;
     schedule.endDate = endDate;
     schedule.price = price;
     schedule.currentPrice = currentPrice;
-
+    schedule.status='updated'; 
     await schedule.save();
 
-    // Reschedule jobs
+   
     await agenda.cancel({ 'data.sku': schedule.sku });
 
     await agenda.schedule(new Date(startDate), 'schedule price update', {
@@ -183,8 +186,11 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update schedule' });
   }
 });
+*/
+
 
 // API to delete a schedule
+/*
 app.delete('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -194,7 +200,10 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
       return res.status(404).json({ error: 'Schedule not found' });
     }
 
-    // Cancel any related jobs
+    schedule.status ='deleted'
+    await schedule.save();
+
+  
     await agenda.cancel({ 'data.sku': schedule.sku });
 
     res.json({ success: true, message: 'Schedule and associated jobs deleted successfully.' });
@@ -203,7 +212,176 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete schedule' });
   }
 });
+*/
+app.post('/api/schedule/change', async (req, res) => {
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
 
+  try {
+    // Create a new schedule and save it to the database
+    const newSchedule = new PriceSchedule(req.body);
+    await newSchedule.save();
+
+    // Log the creation of the schedule to history
+    const historyLog = new History({
+      scheduleId: newSchedule._id,
+      action: 'created',
+      userName,
+      asin,
+      sku,
+      title,
+      price,
+      currentPrice,
+      imageURL,
+      startDate,
+      endDate,
+      timestamp: new Date(),
+    });
+    await historyLog.save();
+
+    // Schedule the price update job
+    await agenda.schedule(new Date(startDate), 'schedule price update', {
+      sku,
+      newPrice: price,
+    });
+
+    // Schedule the price revert job, if endDate is provided
+    if (endDate) {
+      await agenda.schedule(new Date(endDate), 'revert price update', {
+        sku,
+        originalPrice: currentPrice,
+      });
+    }
+
+    // Send the response after all operations are completed
+    res.json({ success: true, message: 'Schedule saved and jobs queued successfully.', schedule: newSchedule });
+  } catch (error) {
+    console.error('Error saving schedule:', error);
+    res.status(500).json({ error: 'Failed to save schedule' });
+  }
+});
+
+app.put('/api/schedule/change/:id', async (req, res) => {
+  const { id } = req.params;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL } = req.body;
+
+  try {
+    const schedule = await PriceSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    // Log the previous state of the schedule before updating
+    const previousState = {
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      price: schedule.price,
+      currentPrice: schedule.currentPrice,
+      status: schedule.status,
+      title: schedule.title,
+      asin: schedule.asin,
+      sku: schedule.sku,
+      imageURL: schedule.imageURL,
+    };
+
+    // Update the schedule with new details
+    schedule.startDate = startDate;
+    schedule.endDate = endDate;
+    schedule.price = price;
+    schedule.currentPrice = currentPrice;
+    schedule.status = 'updated';
+    schedule.title = title || schedule.title; // Ensure title is preserved if not updated
+    schedule.asin = asin || schedule.asin; // Ensure ASIN is preserved if not updated
+    schedule.sku = sku || schedule.sku; // Ensure SKU is preserved if not updated
+    schedule.imageURL = imageURL || schedule.imageURL; // Ensure imageURL is preserved if not updated
+    await schedule.save();
+
+    // Log the update in history with previous and updated states
+    const historyLog = new History({
+      scheduleId: schedule._id,
+      action: 'updated',
+      previousState,
+      updatedState: {
+        startDate: schedule.startDate,
+        endDate: schedule.endDate,
+        price: schedule.price,
+        currentPrice: schedule.currentPrice,
+        status: schedule.status,
+        title: schedule.title,
+        asin: schedule.asin,
+        sku: schedule.sku,
+        imageURL: schedule.imageURL,
+      },
+      userName, // Track the user who made the update
+      timestamp: new Date(),
+    });
+    await historyLog.save();
+
+    // Cancel existing jobs
+    await agenda.cancel({ 'data.sku': schedule.sku });
+
+    // Schedule new jobs
+    await agenda.schedule(new Date(startDate), 'schedule price update', {
+      sku: schedule.sku,
+      newPrice: price,
+    });
+
+    if (endDate) {
+      await agenda.schedule(new Date(endDate), 'revert price update', {
+        sku: schedule.sku,
+        originalPrice: currentPrice,
+      });
+    }
+
+    res.json({ success: true, message: 'Schedule updated successfully.' });
+  } catch (error) {
+    console.error('Error updating schedule:', error);
+    res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
+
+
+
+app.delete('/api/schedule/change/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Find the schedule by ID
+    const schedule = await PriceSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    // Log the deletion action and previous state in history
+    const historyLog = new History({
+      scheduleId: schedule._id,
+      action: 'deleted',
+      userName: schedule.userName,
+      asin: schedule.asin,
+      sku: schedule.sku,
+      title: schedule.title,
+      price: schedule.price,
+      currentPrice: schedule.currentPrice,
+      imageURL: schedule.imageURL,
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      previousState: { ...schedule.toObject() },
+      timestamp: new Date(),
+    });
+    await historyLog.save();
+
+    // Mark the schedule as deleted (soft delete)
+    schedule.status = 'deleted';
+    await schedule.save();
+
+    // Cancel any associated jobs
+    await agenda.cancel({ 'data.sku': schedule.sku });
+
+    res.json({ success: true, message: 'Schedule marked as deleted and associated jobs canceled.' });
+  } catch (error) {
+    console.error('Error deleting schedule:', error);
+    res.status(500).json({ error: 'Failed to delete schedule' });
+  }
+});
 
 // Fetch Access Token function
 const fetchAccessToken = async () => {
@@ -299,6 +477,46 @@ app.get('/details/:asin', async (req, res) => {
   }
 });
 
+app.get('/api/history/:scheduleId', async (req, res) => {
+  const { scheduleId } = req.params;
+
+  try {
+    
+    const history = await History.find({ scheduleId }).sort({ createdAt: -1 });
+
+    
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+app.get('/api/history/:schdeuleId', async (req, res) => {
+  const { scheduleId } = req.params;
+
+  try {
+    
+    const history = await History.find({scheduleId}).sort({ createdAt: -1 });
+
+    
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+app.get('/api/history/', async (req, res) => {
+  
+  try {
+    
+    const history = await History.find().sort({ createdAt: -1 });
+
+    
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+
+
 
 
 const PORT = process.env.PORT || 3000;
@@ -310,6 +528,7 @@ const scheduleRoute = require("./src/route/Schedule");
 const authRoute = require("./src/route/auth");
 const userRoute = require("./src/route/user");
 const PriceSchedule = require('./src/model/PriceSchedule');
+const History = require('./src/model/HistorySchedule');
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);

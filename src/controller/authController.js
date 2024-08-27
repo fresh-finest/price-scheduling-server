@@ -42,7 +42,7 @@ exports.logOut = async(req,res,next)=>{
 exports.resetPassword = async(req,res,next)=>{
     console.log(req.body);
    
-    const {token,newPassword,confirmNewPassword} = req.body;
+    const {token,userName,newPassword,confirmNewPassword} = req.body;
     console.log('Token received on the backend:', token);
 
     if (newPassword !== confirmNewPassword) {
@@ -59,12 +59,14 @@ exports.resetPassword = async(req,res,next)=>{
         }
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
+        user.userName = userName;
+
 
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
 
         await user.save();
-        res.status(200).json({ message: 'Password has been reset successfully' });
+        res.status(200).json({ message: 'Password has been set successfully' });
 
     } catch (error) {
         next(error);

@@ -152,7 +152,7 @@ exports.inviteUser = async (req, res, next) => {
         console.log(token);
         // Send an invitation email with the password setup link
         // const resetUrl = `http://localhost:5173/reset-password?token=${token}`;
-        const resetUrl = `http://localhost:5173/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
+        const resetUrl = `https://price-changing.netlify.app/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
 
 
 

@@ -515,6 +515,21 @@ app.get('/api/history/', async (req, res) => {
 
 
 
+app.post('/send-email', async (req, res) => {
+  const { to, subject, text, html } = req.body;
+
+
+  try {
+    // Call the sendEmail function
+    await sendEmail(to, subject, text, html);
+    res.status(200).send('Email sent successfully');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error sending email');
+  }
+});
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
@@ -526,6 +541,7 @@ const authRoute = require("./src/route/auth");
 const userRoute = require("./src/route/user");
 const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
+const sendEmail = require('./src/service/EmailService');
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);

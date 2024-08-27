@@ -142,7 +142,7 @@ exports.inviteUser = async (req, res, next) => {
         // Generate a token for password setup
         const token = crypto.randomBytes(20).toString('hex');
         newUser.resetPasswordToken = token;
-        newUser.resetPasswordExpires = Date.now() + 5 * 60 * 1000; // Token expires in 5 minutes
+        newUser.resetPasswordExpires = Date.now() + 6 * 60 * 60 * 1000; // Token expires in 5 minutes
 
         // Save the user to the database
         await newUser.save();
@@ -152,7 +152,8 @@ exports.inviteUser = async (req, res, next) => {
         console.log(token);
         // Send an invitation email with the password setup link
         // const resetUrl = `http://localhost:5173/reset-password?token=${token}`;
-        const resetUrl = `https://price-changing.netlify.app/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
+        // const resetUrl = `https://price-changing.netlify.app/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
+        const resetUrl = `https://dps-fresh-finest.netlify.app/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
         // const resetUrl = `http://localhost:5173/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
 
 

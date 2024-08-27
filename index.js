@@ -315,7 +315,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       timestamp: new Date(),
     });
     await historyLog.save();
-
+    
     // Cancel existing jobs
     await agenda.cancel({ 'data.sku': schedule.sku });
 

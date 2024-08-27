@@ -39,40 +39,61 @@ exports.logOut = async(req,res,next)=>{
     }
 }
 
-exports.resetPassword = async(req,res,next)=>{
-    console.log(req.body);
+exports.resetPassword = async (req, res, next) => {
+    console.log('Request body:', req.body);
    
-    const {token,userName,newPassword,confirmNewPassword} = req.body;
+    const { token, userName, newPassword, confirmNewPassword } = req.body;
     console.log('Token received on the backend:', token);
+    console.log('Username received on the backend:', userName);
 
     if (newPassword !== confirmNewPassword) {
         return next(errorHandler(400, "Passwords do not match"));
     }
+
     try {
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() }
-        })
+        });
 
-        if(!user){
+        if (!user) {
             return next(errorHandler(400, "Invalid or expired token"));
         }
+
+        console.log('User before update:', user);
+
+        // Update the password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
-        user.userName = userName;
 
+        // Update the username
+        console.log("username"+userName);
+        if (userName) {
+            user.userName = userName;  // Only update if userName is provided
+            console.log('Setting userName to:', userName);
+        } else {
+            console.log('userName is not provided or is empty');
+        }
 
+        // Clear the reset token and expiration fields
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
 
+        // Save the updated user information
         await user.save();
-        res.status(200).json({ message: 'Password has been set successfully' });
+
+        console.log('User successfully updated:', user);
+
+        res.status(200).json({ message: 'Password and username have been set successfully' });
 
     } catch (error) {
+        console.error('Error saving user:', error);
         next(error);
     }
+};
 
-}
+
+
 
 
 exports.storeToken = async(req,res,next)=>{

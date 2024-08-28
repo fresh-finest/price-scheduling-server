@@ -511,6 +511,15 @@ app.get('/api/history/', async (req, res) => {
   }
 });
 
+app.get('/fetch-all-listings', async (req, res) => {
+  try {
+    const listings = await Listing.find(); // Example limit, adjust as needed
+
+    res.json({ listings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch all listings' });
+  }
+});
 
 
 
@@ -531,6 +540,7 @@ app.post('/send-email', async (req, res) => {
 
 
 
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
@@ -542,6 +552,7 @@ const userRoute = require("./src/route/user");
 const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
+const Listing = require('./src/model/Listing');
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);

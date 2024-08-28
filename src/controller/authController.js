@@ -2,6 +2,9 @@ const jwt = require("jsonwebtoken");
 const User = require("../model/User");
 const { errorHandler } = require("../utils/errorHandler");
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const sendEmail = require('../service/EmailService');
+
 
 exports.signin = async(req,res,next)=>{
     const {email,password} = req.body;
@@ -94,8 +97,6 @@ exports.resetPassword = async (req, res, next) => {
 
 
 
-
-
 exports.storeToken = async(req,res,next)=>{
     const {token,expiration} = req.body;
     const {id} = req.params;
@@ -112,6 +113,84 @@ exports.storeToken = async(req,res,next)=>{
 
         res.status(200).json({ message: 'Token stored successfully' });
     } catch (error) {
+        next(error);
+    }
+}
+
+exports.requestPasswordReset = async (req,res,next)=>{
+    const {email}= req.body;
+    try {
+        const user = await User.findOne({email});
+
+        if(!user){
+            return res.status(404).json({ message: 'User with this email does not exist.' });
+        }
+
+      const token = crypto.randomBytes(20).toString('hex');
+      
+
+
+
+      console.log(token);
+      user.resetPasswordToken = token;
+      user.resetPasswordExpires = Date.now() + 5 * 60 *1000;
+
+      await user.save();
+
+      const resetUrl = `http://localhost:5173/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+
+      await sendEmail(
+        user.email,
+        'Password Reset Request',
+         `You are invited to join Fresh Finest. Please set up your password using the following link: ${resetUrl}`,
+         `
+         <p>You are receiving this email because you (or someone else) have requested to reset the password for your account.</p>
+         <p>Please click on the following button to complete the process:</p>
+         <p><a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; font-size: 16px; color: white; background-color: #28a745; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
+         <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
+    
+    );
+
+    res.status(200).json({ message: 'Password reset link sent to your email.' });
+
+
+    } catch (error) {
+        
+    }
+}
+
+
+
+exports.setForgetPassowrd = async (req,res,next)=>{
+
+    
+    const { token, newPassword, confirmNewPassword } = req.body;
+    if (newPassword !== confirmNewPassword) {
+        return next(errorHandler(400, 'Passwords do not match'));
+    }
+    try {
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+        
+        if (!user) {
+            return next(errorHandler(400, 'Invalid or expired token'));
+        }
+        // Hash the new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+
+        // Clear the reset token and expiration fields
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+
+        await user.save();
+
+        res.status(200).json({ message: 'Password has been reset successfully' });
+        
+    } catch (error) {
+        console.error('Error resetting password:', error);
         next(error);
     }
 }

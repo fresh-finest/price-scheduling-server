@@ -12,6 +12,7 @@ app.use(express.json());
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'https://changing-price.netlify.app',
   'https://price-changing.netlify.app',
   'https://dps-fresh-finest.netlify.app',
 ];

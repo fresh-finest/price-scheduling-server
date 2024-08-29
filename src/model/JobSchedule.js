@@ -11,6 +11,8 @@ const jobScheduleSchema = mongoose.Schema({
   firstChange:{type: Boolean, default:true},
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
+  weekly: { type: Boolean, default: false }, 
+  daysOfWeek: [{ type: Number }], 
 }, { timestamps: true })
 
 const JobSchedule = mongoose.model("Schedule", jobScheduleSchema);

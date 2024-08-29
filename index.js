@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const colors = require("colors");
-
+const dayjs = require('dayjs'); 
 const mongoose = require('mongoose');
 const Agenda = require('agenda');
 require('dotenv').config();
@@ -94,6 +94,83 @@ const updateProductPrice = async (sku, value) => {
     throw error;
   }
 };
+
+// Function to calculate the next occurrence of a day
+/*
+const getNextDayOfWeek = (dayOfWeek, hour = 0, minute = 0) => {
+  const now = dayjs();
+  let nextDay = now.day(dayOfWeek).hour(hour).minute(minute).second(0);
+
+  if (nextDay.isBefore(now)) {
+    nextDay = nextDay.add(1, 'week');
+  }
+
+  return nextDay.toDate();
+};
+
+agenda.define('weekly price update', async (job) => {
+  const { sku, newPrice, daysOfWeek } = job.attrs.data;
+
+  for (const day of daysOfWeek) {
+    const startDate = getNextDayOfWeek(day);
+    await agenda.schedule(startDate, 'schedule price update', { sku, newPrice });
+  }
+
+  console.log(`Weekly price update scheduled for SKU: ${sku} on days: ${daysOfWeek.join(', ')}`);
+});
+
+agenda.define('revert weekly price update', async (job) => {
+  const { sku, originalPrice, daysOfWeek } = job.attrs.data;
+
+  for (const day of daysOfWeek) {
+    const startDate = getNextDayOfWeek(day, 23, 59); // Revert at the end of the day
+    await agenda.schedule(startDate, 'revert price update', { sku, originalPrice });
+  }
+
+  console.log(`Weekly price revert scheduled for SKU: ${sku} on days: ${daysOfWeek.join(', ')}`);
+}); */
+
+// Define a recurring job with cron-like scheduling
+agenda.define('weekly price update', async (job) => {
+  const { sku, newPrice } = job.attrs.data;
+
+  try {
+    await updateProductPrice(sku, newPrice);
+    console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}`);
+  } catch (error) {
+    console.error(`Failed to apply weekly price update for SKU: ${sku}`, error);
+  }
+});
+
+// Define the revert job
+agenda.define('revert weekly price update', async (job) => {
+  const { sku, originalPrice } = job.attrs.data;
+
+  try {
+    await updateProductPrice(sku, originalPrice);
+    console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
+  } catch (error) {
+    console.error(`Failed to revert price for SKU: ${sku}`, error);
+  }
+});
+
+// Schedule the recurring jobs for specified days of the week
+async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek) {
+  for (const day of daysOfWeek) {
+    const updateCron = `0 0 * * ${day}`; // At midnight on the specified day
+    const revertCron = `59 23 * * ${day}`; // At 11:59 PM on the specified day
+
+    // Use a unique job name for each day to avoid overwriting
+    const updateJobName = `weekly price update ${sku} day ${day}`;
+    const revertJobName = `revert weekly price update ${sku} day ${day}`;
+
+    // Schedule the price update for each day in daysOfWeek
+    await agenda.every(updateCron, updateJobName, { sku, newPrice });
+
+    // Schedule the price revert for each day in daysOfWeek
+    await agenda.every(revertCron, revertJobName, { sku, originalPrice });
+  }
+}
 
 // Schedule job to update the price at the specified start date
 agenda.define('schedule price update', async (job) => {
@@ -214,7 +291,9 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
 });
 */
 app.post('/api/schedule/change', async (req, res) => {
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
+  // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek } = req.body;
+
 
   try {
     // Create a new schedule and save it to the database
@@ -234,23 +313,59 @@ app.post('/api/schedule/change', async (req, res) => {
       imageURL,
       startDate,
       endDate,
+      weekly,
+      daysOfWeek,
       timestamp: new Date(),
     });
     await historyLog.save();
+    // Handle weekly scheduling
+    if (weekly && daysOfWeek && daysOfWeek.length > 0) {
 
+      console.log(daysOfWeek);
+      await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek);
+    }
+
+    // Handle one-time scheduling
+    if (!weekly) {
+      await agenda.schedule(new Date(startDate), 'schedule price update', { sku, newPrice: price });
+
+      if (endDate) {
+        await agenda.schedule(new Date(endDate), 'revert price update', { sku, originalPrice: currentPrice });
+      }
+    }
+
+    // if (weekly && daysOfWeek && daysOfWeek.length > 0) {
+    //   await agenda.schedule(new Date(), 'weekly price update', {
+    //     sku,
+    //     newPrice: price,
+    //     daysOfWeek,
+    //   });
+
+    //   await agenda.schedule(new Date(), 'revert weekly price update', {
+    //     sku,
+    //     originalPrice: currentPrice,
+    //     daysOfWeek,
+    //   });
+    // } else {
+    //   await agenda.schedule(new Date(startDate), 'schedule price update', { sku, newPrice: price });
+
+    //   if (endDate) {
+    //     await agenda.schedule(new Date(endDate), 'revert price update', { sku, originalPrice: currentPrice });
+    //   }
+    // }
     // Schedule the price update job
-    await agenda.schedule(new Date(startDate), 'schedule price update', {
-      sku,
-      newPrice: price,
-    });
+    // await agenda.schedule(new Date(startDate), 'schedule price update', {
+    //   sku,
+    //   newPrice: price,
+    // });
 
     // Schedule the price revert job, if endDate is provided
-    if (endDate) {
-      await agenda.schedule(new Date(endDate), 'revert price update', {
-        sku,
-        originalPrice: currentPrice,
-      });
-    }
+    // if (endDate) {
+    //   await agenda.schedule(new Date(endDate), 'revert price update', {
+    //     sku,
+    //     originalPrice: currentPrice,
+    //   });
+    // }
 
     // Send the response after all operations are completed
     res.json({ success: true, message: 'Schedule saved and jobs queued successfully.', schedule: newSchedule });

@@ -656,10 +656,12 @@ app.post('/send-email', async (req, res) => {
 });
 
 
+app.get('/', (req, res) => {
+  res.send('Hello, World!');
+});
 
-
-const PORT = 22;
-app.listen(PORT, () => {
+const PORT = 3000;
+app.listen(PORT,'0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
 

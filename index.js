@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 
 const allowedOrigins = [
-  'https://main.d3iyq7ecbzumwp.amplifyapp.com/',
+  'https://main.d3iyq7ecbzumwp.amplifyapp.com',
   'http://localhost:5173',
   'https://changing-price.netlify.app',
   'https://price-changing.netlify.app',

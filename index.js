@@ -174,6 +174,48 @@ async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWee
   }
 }
 
+// Define a recurring job with cron-like scheduling for monthly updates
+agenda.define('monthly price update', async (job) => {
+  const { sku, newPrice } = job.attrs.data;
+
+  try {
+    await updateProductPrice(sku, newPrice);
+    console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}`);
+  } catch (error) {
+    console.error(`Failed to apply monthly price update for SKU: ${sku}`, error);
+  }
+});
+
+// Define the revert job for monthly updates
+agenda.define('revert monthly price update', async (job) => {
+  const { sku, originalPrice } = job.attrs.data;
+
+  try {
+    await updateProductPrice(sku, originalPrice);
+    console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
+  } catch (error) {
+    console.error(`Failed to revert price for SKU: ${sku}`, error);
+  }
+});
+
+// Schedule the recurring jobs for specified dates of the month
+async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth) {
+  for (const date of datesOfMonth) {
+    const updateCron = `0 0 ${date} * *`; // At midnight on the specified date of the month
+    const revertCron = `59 23 ${date} * *`; // At 11:59 PM on the specified date of the month
+
+    // Use a unique job name for each date to avoid overwriting
+    const updateJobName = `monthly price update ${sku} date ${date}`;
+    const revertJobName = `revert monthly price update ${sku} date ${date}`;
+
+    // Schedule the price update for each date in datesOfMonth
+    await agenda.every(updateCron, updateJobName, { sku, newPrice });
+
+    // Schedule the price revert for each date in datesOfMonth
+    await agenda.every(revertCron, revertJobName, { sku, originalPrice });
+  }
+}
+
 // Schedule job to update the price at the specified start date
 agenda.define('schedule price update', async (job) => {
   const { sku, newPrice } = job.attrs.data;
@@ -294,7 +336,7 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
 */
 app.post('/api/schedule/change', async (req, res) => {
   // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek } = req.body;
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek, monthly, datesOfMonth  } = req.body;
 
 
   try {
@@ -317,6 +359,8 @@ app.post('/api/schedule/change', async (req, res) => {
       endDate,
       weekly,
       daysOfWeek,
+      monthly,
+      datesOfMonth,
       timestamp: new Date(),
     });
     await historyLog.save();
@@ -327,8 +371,14 @@ app.post('/api/schedule/change', async (req, res) => {
       await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek);
     }
 
+    if (monthly && datesOfMonth && datesOfMonth.length > 0) {
+      console.log(datesOfMonth);
+      await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth);
+    }
+
+
     // Handle one-time scheduling
-    if (!weekly) {
+    if (!weekly && !monthly) {
       await agenda.schedule(new Date(startDate), 'schedule price update', { sku, newPrice: price });
 
       if (endDate) {

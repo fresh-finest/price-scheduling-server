@@ -11,8 +11,10 @@ const priceScheduleSchema = mongoose.Schema({
   firstChange: { type: Boolean, default: true },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
-  weekly: { type: Boolean, default: false }, // New field to indicate if this is a weekly schedule
-  daysOfWeek: [{ type: Number }], // New field to store the selected days of the week (0 = Sunday, 6 = Saturday)
+  weekly: { type: Boolean, default: false }, 
+  daysOfWeek: [{ type: Number }], 
+  monthly: {type: Boolean,default: false},
+  datesOfMonth: [{type:Number}],
   status: { type: String, enum: ['created', 'updated', 'deleted'], default: 'created' }, // Field for status
 }, { timestamps: true });
 

@@ -17,6 +17,8 @@ const historySchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   weekly: { type: Boolean, default: false }, 
   daysOfWeek: [{ type: Number }], 
+  monthly: {type: Boolean,default: false},
+  datesOfMonth: [{type:Number}]
 }, { timestamps: true });
 
 const History = mongoose.model('History', historySchema);

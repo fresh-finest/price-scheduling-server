@@ -431,7 +431,7 @@ app.post('/api/schedule/change', async (req, res) => {
 
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL } = req.body;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly, daysOfWeek, monthly, datesOfMonth  } = req.body;
 
   try {
     const schedule = await PriceSchedule.findById(id);
@@ -450,6 +450,10 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       asin: schedule.asin,
       sku: schedule.sku,
       imageURL: schedule.imageURL,
+      weekly: schedule.weekly,
+      daysOfWeek:schedule.daysOfWeek,
+      monthly:schedule.monthly,
+      datesOfMonth:schedule.datesOfMonth
     };
 
     // Update the schedule with new details
@@ -462,6 +466,10 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     schedule.asin = asin || schedule.asin; // Ensure ASIN is preserved if not updated
     schedule.sku = sku || schedule.sku; // Ensure SKU is preserved if not updated
     schedule.imageURL = imageURL || schedule.imageURL; // Ensure imageURL is preserved if not updated
+    schedule.weekly = weekly || false;
+    schedule.daysOfWeek = daysOfWeek || [];
+    schedule.monthly = monthly || false;
+    schedule.datesOfMonth = datesOfMonth || [];
     await schedule.save();
 
     // Log the update in history with previous and updated states
@@ -479,6 +487,11 @@ app.put('/api/schedule/change/:id', async (req, res) => {
         asin: schedule.asin,
         sku: schedule.sku,
         imageURL: schedule.imageURL,
+        imageURL: schedule.imageURL,
+        weekly: schedule.weekly,
+        daysOfWeek: schedule.daysOfWeek,
+        monthly: schedule.monthly,
+        datesOfMonth: schedule.datesOfMonth,
       },
       userName, // Track the user who made the update
       timestamp: new Date(),
@@ -488,7 +501,34 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     // Cancel existing jobs
     await agenda.cancel({ 'data.sku': schedule.sku });
 
+    // Re schedule
+
+    if(weekly && daysOfWeek.length > 0){
+      console.log(daysOfWeek);
+      await scheduleWeeklyPriceChange(sku,price,currentPrice,daysOfWeek);
+    }
+    if(monthly && datesOfMonth.length > 0){
+      console.log(datesOfMonth);
+      await scheduleMonthlyPriceChange(sku,price,currentPrice,datesOfMonth);
+
+    }
+
+    if(!weekly && !monthly){
+      await agenda.schedule(new Date(startDate), 'schedule price update', {
+        sku: schedule.sku,
+        newPrice: price,
+      });
+
+      if (endDate) {
+        await agenda.schedule(new Date(endDate), 'revert price update', {
+          sku: schedule.sku,
+          originalPrice: currentPrice,
+        });
+    }
+  }
+
     // Schedule new jobs
+    /*
     await agenda.schedule(new Date(startDate), 'schedule price update', {
       sku: schedule.sku,
       newPrice: price,
@@ -500,7 +540,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
         originalPrice: currentPrice,
       });
     }
-
+*/
     res.json({ success: true, message: 'Schedule updated successfully.' });
   } catch (error) {
     console.error('Error updating schedule:', error);

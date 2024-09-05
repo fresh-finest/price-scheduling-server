@@ -15,6 +15,8 @@ const priceScheduleSchema = mongoose.Schema({
   daysOfWeek: [{ type: Number }], 
   monthly: {type: Boolean,default: false},
   datesOfMonth: [{type:Number}],
+  startTime:{type:String},
+  endTime:{type:String},
   status: { type: String, enum: ['created', 'updated', 'deleted'], default: 'created' }, // Field for status
 }, { timestamps: true });
 

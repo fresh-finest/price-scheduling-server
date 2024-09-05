@@ -99,40 +99,6 @@ const updateProductPrice = async (sku, value) => {
   }
 };
 
-// Function to calculate the next occurrence of a day
-/*
-const getNextDayOfWeek = (dayOfWeek, hour = 0, minute = 0) => {
-  const now = dayjs();
-  let nextDay = now.day(dayOfWeek).hour(hour).minute(minute).second(0);
-
-  if (nextDay.isBefore(now)) {
-    nextDay = nextDay.add(1, 'week');
-  }
-
-  return nextDay.toDate();
-};
-
-agenda.define('weekly price update', async (job) => {
-  const { sku, newPrice, daysOfWeek } = job.attrs.data;
-
-  for (const day of daysOfWeek) {
-    const startDate = getNextDayOfWeek(day);
-    await agenda.schedule(startDate, 'schedule price update', { sku, newPrice });
-  }
-
-  console.log(`Weekly price update scheduled for SKU: ${sku} on days: ${daysOfWeek.join(', ')}`);
-});
-
-agenda.define('revert weekly price update', async (job) => {
-  const { sku, originalPrice, daysOfWeek } = job.attrs.data;
-
-  for (const day of daysOfWeek) {
-    const startDate = getNextDayOfWeek(day, 23, 59); // Revert at the end of the day
-    await agenda.schedule(startDate, 'revert price update', { sku, originalPrice });
-  }
-
-  console.log(`Weekly price revert scheduled for SKU: ${sku} on days: ${daysOfWeek.join(', ')}`);
-}); */
 
 // Define a recurring job with cron-like scheduling
 agenda.define('weekly price update', async (job) => {
@@ -159,10 +125,15 @@ agenda.define('revert weekly price update', async (job) => {
 });
 
 // Schedule the recurring jobs for specified days of the week
-async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek) {
+async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime,endTime) {
   for (const day of daysOfWeek) {
-    const updateCron = `0 0 * * ${day}`; // At midnight on the specified day
-    const revertCron = `59 23 * * ${day}`; // At 11:59 PM on the specified day
+    // const updateCron = `0 0 * * ${day}`; 
+    // const revertCron = `59 23 * * ${day}`;
+    const [startHour, startMinute] = startTime.split(':');
+    const [endHour, endMinute] = endTime.split(':');
+
+    const updateCron = `${startMinute} ${startHour} ${day} * *`; // At specified time on the given date
+    const revertCron = `${endMinute} ${endHour} ${day} * *`; // At specified end time on the given date
 
     // Use a unique job name for each day to avoid overwriting
     const updateJobName = `weekly price update ${sku} day ${day}`;
@@ -201,10 +172,16 @@ agenda.define('revert monthly price update', async (job) => {
 });
 
 // Schedule the recurring jobs for specified dates of the month
-async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth) {
+async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth,startTime,endTime) {
   for (const date of datesOfMonth) {
-    const updateCron = `0 0 ${date} * *`; // At midnight on the specified date of the month
-    const revertCron = `59 23 ${date} * *`; // At 11:59 PM on the specified date of the month
+    // const updateCron = `0 0 ${date} * *`; 
+    // const revertCron = `59 23 ${date} * *`; 
+    const [startHour, startMinute] = startTime.split(':');
+    const [endHour, endMinute] = endTime.split(':');
+
+    const updateCron = `${startMinute} ${startHour} ${date} * *`; // At specified time on the given date
+    const revertCron = `${endMinute} ${endHour} ${date} * *`; // At specified end time on the given date
+
 
     // Use a unique job name for each date to avoid overwriting
     const updateJobName = `monthly price update ${sku} date ${date}`;
@@ -338,7 +315,7 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
 */
 app.post('/api/schedule/change', async (req, res) => {
   // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek, monthly, datesOfMonth  } = req.body;
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek, monthly, datesOfMonth, startTime,endTime } = req.body;
 
 
   try {
@@ -363,63 +340,34 @@ app.post('/api/schedule/change', async (req, res) => {
       daysOfWeek,
       monthly,
       datesOfMonth,
+      startTime,
+      endTime,
       timestamp: new Date(),
     });
     await historyLog.save();
     // Handle weekly scheduling
     if (weekly && daysOfWeek && daysOfWeek.length > 0) {
 
-      console.log(daysOfWeek);
-      await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek);
+      console.log(daysOfWeek+startTime+endTime);
+      await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek,startTime,endTime);
     }
 
     if (monthly && datesOfMonth && datesOfMonth.length > 0) {
-      console.log(datesOfMonth);
-      await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth);
+      console.log(datesOfMonth+startTime+endTime);
+      await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth,startTime,endTime);
     }
 
 
     // Handle one-time scheduling
     if (!weekly && !monthly) {
-      await agenda.schedule(new Date(startDate), 'schedule price update', { sku, newPrice: price });
+      await agenda.schedule(new Date(startDate), 'schedule price update', {asin, sku, newPrice: price });
 
       if (endDate) {
-        await agenda.schedule(new Date(endDate), 'revert price update', { sku, originalPrice: currentPrice });
+        await agenda.schedule(new Date(endDate), 'revert price update', {asin, sku, originalPrice: currentPrice });
       }
     }
 
-    // if (weekly && daysOfWeek && daysOfWeek.length > 0) {
-    //   await agenda.schedule(new Date(), 'weekly price update', {
-    //     sku,
-    //     newPrice: price,
-    //     daysOfWeek,
-    //   });
-
-    //   await agenda.schedule(new Date(), 'revert weekly price update', {
-    //     sku,
-    //     originalPrice: currentPrice,
-    //     daysOfWeek,
-    //   });
-    // } else {
-    //   await agenda.schedule(new Date(startDate), 'schedule price update', { sku, newPrice: price });
-
-    //   if (endDate) {
-    //     await agenda.schedule(new Date(endDate), 'revert price update', { sku, originalPrice: currentPrice });
-    //   }
-    // }
-    // Schedule the price update job
-    // await agenda.schedule(new Date(startDate), 'schedule price update', {
-    //   sku,
-    //   newPrice: price,
-    // });
-
-    // Schedule the price revert job, if endDate is provided
-    // if (endDate) {
-    //   await agenda.schedule(new Date(endDate), 'revert price update', {
-    //     sku,
-    //     originalPrice: currentPrice,
-    //   });
-    // }
+   
 
     // Send the response after all operations are completed
     res.json({ success: true, message: 'Schedule saved and jobs queued successfully.', schedule: newSchedule });
@@ -431,7 +379,7 @@ app.post('/api/schedule/change', async (req, res) => {
 
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly, daysOfWeek, monthly, datesOfMonth  } = req.body;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly, daysOfWeek, monthly, datesOfMonth,startTime,endTime } = req.body;
 
   try {
     const schedule = await PriceSchedule.findById(id);
@@ -470,6 +418,8 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     schedule.daysOfWeek = daysOfWeek || [];
     schedule.monthly = monthly || false;
     schedule.datesOfMonth = datesOfMonth || [];
+    schedule.startTime = startTime;
+    schedule.endTime = endTime;
     await schedule.save();
 
     // Log the update in history with previous and updated states
@@ -492,6 +442,8 @@ app.put('/api/schedule/change/:id', async (req, res) => {
         daysOfWeek: schedule.daysOfWeek,
         monthly: schedule.monthly,
         datesOfMonth: schedule.datesOfMonth,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
       },
       userName, // Track the user who made the update
       timestamp: new Date(),
@@ -504,12 +456,12 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     // Re schedule
 
     if(weekly && daysOfWeek.length > 0){
-      console.log(daysOfWeek);
-      await scheduleWeeklyPriceChange(sku,price,currentPrice,daysOfWeek);
+      console.log(daysOfWeek+startTime+endTime);
+      await scheduleWeeklyPriceChange(sku,price,currentPrice,daysOfWeek,startTime,endTime);
     }
     if(monthly && datesOfMonth.length > 0){
-      console.log(datesOfMonth);
-      await scheduleMonthlyPriceChange(sku,price,currentPrice,datesOfMonth);
+      console.log(datesOfMonth+startTime+endTime);
+      await scheduleMonthlyPriceChange(sku,price,currentPrice,datesOfMonth,startTime,endTime);
 
     }
 
@@ -527,20 +479,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     }
   }
 
-    // Schedule new jobs
-    /*
-    await agenda.schedule(new Date(startDate), 'schedule price update', {
-      sku: schedule.sku,
-      newPrice: price,
-    });
-
-    if (endDate) {
-      await agenda.schedule(new Date(endDate), 'revert price update', {
-        sku: schedule.sku,
-        originalPrice: currentPrice,
-      });
-    }
-*/
+    
     res.json({ success: true, message: 'Schedule updated successfully.' });
   } catch (error) {
     console.error('Error updating schedule:', error);
@@ -573,6 +512,12 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
       imageURL: schedule.imageURL,
       startDate: schedule.startDate,
       endDate: schedule.endDate,
+      weekly: schedule.weekly,
+      daysOfWeek: schedule.daysOfWeek,
+      monthly: schedule.monthly,
+      datesOfMonth: schedule.datesOfMonth,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
       previousState: { ...schedule.toObject() },
       timestamp: new Date(),
     });
@@ -722,7 +667,7 @@ app.get('/api/history/', async (req, res) => {
 
 app.get('/fetch-all-listings', async (req, res) => {
   try {
-    const listings = await Listing.find(); // Example limit, adjust as needed
+    const listings = await Inventory.find(); // Example limit, adjust as needed
 
     res.json({ listings });
   } catch (error) {
@@ -730,7 +675,17 @@ app.get('/fetch-all-listings', async (req, res) => {
   }
 });
 
+app.get('/api/jobs/:asin',async(req,res)=>{
+  const {asin}= req.params;
+  try {
+    const jobs = await agenda._collection.find({ 'data.asin': asin }).toArray();
 
+    res.json({ success: true, jobs });
+  } catch (error) {
+    console.error('Error fetching jobs by asin:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
+  }
+})
 
 
 app.post('/send-email', async (req, res) => {
@@ -763,7 +718,8 @@ const userRoute = require("./src/route/user");
 const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
-const Listing = require('./src/model/Listing');
+// const Listing = require('./src/model/Listing');
+const Inventory = require("./src/model/Inventory");
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);

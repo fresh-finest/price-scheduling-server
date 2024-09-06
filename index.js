@@ -348,12 +348,12 @@ app.post('/api/schedule/change', async (req, res) => {
     // Handle weekly scheduling
     if (weekly && daysOfWeek && daysOfWeek.length > 0) {
 
-      console.log(daysOfWeek+startTime+endTime);
+      console.log(sku+daysOfWeek+startTime+endTime);
       await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek,startTime,endTime);
     }
 
     if (monthly && datesOfMonth && datesOfMonth.length > 0) {
-      console.log(datesOfMonth+startTime+endTime);
+      console.log(sku+datesOfMonth+startTime+endTime);
       await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth,startTime,endTime);
     }
 
@@ -707,7 +707,7 @@ app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
-const PORT = 3000;
+const PORT = 80;
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });

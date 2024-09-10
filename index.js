@@ -847,7 +847,7 @@ app.post('/send-email', async (req, res) => {
 
 
 app.get('/', (req, res) => {
-  res.send('Hello, World!');
+  res.send('Server is running!');
 });
 
 const PORT = 3000;

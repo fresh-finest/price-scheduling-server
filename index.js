@@ -821,8 +821,9 @@ app.get('/fetch-and-merge-images', async (req, res) => {
 });
 // fetch image
 app.get('/image/:sku', async (req, res) => {
-  const { sku } = req.params;
-
+  // const { sku } = req.params;
+  const sku = decodeURIComponent(req.params.sku);
+  console.log("sku:"+sku);
   try {
     const listingData = await getListingsItem(sku);
     res.json(listingData);
@@ -944,7 +945,7 @@ const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
 // const Listing = require('./src/model/Listing');
 const Product = require("./src/model/Product");
-// const Inventory = require("./src/model/Inventory");
+const Inventory = require("./src/model/Inventory");
 const MergedProduct = require('./src/model/MergedImage');
 
 const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');

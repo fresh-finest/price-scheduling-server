@@ -5,8 +5,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Function to fetch image by SKU from Amazon API
 const fetchImageBySKU = async (sku) => {
+    const encodedSku = encodeURIComponent(sku);
   try {
-    const response = await axios.get(`https://api.priceobo.com/image/${sku}`); // Fetching the image by SKU
+    const response = await axios.get(`https://api.priceobo.com/image/${encodedSku}`);
     const mainImageUrl = response.data?.summaries[0]?.mainImage?.link || null;
     return mainImageUrl; // Return the image URL if found
   } catch (error) {

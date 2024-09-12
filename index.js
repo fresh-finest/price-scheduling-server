@@ -9,14 +9,8 @@ const moment = require('moment-timezone');
 const cron = require('node-cron');
 require('dotenv').config();
 
-const Product = require("./src/model/Product");
-const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
-const { getListingsItem } = require('./src/service/ImageService');
-const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
-const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 
-const Inventory = require("./src/model/Inventory");
-const MergedProduct = require('./src/model/MergedImage');
+
 
 const app = express();
 app.use(express.json());
@@ -948,6 +942,14 @@ const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
 // const Listing = require('./src/model/Listing');
+const Product = require("./src/model/Product");
+const Inventory = require("./src/model/Inventory");
+const MergedProduct = require('./src/model/MergedImage');
+
+const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
+const { getListingsItem } = require('./src/service/ImageService');
+const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
+const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 
 
 app.use("/api/schedule", scheduleRoute);

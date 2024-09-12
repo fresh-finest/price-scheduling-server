@@ -17,6 +17,8 @@ app.use(express.json());
 
 app.use(cors());
 
+app.options('*', cors()); // Enable pre-flight for all routes
+
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db";
 ;
 

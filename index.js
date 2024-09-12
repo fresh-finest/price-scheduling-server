@@ -741,7 +741,6 @@ const fetchProductDetails = async (asin) => {
   return response.data;
 };
 
-/*
 
 // Schedule the task to run every day at 12:00 PM Bangladesh time
 cron.schedule('0 12 * * *', async () => {
@@ -832,7 +831,7 @@ app.get('/image/:sku', async (req, res) => {
   }
 });
 
-*/
+
 // fetch product using asin
 app.get('/product/:asin', async (req, res) => {
   const { asin } = req.params;
@@ -948,10 +947,10 @@ const Product = require("./src/model/Product");
 // const Inventory = require("./src/model/Inventory");
 const MergedProduct = require('./src/model/MergedImage');
 
-// const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
-// const { getListingsItem } = require('./src/service/ImageService');
-// const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
-// const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
+const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
+const { getListingsItem } = require('./src/service/ImageService');
+const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
+const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 
 
 app.use("/api/schedule", scheduleRoute);

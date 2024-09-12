@@ -14,13 +14,10 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-/*
+
 const allowedOrigins = [
-  'https://main.d3iyq7ecbzumwp.amplifyapp.com',
+  'https://app.priceobo.com',
   'http://localhost:5173',
-  'https://changing-price.netlify.app',
-  'https://price-changing.netlify.app',
-  'https://dps-fresh-finest.netlify.app',
 ];
 
 const corsOptions = {
@@ -37,8 +34,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-*/
-app.use(cors());
+
+// app.use(cors());
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db";
 ;

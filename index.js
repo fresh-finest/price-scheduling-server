@@ -5,6 +5,11 @@ const colors = require("colors");
 const dayjs = require('dayjs'); 
 const mongoose = require('mongoose');
 const Agenda = require('agenda');
+const moment = require('moment-timezone');
+const cron = require('node-cron');
+const Inventory = require("./src/model/Inventory");
+const MergedProduct = require('./src/model/MergedImage');
+
 require('dotenv').config();
 
 const app = express();
@@ -191,6 +196,8 @@ async function defineWeeklyJob(sku, day) {
 
 // Schedule the jobs
 async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime, endTime) {
+  
+ 
   for (const day of daysOfWeek) {
     const [startHour, startMinute] = startTime.split(':');
     const [endHour, endMinute] = endTime.split(':');
@@ -204,10 +211,14 @@ async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWee
 
     // Define jobs before scheduling them
     await defineWeeklyJob(sku, day);
-
+    
+    // const updateTimeUTC = moment.tz(`${startHour}:${startMinute}`, "HH:mm", "UTC").toDate();
+        // const revertTimeUTC = moment.tz(`${endHour}:${endMinute}`, "HH:mm", "UTC");
     // Schedule the jobs
     await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
     console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTime}`);
+   
+
 
     await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
     console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
@@ -259,10 +270,10 @@ async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfM
     await defineMonthlyJob(sku, date);
 
     // Schedule the jobs
-    await agenda.every(updateCron, updateJobName, { sku, newPrice, date });
+    await agenda.every(updateCron, updateJobName, { sku, newPrice, date },{ timezone: 'UTC' });
     console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startTime}`);
 
-    await agenda.every(revertCron, revertJobName, { sku, originalPrice, date });
+    await agenda.every(revertCron, revertJobName, { sku, originalPrice, date },{ timezone: 'UTC' });
     console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endTime}`);
   }
 }
@@ -751,6 +762,96 @@ const fetchProductDetails = async (asin) => {
   return response.data;
 };
 
+
+
+// Schedule the task to run every day at 12:00 PM Bangladesh time
+cron.schedule('0 12 * * *', async () => {
+  const bangladeshTime = moment.tz("Asia/Dhaka").format();
+  console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
+  await fetchAndDownloadDataOnce();
+}, {
+  timezone: "Asia/Dhaka"
+});
+
+// Schedule the task to run at 1:00 PM Bangladesh time every day
+cron.schedule('0 13 * * *', async () => {
+  try {
+    console.log('Scheduled task started at 1:00 PM Bangladesh time...');
+
+    // Step 1: Fetch all listings from MongoDB
+    const listings = await Inventory.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+
+    // Step 2: Merge listings with image URLs and save to the MergedImage collection
+    const result = await mergeAndSaveImageData(listings);
+    console.log(result);
+  } catch (error) {
+    console.error('Error during scheduled task:', error);
+  }
+}, {
+  timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh time
+});
+
+
+// Schedule a cron job to run the fetch and merge task every day at 3:00 PM Bangladesh time
+cron.schedule('0 15 * * *', async () => {
+  console.log('Scheduled task started at 3:00 PM Bangladesh time...');
+  
+  try {
+    const listings = await MergedProduct.find();
+    const inventorySummaries = await fetchInventorySummaries();
+    await mergeAndSaveFbmData(listings, inventorySummaries);
+    console.log('Data fetching, merging, and saving completed.');
+  } catch (error) {
+    console.error('Error during scheduled task:', error);
+  }
+}, {
+  timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
+});
+
+app.get('/fetch-and-merge', async (req, res) => {
+  try {
+    // Step 1: Fetch all listings from MongoDB
+    const listings = await MergedProduct.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+
+    // Step 2: Fetch inventory summaries from the Amazon API
+    const inventorySummaries = await fetchInventorySummaries();
+    console.log(`Fetched ${inventorySummaries.length} inventory summaries.`);
+
+    // Step 3: Merge listings with inventory summaries based on asin1 and save to the Product collection
+    const mergedData = await mergeAndSaveFbmData(listings, inventorySummaries);
+
+    // Step 4: Return the merged data as a response
+    res.json(mergedData);
+  } catch (error) {
+    console.error('Error during data processing:', error);
+    res.status(500).json({ error: 'Failed to fetch, merge, and store data' });
+  }
+});
+
+app.get('/fetch-and-merge-images', async (req, res) => {
+  try {
+    const listings = await Inventory.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+    const mergedData = await mergeAndSaveImageData(listings);
+    res.json({ message: 'Data merged and saved successfully.', result: mergedData });
+  } catch (error) {
+    console.error('Error during manual data processing:', error);
+    res.status(500).json({ error: 'Failed to fetch, merge, and save data' });
+  }
+});
+// fetch image
+app.get('/image/:sku', async (req, res) => {
+  const { sku } = req.params;
+
+  try {
+    const listingData = await getListingsItem(sku);
+    res.json(listingData);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch product price' });
+  }
+});
 // fetch product using asin
 app.get('/product/:asin', async (req, res) => {
   const { asin } = req.params;
@@ -810,8 +911,8 @@ app.get('/api/history/', async (req, res) => {
 
 app.get('/fetch-all-listings', async (req, res) => {
   try {
-    const listings = await Inventory.find(); // Example limit, adjust as needed
-
+    // const listings = await Inventory.find(); 
+    const listings = await Product.find();
     res.json({ listings });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch all listings' });
@@ -862,7 +963,11 @@ const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
 // const Listing = require('./src/model/Listing');
-const Inventory = require("./src/model/Inventory");
+const Product = require("./src/model/Product");
+const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
+const { getListingsItem } = require('./src/service/ImageService');
+const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
+const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);

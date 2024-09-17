@@ -20,7 +20,7 @@ const fetchImageBySKU = async (sku) => {
 const mergeAndSaveImageData = async (listings) => {
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i];
-
+    console.log(i);
     if (!listing.listingId) {
       console.warn(`Skipping listing with SKU ${listing.sellerSku} due to missing listingId.`);
       continue;
@@ -49,17 +49,17 @@ const mergeAndSaveImageData = async (listings) => {
 
         // Upsert the data (insert if doesn't exist, update if it does)
         await MergedImage.findOneAndUpdate(
-          { asin1: listing.asin1 },
+          { asin1: listing.asin1, sellerSku: listing.sellerSku},
           mergedData,
           { new: true, upsert: true } // Create a new document if none exists
         );
 
-        console.log(`Merged and saved data for ASIN: ${listing.asin1}`);
+        console.log(`Merged and saved data for SKU: ${listing.sellerSku}`);
       } else {
-        console.warn(`Skipping saving data for ASIN ${listing.asin1} as image fetch failed.`);
+        console.warn(`Skipping saving data for SKU ${listing.sellerSku} as image fetch failed.`);
       }
     } catch (error) {
-      console.error(`Error fetching image for ASIN ${listing.asin1}:`, error.message);
+      console.error(`Error fetching image for ASIN ${listing.sellerSku}:`, error.message);
     }
   }
 

@@ -950,7 +950,7 @@ cron.schedule('0 13 * * *', async () => {
 
 
 // Schedule a cron job to run the fetch and merge task every day at 3:00 PM Bangladesh time
-cron.schedule('0 15 * * *', async () => {
+cron.schedule('0 16 * * *', async () => {
   console.log('Scheduled task started at 3:00 PM Bangladesh time...');
   
   try {
@@ -1071,7 +1071,7 @@ app.get('/api/history/', async (req, res) => {
 app.get('/fetch-all-listings', async (req, res) => {
   try {
     // const listings = await Inventory.find(); 
-    const listings = await Product.find();
+    const listings = await Stock.find();
     res.json({ listings });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch all listings' });
@@ -1130,6 +1130,7 @@ const { fetchAndDownloadDataOnce } = require('./src/service/inventoryService');
 const { getListingsItem } = require('./src/service/ImageService');
 const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
 const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
+const Stock = require('./src/model/Stock');
 
 
 app.use("/api/schedule", scheduleRoute);

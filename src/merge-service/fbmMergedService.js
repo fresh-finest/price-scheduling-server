@@ -1,5 +1,6 @@
 const axios = require('axios');
-const Product = require('../model/Product');
+// const Product = require('../model/Product');
+const Stock = require('../model/Stock');
 
 
 
@@ -67,9 +68,10 @@ const fetchInventorySummaries = async () => {
   
   // Function to merge listing data with inventory summaries and store in Product collection
   const mergeAndSaveFbmData = async (listings, inventorySummaries) => {
+    let i=0;
     return Promise.all(
       listings.map(async (listing) => {
-        const inventory = inventorySummaries.find(summary => summary.asin === listing.asin1);
+        const inventory = inventorySummaries.find(summary => summary.sellerSku === listing.sellerSku);
   
         const mergedData = {
           ...listing._doc,
@@ -81,7 +83,7 @@ const fetchInventorySummaries = async () => {
   
         try {
           // Check if a product with this asin1 already exists
-          const existingProduct = await Product.findOne({ asin1: listing.asin1 });
+          const existingProduct = await Stock.findOne({ sellerSku: listing.sellerSku });
   
           // If product exists, check if there are changes
           if (existingProduct) {
@@ -97,8 +99,8 @@ const fetchInventorySummaries = async () => {
           }
   
           // Only update if there's a difference, or if no existing product is found
-          const updatedProduct = await Product.findOneAndUpdate(
-            { asin1: listing.asin1 }, // Find by asin1 to prevent duplicates
+          const updatedProduct = await Stock.findOneAndUpdate(
+            { asin1: listing.asin1, sellerSku: listing.sellerSku }, // Find by asin1 to prevent duplicates
             updateData,  // Only update fields other than _id and __v
             { new: true, upsert: true } // Create a new document if none exists
           );

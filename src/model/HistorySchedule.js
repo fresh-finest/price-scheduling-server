@@ -21,15 +21,17 @@ const historySchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   weekly: { type: Boolean, default: false }, 
   // daysOfWeek: [{ type: Number }], 
-  weeklySlots:{
+  weeklyTimeSlots:{
     type: Map,
     of:[timeSlotSchema],
+    default:{}
   },
   monthly: {type: Boolean,default: false},
   // datesOfMonth: [{type:Number}],
-  monthlySlots:{
+  monthlyTimeSlots:{
     type:Map,
-    of:[timeSlotSchema]
+    of:[timeSlotSchema],
+    default:{}
   },
   // startTime:{type:String},
   // endTime:{type:String}

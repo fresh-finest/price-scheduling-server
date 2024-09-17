@@ -1,4 +1,8 @@
 const mongoose = require('mongoose');
+const timeSlotSchema = mongoose.Schema({
+  startTime: {type: String},
+  endTime:{type:String}
+},{_id:false});
 
 const historySchema = new mongoose.Schema({
   scheduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceSchedule' },
@@ -16,11 +20,19 @@ const historySchema = new mongoose.Schema({
   endDate: { type: Date },
   timestamp: { type: Date, default: Date.now },
   weekly: { type: Boolean, default: false }, 
-  daysOfWeek: [{ type: Number }], 
+  // daysOfWeek: [{ type: Number }], 
+  weeklySlots:{
+    type: Map,
+    of:[timeSlotSchema],
+  },
   monthly: {type: Boolean,default: false},
-  datesOfMonth: [{type:Number}],
-  startTime:{type:String},
-  endTime:{type:String}
+  // datesOfMonth: [{type:Number}],
+  monthlySlots:{
+    type:Map,
+    of:[timeSlotSchema]
+  },
+  // startTime:{type:String},
+  // endTime:{type:String}
 }, { timestamps: true });
 
 const History = mongoose.model('History', historySchema);

@@ -259,7 +259,7 @@ async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfM
 }
 
 */
-
+/*
 async function defineWeeklyJob(sku, day) {
   const jobName = `weekly_price_update_${sku}_day_${day}`; // Ensure unique job name
   
@@ -284,6 +284,8 @@ async function defineWeeklyJob(sku, day) {
       console.error(`Failed to revert price for SKU: ${sku}, day: ${day}`, error);
     }
   });
+
+
 }
 async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime, endTime) {
   for (const day of daysOfWeek) {
@@ -308,6 +310,114 @@ async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWee
     console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
   }
 }
+*/
+async function defineWeeklyJob(sku, day, timeSlot) {
+  console.log("timeSlot: "+timeSlot.startTime);
+
+  const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
+  const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
+  agenda.define(jobName, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${day}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+
+  agenda.define(`revert_weekly_${revertJobName}`, async (job) => {
+    const { sku, originalPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, originalPrice);
+      console.log(`Price reverted for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+}
+
+const scheduleWeeklyPriceChange = async (sku, newPrice, originalPrice, weeklyTimeSlots) => {
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const { startTime, endTime } of timeSlots) {
+      console.log(day+startTime);
+      const [startHour, startMinute] = startTime.split(':');
+      const [endHour, endMinute] = endTime.split(':');
+
+      const updateCron = `${startMinute} ${startHour} * * ${day}`;
+      const revertCron = `${endMinute} ${endHour} * * ${day}`;
+
+      // Ensure unique job names for each time slot
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}${startMinute}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}${endMinute}`;
+
+      // Define and schedule the update and revert jobs
+      await defineWeeklyJob(sku, day,timeSlots);
+
+      await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTime}`);
+
+      await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
+    }
+  }
+};
+
+async function defineMonthlyJob(sku, date, timeSlot) {
+  const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; // Ensure unique job name for each time slot
+  const revertJobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.endTime}`;
+
+  agenda.define(jobName, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}, date: ${date}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to apply monthly price update for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+
+  agenda.define(`revert_monthly_${revertJobName}`, async (job) => {
+    const { sku, originalPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, originalPrice);
+      console.log(`Price reverted for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+}
+
+const scheduleMonthlyPriceChange = async (sku, newPrice, originalPrice, monthlySlots) => {
+  for (const [date, timeSlots] of Object.entries(monthlySlots)) {
+    for (const { startTime, endTime } of timeSlots) {
+      const [startHour, startMinute] = startTime.split(':');
+      const [endHour, endMinute] = endTime.split(':');
+
+      const updateCron = `${startMinute} ${startHour} ${date} * *`;
+      const revertCron = `${endMinute} ${endHour} ${date} * *`;
+
+      // Ensure unique job names for each time slot
+      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHour}${startMinute}`;
+      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHour}${endMinute}`;
+
+      // Define and schedule the update and revert jobs
+      await defineMonthlyJob(sku, date, timeSlots);
+
+      await agenda.every(updateCron, updateJobName, { sku, newPrice, date });
+      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startTime}`);
+
+      await agenda.every(revertCron, revertJobName, { sku, originalPrice, date });
+      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endTime}`);
+    }
+  }
+};
+
+/*
 async function defineMonthlyJob(sku, date) {
   const jobName = `monthly_price_update_${sku}_date_${date}`; // Ensure unique job name
   
@@ -346,6 +456,7 @@ async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfM
     const updateJobName = `monthly_price_update_${sku}_date_${date}`;
     const revertJobName = `revert_monthly_price_update_${sku}_date_${date}`;
 
+
     // Define jobs before scheduling them
     await defineMonthlyJob(sku, date);
 
@@ -358,72 +469,6 @@ async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfM
   }
 }
 
-
-// Define the job for updating the price on a monthly schedule
-/*
-agenda.define('monthly price update', async (job) => {
-  const { sku, newPrice } = job.attrs.data;
-  console.log("monthly: "+sku+newPrice)
-  try {
-    await updateProductPrice(sku, newPrice);
-    console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}`);
-  } catch (error) {
-    console.error(`Failed to apply monthly price update for SKU: ${sku}`, error);
-  }
-});
-
-// Define the job for reverting the price on a monthly schedule
-agenda.define('revert monthly price', async (job) => {
-  const { sku, originalPrice } = job.attrs.data;
-
-  try {
-    await updateProductPrice(sku, originalPrice);
-    console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
-  } catch (error) {
-    console.error(`Failed to revert price for SKU: ${sku}`, error);
-  }
-});
-
-// Function to schedule monthly price updates and reverts on specified dates
-async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth, startTime, endTime) {
-  try {
-    for (const date of datesOfMonth) {
-      const [startHour, startMinute] = startTime.split(':');
-      const [endHour, endMinute] = endTime.split(':');
-
-      // Cron expressions for scheduling the jobs
-      const updateCron = `${startMinute} ${startHour} ${date} * *`;  // Example: "15 9 5 * *" -> 9:15 AM on the 5th of each month
-      const revertCron = `${endMinute} ${endHour} ${date} * *`;      // Example: "30 18 5 * *" -> 6:30 PM on the 5th of each month
-
-      // Dynamic job names to ensure uniqueness for each SKU and date
-      // const updateJobName = `monthly-price-update-${sku}-date-${date}`;
-      // const revertJobName = `revert-monthly-price-update-${sku}-date-${date}`;
-
-      // Check for existing update jobs before scheduling
-      await agenda.every(updateCron, 'monthly price update', { sku, newPrice });
-      await agenda.every(revertCron,'revert monthly price', { sku, originalPrice });
-      /*
-      const existingUpdateJob = await agenda.jobs({ name: 'monthly price update' });
-      if (!existingUpdateJob.length) {
-        await agenda.every(updateCron, 'monthly price update', { sku, newPrice });
-        console.log(`Scheduled price update for SKU: ${sku} on the ${date} at ${startHour}:${startMinute}`);
-      } else {
-        console.log(`Update job already exists for SKU: ${sku} on the ${date}`);
-      }
-
-      // Check for existing revert jobs before scheduling
-      const existingRevertJob = await agenda.jobs({ name: 'revert monthly price'});
-      if (!existingRevertJob.length) {
-        await agenda.every(revertCron,'revert monthly price', { sku, originalPrice });
-        console.log(`Scheduled price revert for SKU: ${sku} on the ${date} at ${endHour}:${endMinute}`);
-      } else {
-        console.log(`Revert job already exists for SKU: ${sku} on the ${date}`);
-      }
-    }
-  } catch (error) {
-    console.error('Error scheduling monthly price changes:', error);
-  }
-}
 */
 
 // Schedule job to update the price at the specified start date
@@ -546,13 +591,34 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
 */
 app.post('/api/schedule/change', async (req, res) => {
   // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, daysOfWeek, monthly, datesOfMonth, startTime,endTime } = req.body;
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
 
+console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
   try {
+   
     // Create a new schedule and save it to the database
-    const newSchedule = new PriceSchedule(req.body);
+    // const newSchedule = new PriceSchedule(req.body);
+    const newSchedule = new PriceSchedule({
+      userName,
+      asin,
+      sku,
+      title,
+      price,
+      currentPrice,
+      imageURL,
+      startDate,
+      endDate,
+      weekly,
+      weeklyTimeSlots,
+      monthly,
+      monthlyTimeSlots
+    });
     await newSchedule.save();
+
+   
+    // await newSchedule.save();
 
     // Log the creation of the schedule to history
     const historyLog = new History({
@@ -568,24 +634,32 @@ app.post('/api/schedule/change', async (req, res) => {
       startDate,
       endDate,
       weekly,
-      daysOfWeek,
+      weeklyTimeSlots,
       monthly,
-      datesOfMonth,
-      startTime,
-      endTime,
+      monthlyTimeSlots,
+    
       timestamp: new Date(),
     });
     await historyLog.save();
     // Handle weekly scheduling
-    if (weekly && daysOfWeek && daysOfWeek.length > 0) {
+    // if (weekly && daysOfWeek && daysOfWeek.length > 0) {
 
-      console.log(sku+daysOfWeek+startTime+endTime);
-      await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek,startTime,endTime);
+    //   console.log(sku+daysOfWeek+startTime+endTime);
+    //   await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek,startTime,endTime);
+    // }
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      console.log("slots: "+JSON.stringify(weeklyTimeSlots));
+      await scheduleWeeklyPriceChange(sku, price, currentPrice, weeklyTimeSlots);
     }
 
-    if (monthly && datesOfMonth && datesOfMonth.length > 0) {
-      console.log(sku+datesOfMonth+startTime+endTime);
-      await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth,startTime,endTime);
+    // if (monthly && datesOfMonth && datesOfMonth.length > 0) {
+    //   console.log(sku+datesOfMonth+startTime+endTime);
+    //   await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth,startTime,endTime);
+    // }
+
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
+      await scheduleMonthlyPriceChange(sku, price, currentPrice, monthlyTimeSlots);
     }
 
 

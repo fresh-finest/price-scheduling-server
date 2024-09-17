@@ -312,9 +312,10 @@ async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWee
 }
 */
 async function defineWeeklyJob(sku, day, timeSlot) {
-  console.log("timeSlot: "+timeSlot.startTime);
+  console.log("timeSlot: "+JSON.stringify(timeSlot.startTime));
 
   const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
+  console.log(jobName);
   const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
   agenda.define(jobName, async (job) => {
     const { sku, newPrice } = job.attrs.data;
@@ -341,29 +342,30 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 
 const scheduleWeeklyPriceChange = async (sku, newPrice, originalPrice, weeklyTimeSlots) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-    for (const { startTime, endTime } of timeSlots) {
-      console.log(day+startTime);
-      const [startHour, startMinute] = startTime.split(':');
-      const [endHour, endMinute] = endTime.split(':');
+    for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
+      console.log(day + timeSlot.startTime);
+      const [startHour, startMinute] = timeSlot.startTime.split(':');
+      const [endHour, endMinute] = timeSlot.endTime.split(':');
 
       const updateCron = `${startMinute} ${startHour} * * ${day}`;
       const revertCron = `${endMinute} ${endHour} * * ${day}`;
 
       // Ensure unique job names for each time slot
-      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}${startMinute}`;
-      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}${endMinute}`;
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
 
-      // Define and schedule the update and revert jobs
-      await defineWeeklyJob(sku, day,timeSlots);
+      // Pass the correct timeSlot object
+      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
       await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
-      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTime}`);
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
 
       await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
-      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${timeSlot.endTime}`);
     }
   }
 };
+
 
 async function defineMonthlyJob(sku, date, timeSlot) {
   const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; // Ensure unique job name for each time slot
@@ -394,28 +396,29 @@ async function defineMonthlyJob(sku, date, timeSlot) {
 
 const scheduleMonthlyPriceChange = async (sku, newPrice, originalPrice, monthlySlots) => {
   for (const [date, timeSlots] of Object.entries(monthlySlots)) {
-    for (const { startTime, endTime } of timeSlots) {
-      const [startHour, startMinute] = startTime.split(':');
-      const [endHour, endMinute] = endTime.split(':');
+    for (const timeSlot of timeSlots) {  // Pass each specific timeSlot here
+      const [startHour, startMinute] = timeSlot.startTime.split(':');
+      const [endHour, endMinute] = timeSlot.endTime.split(':');
 
       const updateCron = `${startMinute} ${startHour} ${date} * *`;
       const revertCron = `${endMinute} ${endHour} ${date} * *`;
 
       // Ensure unique job names for each time slot
-      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHour}${startMinute}`;
-      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHour}${endMinute}`;
+      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHour}:${startMinute}`;
+      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHour}:${endMinute}`;
 
       // Define and schedule the update and revert jobs
-      await defineMonthlyJob(sku, date, timeSlots);
+      await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
 
       await agenda.every(updateCron, updateJobName, { sku, newPrice, date });
-      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startTime}`);
+      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
 
       await agenda.every(revertCron, revertJobName, { sku, originalPrice, date });
-      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endTime}`);
+      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${timeSlot.endTime}`);
     }
   }
 };
+
 
 /*
 async function defineMonthlyJob(sku, date) {

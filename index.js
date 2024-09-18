@@ -340,7 +340,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   });
 }
 
-const scheduleWeeklyPriceChange = async (sku, newPrice, originalPrice, weeklyTimeSlots) => {
+const scheduleWeeklyPriceChange = async (sku, originalPrice, weeklyTimeSlots) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
       console.log(day + timeSlot.startTime);
@@ -357,7 +357,7 @@ const scheduleWeeklyPriceChange = async (sku, newPrice, originalPrice, weeklyTim
       // Pass the correct timeSlot object
       await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, day });
       console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
 
       await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
@@ -394,7 +394,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   });
 }
 
-const scheduleMonthlyPriceChange = async (sku, newPrice, originalPrice, monthlySlots) => {
+const scheduleMonthlyPriceChange = async (sku, originalPrice, monthlySlots) => {
   for (const [date, timeSlots] of Object.entries(monthlySlots)) {
     for (const timeSlot of timeSlots) {  // Pass each specific timeSlot here
       const [startHour, startMinute] = timeSlot.startTime.split(':');
@@ -410,7 +410,7 @@ const scheduleMonthlyPriceChange = async (sku, newPrice, originalPrice, monthlyS
       // Define and schedule the update and revert jobs
       await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice, date });
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date });
       console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
 
       await agenda.every(revertCron, revertJobName, { sku, originalPrice, date });
@@ -652,7 +652,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     // }
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
       console.log("slots: "+JSON.stringify(weeklyTimeSlots));
-      await scheduleWeeklyPriceChange(sku, price, currentPrice, weeklyTimeSlots);
+      await scheduleWeeklyPriceChange(sku,currentPrice, weeklyTimeSlots);
     }
 
     // if (monthly && datesOfMonth && datesOfMonth.length > 0) {
@@ -662,7 +662,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
       console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
-      await scheduleMonthlyPriceChange(sku, price, currentPrice, monthlyTimeSlots);
+      await scheduleMonthlyPriceChange(sku, currentPrice, monthlyTimeSlots);
     }
 
 
@@ -687,9 +687,10 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly, daysOfWeek, monthly, datesOfMonth,startTime,endTime } = req.body;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly,weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
 
-  console.log("sku edit: "+sku+"week days: "+daysOfWeek+"time "+startTime);
+  
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
   try {
     const schedule = await PriceSchedule.findById(id);
     if (!schedule) {
@@ -708,9 +709,9 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       sku: schedule.sku,
       imageURL: schedule.imageURL,
       weekly: schedule.weekly,
-      daysOfWeek:schedule.daysOfWeek,
+      weeklyTimeSlots:schedule.weeklyTimeSlots,
       monthly:schedule.monthly,
-      datesOfMonth:schedule.datesOfMonth
+      monthlyTimeSlots:schedule.monthlyTimeSlots
     };
 
     // Update the schedule with new details
@@ -724,11 +725,10 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     schedule.sku = sku || schedule.sku; // Ensure SKU is preserved if not updated
     schedule.imageURL = imageURL || schedule.imageURL; // Ensure imageURL is preserved if not updated
     schedule.weekly = weekly || false;
-    schedule.daysOfWeek = daysOfWeek || [];
+    schedule.weeklyTimeSlots = weeklyTimeSlots || [];
     schedule.monthly = monthly || false;
-    schedule.datesOfMonth = datesOfMonth || [];
-    schedule.startTime = startTime;
-    schedule.endTime = endTime;
+    schedule.monthlySlots = monthlyTimeSlots || [];
+    
     await schedule.save();
 
     // Log the update in history with previous and updated states
@@ -748,11 +748,10 @@ app.put('/api/schedule/change/:id', async (req, res) => {
         imageURL: schedule.imageURL,
         imageURL: schedule.imageURL,
         weekly: schedule.weekly,
-        daysOfWeek: schedule.daysOfWeek,
+        weekltTimeSlots: schedule.weeklyTimeSlots,
         monthly: schedule.monthly,
-        datesOfMonth: schedule.datesOfMonth,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
+        monthlyTimeSlots: schedule.monthlyTimeSlots,
+      
       },
       userName, // Track the user who made the update
       timestamp: new Date(),
@@ -763,15 +762,12 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     await agenda.cancel({ 'data.sku': schedule.sku });
 
     // Re schedule
-    console.log(daysOfWeek+startTime+endTime);
-    if(weekly && daysOfWeek.length > 0){
-      console.log(daysOfWeek+startTime+endTime);
-      await scheduleWeeklyPriceChange(sku,price,currentPrice,daysOfWeek,startTime,endTime);
+    
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      await scheduleWeeklyPriceChange(sku,currentPrice, weeklyTimeSlots);
     }
-    if(monthly && datesOfMonth.length > 0){
-      console.log(datesOfMonth+startTime+endTime);
-      await scheduleMonthlyPriceChange(sku,price,currentPrice,datesOfMonth,startTime,endTime);
-
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      await scheduleMonthlyPriceChange(sku,currentPrice, monthlyTimeSlots);
     }
 
     if(!weekly && !monthly){
@@ -824,11 +820,10 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
       startDate: schedule.startDate,
       endDate: schedule.endDate,
       weekly: schedule.weekly,
-      daysOfWeek: schedule.daysOfWeek,
+      weeklyTimeSlots: schedule.weeklyTimeSlots,
       monthly: schedule.monthly,
-      datesOfMonth: schedule.datesOfMonth,
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
+      monthlyTimeSlots: schedule.monthlyTimeSlots,
+     
       previousState: { ...schedule.toObject() },
       timestamp: new Date(),
     });

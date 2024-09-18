@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const timeSlotSchema = mongoose.Schema({
   startTime: {type: String},
-  endTime:{type:String}
+  endTime:{type:String},
+  newPrice:{type:Number}
 },{_id:false});
 
 const priceScheduleSchema = mongoose.Schema({

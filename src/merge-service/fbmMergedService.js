@@ -28,6 +28,8 @@ const fetchAccessToken = async () => {
   };
 
   // Function to fetch inventory summaries from the Amazon API
+
+  /*
 const fetchInventorySummaries = async () => {
     const endpoint = 'https://sellingpartnerapi-na.amazon.com';
     const path = '/fba/inventory/v1/summaries';
@@ -64,7 +66,60 @@ const fetchInventorySummaries = async () => {
       console.error('Error fetching inventory summaries:', error.response ? error.response.data : error.message);
       throw error;
     }
-  };
+  };*/
+
+  const fetchInventorySummaries = async (nextToken = null, allSummaries = []) => {
+    const endpoint = 'https://sellingpartnerapi-na.amazon.com';
+    const path = '/fba/inventory/v1/summaries';
+    const accessToken = await fetchAccessToken();
+    
+    const request = {
+      method: 'GET',
+      url: `${endpoint}${path}`,
+      headers: {
+        'x-amz-access-token': accessToken,
+        'content-type': 'application/json',
+      },
+      params: {
+        marketplaceIds: credentials.marketplace_id,
+        details: true,
+        granularityType: 'Marketplace',
+        granularityId: credentials.marketplace_id,
+        startDateTime: '2023-05-01T00:00:00Z',
+        ...(nextToken && { nextToken }),  // Include nextToken in the request if available
+      },
+    };
+  
+    try {
+      const response = await axios(request);
+  
+      // Log full response in case of debugging needs
+      console.log('API Response:', response.data);
+  
+      // Extract inventorySummaries from the correct path
+      const inventorySummaries = response.data.payload?.inventorySummaries || [];
+      const newNextToken = response.data.pagination?.nextToken;
+  
+      // Accumulate the current batch of inventory summaries
+      if (Array.isArray(inventorySummaries)) {
+        allSummaries = [...allSummaries, ...inventorySummaries];
+      } else {
+        console.warn('inventorySummaries is not an array:', inventorySummaries);
+      }
+  
+      // If there's a nextToken, fetch the next page
+      if (newNextToken) {
+        return fetchInventorySummaries(newNextToken, allSummaries);
+      }
+  
+      // Return all accumulated summaries once there is no nextToken
+      return allSummaries;
+  
+    } catch (error) {
+      console.error('Error fetching inventory summaries:', error);
+      throw error;
+    }
+  }
   
   // Function to merge listing data with inventory summaries and store in Product collection
   const mergeAndSaveFbmData = async (listings, inventorySummaries) => {

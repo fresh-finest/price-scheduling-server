@@ -328,7 +328,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     }
   });
 
-  agenda.define(`revert_weekly_${revertJobName}`, async (job) => {
+  agenda.define(`revert_${revertJobName}`, async (job) => {
     const { sku, originalPrice } = job.attrs.data;
 
     try {
@@ -382,7 +382,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
     }
   });
 
-  agenda.define(`revert_monthly_${revertJobName}`, async (job) => {
+  agenda.define(`revert_${revertJobName}`, async (job) => {
     const { sku, originalPrice } = job.attrs.data;
 
     try {

@@ -748,7 +748,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
         imageURL: schedule.imageURL,
         imageURL: schedule.imageURL,
         weekly: schedule.weekly,
-        weekltTimeSlots: schedule.weeklyTimeSlots,
+        weeklyTimeSlots: schedule.weeklyTimeSlots,
         monthly: schedule.monthly,
         monthlyTimeSlots: schedule.monthlyTimeSlots,
       

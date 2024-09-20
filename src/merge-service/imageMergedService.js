@@ -8,8 +8,10 @@ const fetchImageBySKU = async (sku) => {
     const encodedSku = encodeURIComponent(sku);
   try {
     const response = await axios.get(`https://api.priceobo.com/image/${encodedSku}`);
-    const mainImageUrl = response.data?.summaries[0]?.mainImage?.link || null;
-    return mainImageUrl; // Return the image URL if found
+    const summary = response.data?.summaries[0];
+    const mainImageUrl = summary?.mainImage?.link || null;
+    const fnSku = summary.fnSku || null;
+    return {mainImageUrl,fnSku}; // Return the image URL if found
   } catch (error) {
     console.error(`Error fetching image for SKU ${sku}:`, error.message);
     return null; // Return null if fetching fails
@@ -29,9 +31,9 @@ const mergeAndSaveImageData = async (listings) => {
     await delay(1000); // Wait for 1 second between each request
 
     try {
-      const imageUrl = await fetchImageBySKU(listing.sellerSku); // Fetch image by SKU
+      const {mainImageUrl,fnSku} = await fetchImageBySKU(listing.sellerSku); // Fetch image by SKU
 
-      if (imageUrl) {
+      if (mainImageUrl) {
         const mergedData = {
           asin1: listing.asin1,
           itemName: listing.itemName,
@@ -39,8 +41,9 @@ const mergeAndSaveImageData = async (listings) => {
           fulfillmentChannel: listing.fulfillmentChannel,
           price: listing.price,
           sellerSku: listing.sellerSku,
-          imageUrl: imageUrl, // Save the fetched image
-          listingId: listing.listingId, // Ensure listingId is set
+          fnSku:fnSku,
+          imageUrl: mainImageUrl, 
+          listingId: listing.listingId, 
           quantity: listing.quantity,
           createdAt: listing.createdAt,
           updatedAt: listing.updatedAt,

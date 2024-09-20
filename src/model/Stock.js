@@ -5,6 +5,7 @@ const stockSchema = new mongoose.Schema({
   itemDescription: { type: String, trim: true },
   listingId: { type: String, unique: true, required: true },  // Listing ID is required and unique
   sellerSku: { type: String, required: true, trim: true },  // SKU is required
+  fnSku:{type:String},
   price: { type: Number, default: 0 },  // Default price is 0
   quantity: { type: Number, default: 0 },  // Default quantity is 0
   openDate: { type: String },  // Consider changing to Date type for easier handling of dates

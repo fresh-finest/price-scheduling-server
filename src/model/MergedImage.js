@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema({
   itemDescription: { type: String, trim: true },
   listingId: { type: String, unique: true, required: true }, // Unique identifier for the listing
   sellerSku:{type: String},
+  fnSku:{type:String},
   price: { type: Number, default: 0 },
   quantity: { type: Number, default: 0 },
   openDate: { type: String },

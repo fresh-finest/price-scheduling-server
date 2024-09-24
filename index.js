@@ -945,7 +945,7 @@ cron.schedule('0 13 * * *', async () => {
 
 
 // Schedule a cron job to run the fetch and merge task every day at 3:00 PM Bangladesh time
-cron.schedule('0 16 * * *', async () => {
+/*cron.schedule('0 16 * * *', async () => {
   console.log('Scheduled task started at 3:00 PM Bangladesh time...');
   
   try {
@@ -958,6 +958,19 @@ cron.schedule('0 16 * * *', async () => {
   }
 }, {
   timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
+});
+*/
+cron.schedule('0 * * * *', async () => {
+  console.log('Scheduled task started...');
+
+  try {
+    const listings = await MergedProduct.find();
+    const inventorySummaries = await fetchInventorySummaries();
+    await mergeAndSaveFbmData(listings, inventorySummaries);
+    console.log('Data fetching, merging, and saving completed.');
+  } catch (error) {
+    console.error('Error during scheduled task:', error);
+  }
 });
 
 app.get('/fetch-and-merge', async (req, res) => {
@@ -1004,6 +1017,17 @@ app.get('/image/:sku', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch product price' });
   }
 });
+
+app.get('/list/:sku',async(req,res)=>{
+  const { sku } = req.params;
+
+  try {
+    const listingData = await getListingsItemBySku(sku);
+    res.json(listingData);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch listing item' });
+  }
+})
 
 
 // fetch product using asin
@@ -1126,6 +1150,7 @@ const { getListingsItem } = require('./src/service/ImageService');
 const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedService');
 const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 const Stock = require('./src/model/Stock');
+const { getListingsItemBySku } = require('./src/service/getPriceService');
 
 
 app.use("/api/schedule", scheduleRoute);

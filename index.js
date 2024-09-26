@@ -8,19 +8,34 @@ const Agenda = require('agenda');
 const moment = require('moment-timezone');
 const cron = require('node-cron');
 require('dotenv').config();
+const cookieParser = require('cookie-parser');
 
+const { authenticateUser } = require('./src/middleware/authMiddleware');
 
 
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());  // To parse cookies
 
-app.use(cors());
+// app.use(cors());
+const allowedOrigins = ['http://localhost:5173', 'https://api.priceobo.com'];
 
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,  // Allow cookies to be sent/received
+}));
 app.options('*', cors()); // Enable pre-flight for all routes
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db";
-;
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose
   .connect(MONGO_URI)
@@ -86,231 +101,7 @@ const updateProductPrice = async (sku, value) => {
 };
 
 
-// Define a recurring job with cron-like scheduling
-/*
-agenda.define('weekly price update', async (job) => {
-  const { sku, newPrice } = job.attrs.data;
-   console.log("weekly is updating..");
-  try {
-    await updateProductPrice(sku, newPrice);
-    console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}`);
-  } catch (error) {
-    console.error(`Failed to apply weekly price update for SKU: ${sku}`, error);
-  }
-});
 
-// Define the revert job
-agenda.define('revert weekly price', async (job) => {
-  const { sku, originalPrice } = job.attrs.data;
-  
-  try {
-    await updateProductPrice(sku, originalPrice);
-    console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
-  } catch (error) {
-    console.error(`Failed to revert price for SKU: ${sku}`, error);
-  }
-});
-
-// Schedule the recurring jobs for specified days of the week
-async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime,endTime) {
-  for (const day of daysOfWeek) {
-    // const updateCron = `0 0 * * ${day}`; 
-    // const revertCron = `59 23 * * ${day}`;
-    const [startHour, startMinute] = startTime.split(':');
-    const [endHour, endMinute] = endTime.split(':');
-
-    // const updateCron = `${startMinute} ${startHour} ${day} * *`; 
-    // const revertCron = `${endMinute} ${endHour} ${day} * *`; 
-
-    
-    // const updateJobName = `weekly price update ${sku} day ${day}`;
-    // const revertJobName = `revert weekly price update ${sku} day ${day}`;
-
-    const updateCron = `${startMinute} ${startHour} * * ${day}`;
-    const revertCron = `${endMinute} ${endHour} * * ${day}`; 
-
-    // const updateJobName = `weekly price update* ${sku} day ${day}`;
-    // const revertJobName = `revert weekly price update* ${sku} day ${day}`;
-
-
-    // Schedule the price update for each day in daysOfWeek
-    await agenda.every(updateCron, 'weekly price update', { sku, newPrice, day });
-    await agenda.every(revertCron, 'revert weekly price', { sku, originalPrice, day});
-
-
-    // await agenda.every(updateCron,'weekly price update', { sku, newPrice });
-
-    // Schedule the price revert for each day in daysOfWeek
-    // await agenda.every(revertCron, 'revert weekly price update', { sku, originalPrice });
-  }
-}
-  */
-
-// Dynamic job with weekly price changing 
-/*
-async function defineWeeklyJob(sku, day) {
-  const jobName = `weekly price update ${sku} day ${day}`;
-  
-  agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, newPrice);
-      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${day}`);
-    } catch (error) {
-      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${day}`, error);
-    }
-  });
-  
-  agenda.define(`revert ${jobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, day: ${day}`);
-    } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}`, error);
-    }
-  });
-}
-
-// Schedule the jobs
-async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime, endTime) {
-  
- 
-  for (const day of daysOfWeek) {
-    const [startHour, startMinute] = startTime.split(':');
-    const [endHour, endMinute] = endTime.split(':');
-
-    const updateCron = `${startMinute} ${startHour} * * ${day}`;
-    const revertCron = `${endMinute} ${endHour} * * ${day}`;
-
-    // Ensure the job name matches the definition
-    const updateJobName = `weekly price update ${sku} day ${day}`;
-    const revertJobName = `revert weekly price update ${sku} day ${day}`;
-
-    // Define jobs before scheduling them
-    await defineWeeklyJob(sku, day);
-    
-    // const updateTimeUTC = moment.tz(`${startHour}:${startMinute}`, "HH:mm", "UTC").toDate();
-        // const revertTimeUTC = moment.tz(`${endHour}:${endMinute}`, "HH:mm", "UTC");
-    // Schedule the jobs
-    await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
-    console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTime}`);
-   
-
-
-    await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
-    console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
-  }
-}
-
-
-// Dynamic job with monthly updating price
-async function defineMonthlyJob(sku, date) {
-  const jobName = `monthly price update ${sku} date ${date}`;
-  
-  agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, newPrice);
-      console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}, date: ${date}`);
-    } catch (error) {
-      console.error(`Failed to apply monthly price update for SKU: ${sku}, date: ${date}`, error);
-    }
-  });
-  
-  agenda.define(`revert ${jobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, date: ${date}`);
-    } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}`, error);
-    }
-  });
-}
-
-// Schedule the jobs for monthly price changes
-async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth, startTime, endTime) {
-  for (const date of datesOfMonth) {
-    const [startHour, startMinute] = startTime.split(':');
-    const [endHour, endMinute] = endTime.split(':');
-
-    const updateCron = `${startMinute} ${startHour} ${date} * *`;
-    const revertCron = `${endMinute} ${endHour} ${date} * *`;
-
-    // Ensure the job name matches the definition
-    const updateJobName = `monthly price update ${sku} date ${date}`;
-    const revertJobName = `revert monthly price update ${sku} date ${date}`;
-
-    // Define jobs before scheduling them
-    await defineMonthlyJob(sku, date);
-
-    // Schedule the jobs
-    await agenda.every(updateCron, updateJobName, { sku, newPrice, date },{ timezone: 'UTC' });
-    console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startTime}`);
-
-    await agenda.every(revertCron, revertJobName, { sku, originalPrice, date },{ timezone: 'UTC' });
-    console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endTime}`);
-  }
-}
-
-*/
-/*
-async function defineWeeklyJob(sku, day) {
-  const jobName = `weekly_price_update_${sku}_day_${day}`; // Ensure unique job name
-  
-  agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, newPrice);
-      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${day}`);
-    } catch (error) {
-      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${day}`, error);
-    }
-  });
-  
-  agenda.define(`revert_weekly_${jobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, day: ${day}`);
-    } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}`, error);
-    }
-  });
-
-
-}
-async function scheduleWeeklyPriceChange(sku, newPrice, originalPrice, daysOfWeek, startTime, endTime) {
-  for (const day of daysOfWeek) {
-    const [startHour, startMinute] = startTime.split(':');
-    const [endHour, endMinute] = endTime.split(':');
-
-    const updateCron = `${startMinute} ${startHour} * * ${day}`;
-    const revertCron = `${endMinute} ${endHour} * * ${day}`;
-
-    // Ensure unique job name
-    const updateJobName = `weekly_price_update_${sku}_day_${day}`;
-    const revertJobName = `revert_weekly_price_update_${sku}_day_${day}`;
-
-    // Define jobs before scheduling them
-    await defineWeeklyJob(sku, day);
-
-    // Schedule the jobs
-    await agenda.every(updateCron, updateJobName, { sku, newPrice, day });
-    console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTime}`);
-
-    await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
-    console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTime}`);
-  }
-}
-*/
 async function defineWeeklyJob(sku, day, timeSlot) {
   console.log("timeSlot: "+JSON.stringify(timeSlot.startTime));
 
@@ -420,59 +211,7 @@ const scheduleMonthlyPriceChange = async (sku, originalPrice, monthlySlots) => {
 };
 
 
-/*
-async function defineMonthlyJob(sku, date) {
-  const jobName = `monthly_price_update_${sku}_date_${date}`; // Ensure unique job name
-  
-  agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, newPrice);
-      console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}, date: ${date}`);
-    } catch (error) {
-      console.error(`Failed to apply monthly price update for SKU: ${sku}, date: ${date}`, error);
-    }
-  });
-  
-  agenda.define(`revert_monthly_${jobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
-    
-    try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, date: ${date}`);
-    } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}`, error);
-    }
-  });
-}
 
-async function scheduleMonthlyPriceChange(sku, newPrice, originalPrice, datesOfMonth, startTime, endTime) {
-  for (const date of datesOfMonth) {
-    const [startHour, startMinute] = startTime.split(':');
-    const [endHour, endMinute] = endTime.split(':');
-
-    const updateCron = `${startMinute} ${startHour} ${date} * *`;
-    const revertCron = `${endMinute} ${endHour} ${date} * *`;
-
-    // Ensure unique job name
-    const updateJobName = `monthly_price_update_${sku}_date_${date}`;
-    const revertJobName = `revert_monthly_price_update_${sku}_date_${date}`;
-
-
-    // Define jobs before scheduling them
-    await defineMonthlyJob(sku, date);
-
-    // Schedule the jobs
-    await agenda.every(updateCron, updateJobName, { sku, newPrice, date }, { timezone: 'UTC' });
-    console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startTime}`);
-
-    await agenda.every(revertCron, revertJobName, { sku, originalPrice, date }, { timezone: 'UTC' });
-    console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endTime}`);
-  }
-}
-
-*/
 
 // Schedule job to update the price at the specified start date
 agenda.define('schedule price update', async (job) => {
@@ -492,106 +231,7 @@ agenda.define('revert price update', async (job) => {
   await agenda.start();
 })();
 
-// API to save the schedule and queue the jobs
-/*
-app.post('/api/schedule/change', async (req, res) => {
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
 
-  try {
-    
-    await agenda.schedule(new Date(startDate), 'schedule price update', {
-      sku,
-      newPrice: price,
-    });
-
-   
-    if (endDate) {
-      await agenda.schedule(new Date(endDate), 'revert price update', {
-        sku,
-        originalPrice: currentPrice,
-      });
-    }
-
-  
-    const schedule = new PriceSchedule({ userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate });
-    await schedule.save();
-
-    res.json({ success: true, message: 'Schedule saved and jobs queued successfully.' });
-  } catch (error) {
-    console.error('Error saving schedule:', error);
-    res.status(500).json({ error: 'Failed to save schedule' });
-  }
-});
-*/
-
-// API to update a schedule
-/*
-app.put('/api/schedule/change/:id', async (req, res) => {
-  const { id } = req.params;
-  const { startDate, endDate, price, currentPrice } = req.body;
-
-  try {
-    const schedule = await PriceSchedule.findById(id);
-    if (!schedule) {
-      return res.status(404).json({ error: 'Schedule not found' });
-    }
-
-    
-    schedule.startDate = startDate;
-    schedule.endDate = endDate;
-    schedule.price = price;
-    schedule.currentPrice = currentPrice;
-    schedule.status='updated'; 
-    await schedule.save();
-
-   
-    await agenda.cancel({ 'data.sku': schedule.sku });
-
-    await agenda.schedule(new Date(startDate), 'schedule price update', {
-      sku: schedule.sku,
-      newPrice: price,
-    });
-
-    if (endDate) {
-      await agenda.schedule(new Date(endDate), 'revert price update', {
-        sku: schedule.sku,
-        originalPrice: currentPrice,
-      });
-    }
-
-    res.json({ success: true, message: 'Schedule updated successfully.' });
-  } catch (error) {
-    console.error('Error updating schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule' });
-  }
-});
-*/
-
-
-// API to delete a schedule
-/*
-app.delete('/api/schedule/change/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const schedule = await PriceSchedule.findByIdAndDelete(id);
-    if (!schedule) {
-      return res.status(404).json({ error: 'Schedule not found' });
-    }
-
-    schedule.status ='deleted'
-    await schedule.save();
-
-  
-    await agenda.cancel({ 'data.sku': schedule.sku });
-
-    res.json({ success: true, message: 'Schedule and associated jobs deleted successfully.' });
-  } catch (error) {
-    console.error('Error deleting schedule:', error);
-    res.status(500).json({ error: 'Failed to delete schedule' });
-  }
-});
-*/
 app.post('/api/schedule/change', async (req, res) => {
   // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
   const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
@@ -943,9 +583,9 @@ cron.schedule('0 13 * * *', async () => {
   timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh time
 });
 
-
+/*
 // Schedule a cron job to run the fetch and merge task every day at 3:00 PM Bangladesh time
-/*cron.schedule('0 16 * * *', async () => {
+cron.schedule('0 16 * * *', async () => {
   console.log('Scheduled task started at 3:00 PM Bangladesh time...');
   
   try {
@@ -958,20 +598,25 @@ cron.schedule('0 13 * * *', async () => {
   }
 }, {
   timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
-});
-*/
-cron.schedule('0 * * * *', async () => {
-  console.log('Scheduled task started...');
+});*/
 
+
+
+cron.schedule('0 * * * *', async () => {
+  console.log('Scheduled task started (every two hours)...');
+  
   try {
-    const listings = await MergedProduct.find();
-    const inventorySummaries = await fetchInventorySummaries();
-    await mergeAndSaveFbmData(listings, inventorySummaries);
-    console.log('Data fetching, merging, and saving completed.');
+    // Call your API endpoint
+    const response = await axios.get('http://localhost:3000/fetch-and-merge'); 
+    console.log('Cron job completed:', response.data);
   } catch (error) {
-    console.error('Error during scheduled task:', error);
+    console.error('Error during cron job:', error);
   }
+}, {
+  timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
 });
+
+
 
 app.get('/fetch-and-merge', async (req, res) => {
   try {
@@ -1054,16 +699,39 @@ app.get('/details/:asin', async (req, res) => {
 });
 
 
-app.get('/api/history/:schdeuleId', async (req, res) => {
-  const { scheduleId } = req.params;
+app.get('/api/history/sku/:sku', async(req,res)=>{
+  const {sku} = req.params;
+  console.log(sku)
 
   try {
     
-    const history = await History.find({scheduleId}).sort({ createdAt: -1 });
+    const result = await History.find({sku:sku});
+    res.json(result);
+  }  catch (error) {
+    res.status(400).json({
+      status: "Fail",
+      message: "Couldn't fetch data.",
+      error: error.message
+  });
+  }
+})
+app.get('/api/history/:scheduleId', async (req, res) => {
+  const { scheduleId } = req.params;
 
-    
+  if (!mongoose.Types.ObjectId.isValid(scheduleId)) {
+    return res.status(400).json({ error: 'Invalid scheduleId format' });
+  }
+
+  try {
+    const history = await History.find({ scheduleId: new mongoose.Types.ObjectId(scheduleId) }).sort({ createdAt: -1 });
+
+    if (!history || history.length === 0) {
+      return res.status(404).json({ message: 'No history found for this scheduleId' });
+    }
+
     res.json(history);
   } catch (error) {
+    console.error('Error fetching history:', error);
     res.status(500).json({ error: 'Failed to fetch history' });
   }
 });
@@ -1087,7 +755,7 @@ app.get('/api/history/', async (req, res) => {
   }
 });
 
-app.get('/fetch-all-listings', async (req, res) => {
+app.get('/fetch-all-listings',authenticateUser, async (req, res) => {
   try {
     // const listings = await Inventory.find(); 
     const listings = await Stock.find();
@@ -1097,14 +765,14 @@ app.get('/fetch-all-listings', async (req, res) => {
   }
 });
 
-app.get('/api/jobs/:asin',async(req,res)=>{
+app.get('/api/jobs/:id',async(req,res)=>{
   const {asin}= req.params;
   try {
     const jobs = await agenda._collection.find({ 'data.asin': asin }).toArray();
 
     res.json({ success: true, jobs });
   } catch (error) {
-    console.error('Error fetching jobs by asin:', error);
+    console.error('Error fetching jobs by id:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
   }
 })
@@ -1129,9 +797,9 @@ app.get('/', (req, res) => {
   res.send('Server is running!');
 });
 
-const PORT = 3000;
-app.listen(PORT,'0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+// const PORT = 3000;
+app.listen(process.env.PORT,'0.0.0.0', () => {
+  console.log(`Server is running on port ${process.env.PORT}`);
 });
 
 const scheduleRoute = require("./src/route/Schedule");

@@ -20,7 +20,7 @@ exports.signin = async(req,res,next)=>{
             return next(errorHandler(500, "JWT_SECRET environment variable not set"));
         }
 
-        const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
 
         const { password: pass, ...rest } = validUser._doc;
 

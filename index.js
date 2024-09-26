@@ -602,7 +602,7 @@ cron.schedule('0 16 * * *', async () => {
 
 
 
-cron.schedule('0 * * * *', async () => {
+cron.schedule('0 */2 * * *', async () => {
   console.log('Scheduled task started (every two hours)...');
   
   try {

@@ -18,22 +18,23 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());  // To parse cookies
 
-// app.use(cors());
-const allowedOrigins = ['http://localhost:5173', 'https://api.priceobo.com'];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,  // Allow cookies to be sent/received
-}));
+app.use(cors());
 app.options('*', cors()); // Enable pre-flight for all routes
+// const allowedOrigins = ['http://localhost:5173', 'https://api.priceobo.com'];
+
+// app.use(cors({
+//   origin: function (origin, callback) {
+   
+//     if (!origin) return callback(null, true);
+//     if (allowedOrigins.includes(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error('Not allowed by CORS'));
+//     }
+//   },
+//   credentials: true,  
+// }));
+
 
 const MONGO_URI = process.env.MONGO_URI;
 

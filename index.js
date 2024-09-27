@@ -10,7 +10,7 @@ const cron = require('node-cron');
 require('dotenv').config();
 const cookieParser = require('cookie-parser');
 
-const { authenticateUser } = require('./src/middleware/authMiddleware');
+// const { authenticateUser } = require('./src/middleware/authMiddleware');
 
 
 
@@ -120,18 +120,18 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   });
 
   agenda.define(`revert_${revertJobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
+    const { sku, revertPrice } = job.attrs.data;
 
     try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`);
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, day: ${day}, slot: ${timeSlot.endTime}`);
     } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`, error);
+      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}, slot: ${timeSlot.endTime}`, error);
     }
   });
 }
 
-const scheduleWeeklyPriceChange = async (sku, originalPrice, weeklyTimeSlots) => {
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
       console.log(day + timeSlot.startTime);
@@ -151,7 +151,7 @@ const scheduleWeeklyPriceChange = async (sku, originalPrice, weeklyTimeSlots) =>
       await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, day });
       console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, originalPrice, day });
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, day });
       console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${timeSlot.endTime}`);
     }
   }
@@ -174,18 +174,18 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   });
 
   agenda.define(`revert_${revertJobName}`, async (job) => {
-    const { sku, originalPrice } = job.attrs.data;
+    const { sku, revertPrice } = job.attrs.data;
 
     try {
-      await updateProductPrice(sku, originalPrice);
-      console.log(`Price reverted for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`);
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, date: ${date}, slot: ${timeSlot.endTime}`);
     } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`, error);
+      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}, slot: ${timeSlot.endTime}`, error);
     }
   });
 }
 
-const scheduleMonthlyPriceChange = async (sku, originalPrice, monthlySlots) => {
+const scheduleMonthlyPriceChange = async (sku, monthlySlots) => {
   for (const [date, timeSlots] of Object.entries(monthlySlots)) {
     for (const timeSlot of timeSlots) {  // Pass each specific timeSlot here
       const [startHour, startMinute] = timeSlot.startTime.split(':');
@@ -204,7 +204,7 @@ const scheduleMonthlyPriceChange = async (sku, originalPrice, monthlySlots) => {
       await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date });
       console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, originalPrice, date });
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, date });
       console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${timeSlot.endTime}`);
     }
   }
@@ -292,7 +292,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     // }
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
       console.log("slots: "+JSON.stringify(weeklyTimeSlots));
-      await scheduleWeeklyPriceChange(sku,currentPrice, weeklyTimeSlots);
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots);
     }
 
     // if (monthly && datesOfMonth && datesOfMonth.length > 0) {
@@ -302,7 +302,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
       console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
-      await scheduleMonthlyPriceChange(sku, currentPrice, monthlyTimeSlots);
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots);
     }
 
 
@@ -600,15 +600,26 @@ cron.schedule('0 16 * * *', async () => {
   timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
 });*/
 
+// cron.schedule('0 * * * *', async () => {
+//   console.log('Scheduled task started...');
 
+//   try {
+//     const listings = await MergedProduct.find();
+//     const inventorySummaries = await fetchInventorySummaries();
+//     await mergeAndSaveFbmData(listings, inventorySummaries);
+//     console.log('Data fetching, merging, and saving completed.');
+//   } catch (error) {
+//     console.error('Error during scheduled task:', error);
+//   }
+// });
 
-cron.schedule('0 */2 * * *', async () => {
+cron.schedule('30 */1 * * *', async () => {
   console.log('Scheduled task started (every two hours)...');
   
   try {
     // Call your API endpoint
-    const response = await axios.get('http://localhost:3000/fetch-and-merge'); 
-    console.log('Cron job completed:', response.data);
+    const response = await axios.get('https://api.priceobo.com/fetch-and-merge'); 
+    
   } catch (error) {
     console.error('Error during cron job:', error);
   }
@@ -616,6 +627,20 @@ cron.schedule('0 */2 * * *', async () => {
   timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
 });
 
+// const axios = require('axios');
+
+// (async () => {
+//   try {
+//     const response = await axios.get('http://localhost:3000/fetch-and-merge');
+//     console.log('Manual API call completed:', response.data);
+//   } catch (error) {
+//     console.error('Manual API call error:', error.message);
+//     if (error.response) {
+//       console.error('Response status:', error.response.status);
+//       console.error('Response data:', error.response.data);
+//     }
+//   }
+// })();
 
 
 app.get('/fetch-and-merge', async (req, res) => {
@@ -755,7 +780,7 @@ app.get('/api/history/', async (req, res) => {
   }
 });
 
-app.get('/fetch-all-listings',authenticateUser, async (req, res) => {
+app.get('/fetch-all-listings', async (req, res) => {
   try {
     // const listings = await Inventory.find(); 
     const listings = await Stock.find();

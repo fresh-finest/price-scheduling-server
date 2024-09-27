@@ -5,6 +5,17 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sendEmail = require('../service/EmailService');
 
+const generateAccessToken = (userId) => {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable not set');
+    }
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '1h' }); // Adjust the expiry time as needed
+  };
+
+const generateRefreshToken = (userId)=>{
+    return jwt.sign({id:userId}, process.env.REFRESH_SECRET, {expiresIn:'7d'});
+}
+
 
 exports.signin = async(req,res,next)=>{
     const {email,password} = req.body;
@@ -20,28 +31,189 @@ exports.signin = async(req,res,next)=>{
             return next(errorHandler(500, "JWT_SECRET environment variable not set"));
         }
 
-        const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        // const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        const accessToken = generateAccessToken(validUser._id);
+        const refreshToken =generateRefreshToken(validUser._id);
 
         const { password: pass, ...rest } = validUser._doc;
-
         res
-            .cookie("access_token", token, { httpOnly: true})
-            .status(200)
-            .json(rest);
+        .cookie("access_token", accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'None',
+        })
+        .cookie("refresh_token", refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'None',
+        })
+        .status(200)
+        .json(rest); // Send user details except password
+        // res
+        //     .cookie("access_token", token, { httpOnly: true})
+        //     .status(200)
+        //     .json(rest);
     } catch (error) {
         next(error);
     }
 }
 
-exports.logOut = async(req,res,next)=>{
+/*
+exports.signin = async (req, res, next) => {
+    const { email, password } = req.body;
+  
     try {
-        res.clearCookie('access_token');
-        res.status(200).json('User has been logged out1.')
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ message: 'User not found' });
+  
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) return res.status(401).json({ message: 'Invalid password' });
+  
+      // Generate tokens
+      const accessToken = generateAccessToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
+  
+      // Store the refresh token in the user record
+      user.refreshToken = refreshToken;
+      await user.save();
+  
+      // Send tokens in response body (NOT for production)
+      return res.status(200).json({
+        accessToken,
+        refreshToken,
+        user: {
+          email: user.email,
+          userName: user.userName,
+          role: user.role,
+          avatar: user.avatar,
+        },
+      });
     } catch (error) {
-        next(error);
+      next(error);
     }
-}
+  };
+  */
 
+// exports.logOut = async(req,res,next)=>{
+//     try {
+//         res.clearCookie('access_token');
+//         res.status(200).json('User has been logged out1.')
+//     } catch (error) {
+//         next(error);
+//     }
+// }
+
+exports.logOut = async (req, res, next) => {
+    try {
+      // Clear both the access token and refresh token cookies
+      res.clearCookie('access_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',  // Ensure cookies are properly cleared
+        sameSite: 'None',
+      });
+      res.clearCookie('refresh_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',  // Ensure cookies are properly cleared
+        sameSite: 'None',
+      });
+  
+      res.status(200).json({ message: 'User has been logged out.' });
+    } catch (error) {
+      next(error);
+    }
+  };
+  
+
+  exports.createRefreshToken = async (req, res, next) => {
+    const refreshToken = req.cookies.refresh_token;
+    console.log(refreshToken)
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: "Unauthorized, refresh token not provided" });
+  }
+
+  try {
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    
+    // Check if the stored refresh token matches the one in the request
+    if (!user) {
+      return res.status(403).json({ message: "Forbidden, invalid refresh token" });
+    }
+
+    // Generate a new access token
+    const newAccessToken = generateAccessToken(user._id);
+    console.log("new access token"+newAccessToken)
+    // Optionally generate a new refresh token and update it in the database
+    const newRefreshToken = jwt.sign({ id: user._id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    // Send new tokens as cookies
+    res
+      .cookie('access_token', newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'None',
+      })
+      .cookie('refresh_token', newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'None',
+      })
+      .status(200)
+      .json({ message: "Access token refreshed" });
+  } catch (error) {
+    return res.status(403).json({ message: "Invalid refresh token" });
+  }
+  };
+  /*
+  exports.createRefreshToken = async (req, res, next) => {
+    const refreshToken = req.cookies.refresh_token;
+    console.log(refreshToken);
+  
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Unauthorized, refresh token not provided" });
+    }
+  
+    try {
+      // Verify the refresh token
+      const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+      const user = await User.findById(decoded.id);
+  
+      console.log("User's stored refresh token:", user.refreshToken);
+  
+      // Check if the stored refresh token matches the one in the request
+      if (!user || user.refreshToken !== refreshToken) {
+        return res.status(403).json({ message: "Forbidden, invalid refresh token" });
+      }
+  
+      // Generate a new access token
+      const newAccessToken = generateAccessToken(user._id);
+      console.log("New access token:", newAccessToken);
+  
+      // Optionally generate a new refresh token and update it in the database
+      const newRefreshToken = jwt.sign({ id: user._id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+      user.refreshToken = newRefreshToken;
+      await user.save();
+  
+      // Send response with the new tokens and user info
+      res.status(200).json({
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          email: user.email,
+          userName: user.userName,
+          role: user.role,
+          avatar: user.avatar,
+        },
+      });
+    } catch (error) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
+  };*/
 exports.resetPassword = async (req, res, next) => {
     console.log('Request body:', req.body);
    

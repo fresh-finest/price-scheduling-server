@@ -214,19 +214,71 @@ const scheduleMonthlyPriceChange = async (sku, monthlySlots) => {
 
 
 
-// Schedule job to update the price at the specified start date
+/*
 agenda.define('schedule price update', async (job) => {
   const { sku, newPrice } = job.attrs.data;
   await updateProductPrice(sku, newPrice);
   console.log(`Price updated for SKU: ${sku} to ${newPrice}`);
 });
 
-// Schedule job to revert the price at the specified end date
+
 agenda.define('revert price update', async (job) => {
   const { sku, originalPrice } = job.attrs.data;
   await updateProductPrice(sku, originalPrice);
   console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
-});
+});*/
+
+const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate) => {
+  try {
+    // Ensure startDate and endDate are valid Date objects
+    const validStartDate = new Date(startDate);
+    const validEndDate = endDate ? new Date(endDate) : null;
+
+    // Validate the dates
+    if (isNaN(validStartDate.getTime()) || (validEndDate && isNaN(validEndDate.getTime()))) {
+      throw new Error('Invalid start or end date');
+    }
+
+    // Define and schedule the price update job at the start date
+    const updateJobName = `schedule_price_update_${sku}_${validStartDate.toISOString()}`;
+    
+    agenda.define(updateJobName, async (job) => {
+      const { sku, newPrice } = job.attrs.data;
+      try {
+        await updateProductPrice(sku, newPrice);
+        console.log(`Price updated for SKU: ${sku} to ${newPrice}`);
+      } catch (error) {
+        console.error(`Failed to update price for SKU: ${sku}`, error);
+      }
+    });
+
+    await agenda.schedule(validStartDate.toISOString(), updateJobName, { sku, newPrice });
+    console.log(`Scheduled price update for SKU: ${sku} at ${validStartDate} to ${newPrice}`);
+
+    // Define and schedule the price revert job at the end date (if provided)
+    if (validEndDate) {
+      const revertJobName = `revert_price_update_${sku}_${validEndDate.toISOString()}`;
+
+      agenda.define(revertJobName, async (job) => {
+        const { sku, originalPrice } = job.attrs.data;
+        try {
+          await updateProductPrice(sku, originalPrice);
+          console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
+        } catch (error) {
+          console.error(`Failed to revert price for SKU: ${sku}`, error);
+        }
+      });
+
+      await agenda.schedule(validEndDate.toISOString(), revertJobName, { sku, originalPrice });
+      console.log(`Scheduled price revert for SKU: ${sku} at ${validEndDate} to ${originalPrice}`);
+    }
+
+  } catch (error) {
+    console.error(`Error scheduling price changes for SKU: ${sku}`, error);
+  }
+};
+
+
 
 (async function () {
   await agenda.start();
@@ -308,13 +360,19 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
 
     // Handle one-time scheduling
-    if (!weekly && !monthly) {
-      await agenda.schedule(new Date(startDate), 'schedule price update', {asin, sku, newPrice: price });
+    // if (!weekly && !monthly) {
+    //   await agenda.schedule(new Date(startDate), 'schedule price update', {asin, sku, newPrice: price });
 
-      if (endDate) {
-        await agenda.schedule(new Date(endDate), 'revert price update', {asin, sku, originalPrice: currentPrice });
-      }
+    //   if (endDate) {
+    //     await agenda.schedule(new Date(endDate), 'revert price update', {asin, sku, originalPrice: currentPrice });
+    //   }
+    // }
+
+    if (!weekly && !monthly) {
+      // Instead of scheduling separate tasks, call singleDayScheduleChange
+      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate);
     }
+    
 
    
 
@@ -337,6 +395,9 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     if (!schedule) {
       return res.status(404).json({ error: 'Schedule not found' });
     }
+
+     // Cancel existing jobs
+     
 
     // Log the previous state of the schedule before updating
     const previousState = {
@@ -399,32 +460,37 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     });
     await historyLog.save();
     
+   
     // Cancel existing jobs
     await agenda.cancel({ 'data.sku': schedule.sku });
-
     // Re schedule
     
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      await scheduleWeeklyPriceChange(sku,currentPrice, weeklyTimeSlots);
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots);
     }
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      await scheduleMonthlyPriceChange(sku,currentPrice, monthlyTimeSlots);
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots);
     }
 
-    if(!weekly && !monthly){
-      console.log(schedule.price);
-      await agenda.schedule(new Date(startDate), 'schedule price update', {
-        sku: schedule.sku,
-        newPrice: schedule.price,
-      });
+  //   if(!weekly && !monthly){
+  //     console.log(schedule.price);
+  //     await agenda.schedule(new Date(startDate), 'schedule price update', {
+  //       sku: schedule.sku,
+  //       newPrice: schedule.price,
+  //     });
 
-      if (endDate) {
-        console.log(schedule.currentPrice);
-        await agenda.schedule(new Date(endDate), 'revert price update', {
-          sku: schedule.sku,
-          originalPrice: schedule.currentPrice,
-        });
-    }
+  //     if (endDate) {
+  //       console.log(schedule.currentPrice);
+  //       await agenda.schedule(new Date(endDate), 'revert price update', {
+  //         sku: schedule.sku,
+  //         originalPrice: schedule.currentPrice,
+  //       });
+  //   }
+  // }
+
+  if (!weekly && !monthly) {
+    // Instead of scheduling separate tasks, call singleDayScheduleChange
+    await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate);
   }
 
     

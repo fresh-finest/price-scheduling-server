@@ -3,8 +3,8 @@ const timeSlotSchema = mongoose.Schema({
   startTime: {type: String},
   endTime:{type:String},
   newPrice:{type:Number},
-  revertPrice:{type:Number}
-  
+  revertPrice:{type:Number},
+  scheduleId: mongoose.Schema.Types.ObjectId,
 },{_id:false});
 
 const historySchema = new mongoose.Schema({

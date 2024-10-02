@@ -110,7 +110,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   console.log(jobName);
   const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
   agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
+    const { sku, newPrice} = job.attrs.data;
 
     try {
       await updateProductPrice(sku, newPrice);
@@ -121,7 +121,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   });
 
   agenda.define(`revert_${revertJobName}`, async (job) => {
-    const { sku, revertPrice } = job.attrs.data;
+    const { sku, revertPrice} = job.attrs.data;
 
     try {
       await updateProductPrice(sku, revertPrice);
@@ -131,11 +131,13 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     }
   });
 }
-
+/*
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
-      console.log(day + timeSlot.startTime);
+      console.log(day + timeSlot.startTime);     
+       
+      
       const [startHour, startMinute] = timeSlot.startTime.split(':');
       const [endHour, endMinute] = timeSlot.endTime.split(':');
 
@@ -149,14 +151,57 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots) => {
       // Pass the correct timeSlot object
       await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, day });
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice,day});
       console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, day });
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, day});
       console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${timeSlot.endTime}`);
     }
   }
 };
+*/
+
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
+      console.log(day + timeSlot.startTime);     
+
+      // Destructure start and end time
+      const [startHour, startMinute] = timeSlot.startTime.split(':');
+      const [endHour, endMinute] = timeSlot.endTime.split(':');
+
+      // Define cron expressions for scheduling jobs
+      const updateCron = `${startMinute} ${startHour} * * ${day}`;
+      const revertCron = `${endMinute} ${endHour} * * ${day}`;
+
+      // Ensure unique job names for each time slot
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
+
+      // Add timeSlotScheduleId to the job data
+     
+
+      // Schedule the price update job with timeSlotScheduleId
+      await agenda.every(updateCron, updateJobName, { 
+        sku, 
+        newPrice: timeSlot.newPrice, 
+        day, 
+        scheduleId
+      });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
+
+      // Schedule the price revert job with timeSlotScheduleId
+      await agenda.every(revertCron, revertJobName, { 
+        sku, 
+        revertPrice: timeSlot.revertPrice, 
+        day, 
+        scheduleId
+      });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${timeSlot.endTime}`);
+    }
+  }
+};
+
 
 
 async function defineMonthlyJob(sku, date, timeSlot) {
@@ -164,7 +209,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   const revertJobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.endTime}`;
 
   agenda.define(jobName, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
+    const { sku, newPrice,scheduleId } = job.attrs.data;
 
     try {
       await updateProductPrice(sku, newPrice);
@@ -175,7 +220,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   });
 
   agenda.define(`revert_${revertJobName}`, async (job) => {
-    const { sku, revertPrice } = job.attrs.data;
+    const { sku, revertPrice} = job.attrs.data;
 
     try {
       await updateProductPrice(sku, revertPrice);
@@ -186,9 +231,10 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   });
 }
 
-const scheduleMonthlyPriceChange = async (sku, monthlySlots) => {
+const scheduleMonthlyPriceChange = async (sku, monthlySlots, scheduleId) => {
   for (const [date, timeSlots] of Object.entries(monthlySlots)) {
     for (const timeSlot of timeSlots) {  // Pass each specific timeSlot here
+     
       const [startHour, startMinute] = timeSlot.startTime.split(':');
       const [endHour, endMinute] = timeSlot.endTime.split(':');
 
@@ -202,10 +248,10 @@ const scheduleMonthlyPriceChange = async (sku, monthlySlots) => {
       // Define and schedule the update and revert jobs
       await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date });
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date,scheduleId});
       console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, date });
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, date,scheduleId});
       console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${timeSlot.endTime}`);
     }
   }
@@ -228,12 +274,12 @@ agenda.define('revert price update', async (job) => {
   console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
 });*/
 
-const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate) => {
+const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate, scheduleId) => {
   try {
     // Ensure startDate and endDate are valid Date objects
     const validStartDate = new Date(startDate);
     const validEndDate = endDate ? new Date(endDate) : null;
-
+    const timeSlotScheduleId = new mongoose.Types.ObjectId();
     // Validate the dates
     if (isNaN(validStartDate.getTime()) || (validEndDate && isNaN(validEndDate.getTime()))) {
       throw new Error('Invalid start or end date');
@@ -241,42 +287,43 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
 
     // Define and schedule the price update job at the start date
     const updateJobName = `schedule_price_update_${sku}_${validStartDate.toISOString()}`;
-    
+
     agenda.define(updateJobName, async (job) => {
-      const { sku, newPrice } = job.attrs.data;
+      const { sku, newPrice, scheduleId } = job.attrs.data;
       try {
         await updateProductPrice(sku, newPrice);
-        console.log(`Price updated for SKU: ${sku} to ${newPrice}`);
+     
       } catch (error) {
-        console.error(`Failed to update price for SKU: ${sku}`, error);
+        console.error(`Failed to update price for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
       }
     });
 
-    await agenda.schedule(validStartDate.toISOString(), updateJobName, { sku, newPrice });
-    console.log(`Scheduled price update for SKU: ${sku} at ${validStartDate} to ${newPrice}`);
+    await agenda.schedule(validStartDate.toISOString(), updateJobName, { sku, newPrice, scheduleId });
+    console.log(`Scheduled price update for SKU: ${sku} at ${validStartDate} to ${newPrice} (Schedule ID: ${scheduleId})`);
 
     // Define and schedule the price revert job at the end date (if provided)
     if (validEndDate) {
       const revertJobName = `revert_price_update_${sku}_${validEndDate.toISOString()}`;
 
       agenda.define(revertJobName, async (job) => {
-        const { sku, originalPrice } = job.attrs.data;
+        const { sku, originalPrice, scheduleId } = job.attrs.data;
         try {
           await updateProductPrice(sku, originalPrice);
-          console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
+          console.log(`Price reverted for SKU: ${sku} to ${originalPrice} (Schedule ID: ${scheduleId})`);
         } catch (error) {
-          console.error(`Failed to revert price for SKU: ${sku}`, error);
+          console.error(`Failed to revert price for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
         }
       });
 
-      await agenda.schedule(validEndDate.toISOString(), revertJobName, { sku, originalPrice });
-      console.log(`Scheduled price revert for SKU: ${sku} at ${validEndDate} to ${originalPrice}`);
+      await agenda.schedule(validEndDate.toISOString(), revertJobName, { sku, originalPrice, scheduleId });
+      console.log(`Scheduled price revert for SKU: ${sku} at ${validEndDate} to ${originalPrice} (Schedule ID: ${scheduleId})`);
     }
 
   } catch (error) {
-    console.error(`Error scheduling price changes for SKU: ${sku}`, error);
+    console.error(`Error scheduling price changes for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
   }
 };
+
 
 
 
@@ -293,7 +340,7 @@ app.post('/api/schedule/change', async (req, res) => {
 console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
   try {
-   
+    
     // Create a new schedule and save it to the database
     // const newSchedule = new PriceSchedule(req.body);
     const newSchedule = new PriceSchedule({
@@ -309,7 +356,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
       weekly,
       weeklyTimeSlots,
       monthly,
-      monthlyTimeSlots
+      monthlyTimeSlots,
     });
     await newSchedule.save();
 
@@ -343,9 +390,11 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     //   console.log(sku+daysOfWeek+startTime+endTime);
     //   await scheduleWeeklyPriceChange(sku, price, currentPrice, daysOfWeek,startTime,endTime);
     // }
+
+    console.log("new schedule id"+newSchedule._id)
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
       console.log("slots: "+JSON.stringify(weeklyTimeSlots));
-      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots);
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,newSchedule._id);
     }
 
     // if (monthly && datesOfMonth && datesOfMonth.length > 0) {
@@ -355,7 +404,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
       console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
-      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots);
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,newSchedule._id);
     }
 
 
@@ -370,20 +419,22 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
     if (!weekly && !monthly) {
       // Instead of scheduling separate tasks, call singleDayScheduleChange
-      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate);
+      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate,newSchedule._id );
     }
     
 
    
 
     // Send the response after all operations are completed
-    res.json({ success: true, message: 'Schedule saved and jobs queued successfully.', schedule: newSchedule });
+    res.json({ success: true, message: 'Schedule saved and jobs queued successfully.', schedule: newSchedule._id });
   } catch (error) {
     console.error('Error saving schedule:', error);
     res.status(500).json({ error: 'Failed to save schedule' });
   }
 });
 
+
+/*
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
   const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly,weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
@@ -397,7 +448,22 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     }
 
      // Cancel existing jobs
-     
+     const weeklySlotsWithIds = {};
+     const monthlySlotsWithIds = {};
+     for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+       weeklySlotsWithIds[day] = timeSlots.map(slot => ({
+         ...slot,
+         timeSlotScheduleId:slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Generate unique ObjectId here
+       }));
+     }
+ 
+     // Add a unique ObjectId for each time slot in monthly schedules
+     for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
+       monthlySlotsWithIds[date] = timeSlots.map(slot => ({
+         ...slot,
+         timeSlotScheduleId:  slot.timeSlotScheduleId  || new mongoose.Types.ObjectId(), // Generate unique ObjectId here
+       }));
+     }
 
     // Log the previous state of the schedule before updating
     const previousState = {
@@ -411,9 +477,9 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       sku: schedule.sku,
       imageURL: schedule.imageURL,
       weekly: schedule.weekly,
-      weeklyTimeSlots:schedule.weeklyTimeSlots,
+      weeklyTimeSlots: schedule.weeklyTimeSlots,
       monthly:schedule.monthly,
-      monthlyTimeSlots:schedule.monthlyTimeSlots
+      monthlyTimeSlots: schedule.monthlyTimeSlots
     };
 
     // Update the schedule with new details
@@ -427,9 +493,9 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     schedule.sku = sku || schedule.sku; // Ensure SKU is preserved if not updated
     schedule.imageURL = imageURL || schedule.imageURL; // Ensure imageURL is preserved if not updated
     schedule.weekly = weekly || false;
-    schedule.weeklyTimeSlots = weeklyTimeSlots || [];
+    schedule.weeklyTimeSlots = weeklySlotsWithIds;
     schedule.monthly = monthly || false;
-    schedule.monthlySlots = monthlyTimeSlots || [];
+    schedule.monthlySlots =monthlySlotsWithIds;
     
     await schedule.save();
 
@@ -462,14 +528,38 @@ app.put('/api/schedule/change/:id', async (req, res) => {
     
    
     // Cancel existing jobs
-    await agenda.cancel({ 'data.sku': schedule.sku });
+    // console.log("schedule id:"+schedule._id)
+    // await agenda.cancel({ 'data.sku': schedule.sku });
+    console.log("schedule id: "+schedule._id);
+   
     // Re schedule
     
+    // Cancel existing jobs only for the updated time slots
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots);
+      for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+        for (const timeSlot of timeSlots) {
+          // Cancel the existing job for the specific timeSlotScheduleId
+          await agenda.cancel({ 'data.timeSlotScheduleId': timeSlot.timeSlotScheduleId });
+        }
+      }
+    }
+
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
+        for (const timeSlot of timeSlots) {
+          // Cancel the existing job for the specific timeSlotScheduleId
+          await agenda.cancel({ 'data.timeSlotScheduleId': timeSlot.timeSlotScheduleId });
+        }
+      }
+    }
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      // await agenda.cancel({ 'data.sku': schedule.sku });
+    
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,schedule._id);
     }
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots);
+      // await agenda.cancel({ 'data.sku': schedule.sku });
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,schedule._id);
     }
 
   //   if(!weekly && !monthly){
@@ -489,8 +579,9 @@ app.put('/api/schedule/change/:id', async (req, res) => {
   // }
 
   if (!weekly && !monthly) {
+    await agenda.cancel({ 'data.scheduleId': schedule._id});
     // Instead of scheduling separate tasks, call singleDayScheduleChange
-    await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate);
+    await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
   }
 
     
@@ -501,6 +592,272 @@ app.put('/api/schedule/change/:id', async (req, res) => {
   }
 });
 
+*/
+app.put('/api/schedule/change/:id', async (req, res) => {
+  const { id } = req.params;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots } = req.body;
+
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
+
+  try {
+    const schedule = await PriceSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    // Cancel existing jobs
+   
+    // Log the previous state of the schedule before updating
+    const previousState = {
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      price: schedule.price,
+      currentPrice: schedule.currentPrice,
+      status: schedule.status,
+      title: schedule.title,
+      asin: schedule.asin,
+      sku: schedule.sku,
+      imageURL: schedule.imageURL,
+      weekly: schedule.weekly,
+      weeklyTimeSlots: schedule.weeklyTimeSlots,
+      monthly: schedule.monthly,
+      monthlyTimeSlots: schedule.monthlyTimeSlots,
+    };
+
+    // Update the schedule with new details
+    schedule.startDate = startDate;
+    schedule.endDate = endDate;
+    schedule.price = price;
+    schedule.currentPrice = currentPrice;
+    schedule.status = 'updated';
+    schedule.title = title || schedule.title;
+    schedule.asin = asin || schedule.asin;
+    schedule.sku = sku || schedule.sku;
+    schedule.imageURL = imageURL || schedule.imageURL;
+    schedule.weekly = weekly || false;
+    schedule.weeklyTimeSlots = weeklyTimeSlots || [];
+    schedule.monthly = monthly || false;
+    schedule.monthlyTimeSlots = monthlyTimeSlots || [];
+
+    await schedule.save();
+
+    // Log the update in history with previous and updated states
+    const historyLog = new History({
+      scheduleId: schedule._id,
+      action: 'updated',
+      previousState,
+      updatedState: {
+        startDate: schedule.startDate,
+        endDate: schedule.endDate,
+        price: schedule.price,
+        currentPrice: schedule.currentPrice,
+        status: schedule.status,
+        title: schedule.title,
+        asin: schedule.asin,
+        sku: schedule.sku,
+        imageURL: schedule.imageURL,
+        weekly: schedule.weekly,
+        weeklyTimeSlots: schedule.weeklyTimeSlots,
+        monthly: schedule.monthly,
+        monthlyTimeSlots: schedule.monthlyTimeSlots,
+      },
+      userName,
+      timestamp: new Date(),
+    });
+    await historyLog.save();
+
+    // Unified job cancellation logic for both weekly and monthly time slot
+    const scheduleId = schedule._id;
+    console.log("schedulId:"+scheduleId)
+    await agenda.cancel({ 'data.scheduleId': schedule._id });
+
+    
+    // Reschedule weekly jobs
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots, schedule._id);
+    }
+
+    // Reschedule monthly jobs
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots, schedule._id);
+    }
+
+    // If no weekly or monthly schedules, handle single-day schedules
+    if (!weekly && !monthly) {
+      await agenda.cancel({ 'data.scheduleId': schedule._id });
+      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
+    }
+
+    res.json({ success: true, message: 'Schedule updated successfully.' });
+  } catch (error) {
+    console.error('Error updating schedule:', error);
+    res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
+/*
+const cancelObsoleteJobs = async (oldTimeSlots, newTimeSlots) => {
+  console.log("Old time slots:", oldTimeSlots);
+
+  // Collect the timeSlotScheduleIds as strings
+  const oldTimeSlotIds = new Set(oldTimeSlots.map(({ timeSlotScheduleId }) => timeSlotScheduleId?.toString()).filter(Boolean));
+  const newTimeSlotIds = new Set(newTimeSlots.map(({ timeSlotScheduleId }) => timeSlotScheduleId?.toString()).filter(Boolean));
+
+  for (const oldId of oldTimeSlotIds) {
+    // If the old ID no longer exists in the new schedule, cancel the job
+    if (!newTimeSlotIds.has(oldId)) {
+      console.log(`Attempting to cancel job for timeSlotScheduleId: ${oldId}`);
+
+      try {
+        // No need to convert to ObjectId, since it is stored as a string
+        console.log(`Cancel query: { 'data.timeSlotScheduleId': "${oldId}" }`);
+
+        // Attempt to cancel the job with the specific timeSlotScheduleId
+        const result = await agenda.cancel({ 'data.timeSlotScheduleId': oldId });
+
+        if (result > 0) {
+          console.log(`Successfully canceled job for timeSlotScheduleId: ${oldId}`);
+        } else {
+          console.log(`No jobs found to cancel for timeSlotScheduleId: ${oldId}`);
+        }
+      } catch (err) {
+        console.error(`Error during job cancellation for timeSlotScheduleId: ${oldId}`, err);
+      }
+    }
+  }
+};
+
+app.put('/api/schedule/change/:id', async (req, res) => {
+  const { id } = req.params;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots } = req.body;
+
+  try {
+    const schedule = await PriceSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    // Prepare updated weekly and monthly slots with preserved timeSlotScheduleId
+    const weeklySlotsWithIds = {};
+    const monthlySlotsWithIds = {};
+
+    // Process weekly time slots
+    for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+      weeklySlotsWithIds[day] = timeSlots.map(slot => ({
+        ...slot,
+        timeSlotScheduleId: slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Preserve existing ID or generate new one
+      }));
+    }
+
+    // Process monthly time slots
+    for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
+      monthlySlotsWithIds[date] = timeSlots.map(slot => ({
+        ...slot,
+        timeSlotScheduleId: slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Preserve existing ID or generate new one
+      }));
+    }
+
+    // Log the previous state of the schedule before updating
+    const previousState = {
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      price: schedule.price,
+      currentPrice: schedule.currentPrice,
+      status: schedule.status,
+      title: schedule.title,
+      asin: schedule.asin,
+      sku: schedule.sku,
+      imageURL: schedule.imageURL,
+      weekly: schedule.weekly,
+      weeklyTimeSlots: schedule.weeklyTimeSlots,
+      monthly: schedule.monthly,
+      monthlyTimeSlots: schedule.monthlyTimeSlots
+    };
+
+    // Update the schedule with new details
+    schedule.startDate = startDate;
+    schedule.endDate = endDate;
+    schedule.price = price;
+    schedule.currentPrice = currentPrice;
+    schedule.status = 'updated';
+    schedule.title = title || schedule.title;
+    schedule.asin = asin || schedule.asin;
+    schedule.sku = sku || schedule.sku;
+    schedule.imageURL = imageURL || schedule.imageURL;
+    schedule.weekly = weekly || false;
+    schedule.weeklyTimeSlots = weeklySlotsWithIds;
+    schedule.monthly = monthly || false;
+    schedule.monthlyTimeSlots = monthlySlotsWithIds;
+
+    await schedule.save();
+
+    // Log the update in history with previous and updated states
+    const historyLog = new History({
+      scheduleId: schedule._id,
+      action: 'updated',
+      previousState,
+      updatedState: {
+        startDate: schedule.startDate,
+        endDate: schedule.endDate,
+        price: schedule.price,
+        currentPrice: schedule.currentPrice,
+        status: schedule.status,
+        title: schedule.title,
+        asin: schedule.asin,
+        sku: schedule.sku,
+        imageURL: schedule.imageURL,
+        weekly: schedule.weekly,
+        weeklyTimeSlots: schedule.weeklyTimeSlots,
+        monthly: schedule.monthly,
+        monthlyTimeSlots: schedule.monthlyTimeSlots
+      },
+      userName,
+      timestamp: new Date(),
+    });
+    await historyLog.save();
+
+    // Cancel jobs for obsolete weekly time slots
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      for (const [day, newTimeSlots] of Object.entries(weeklyTimeSlots)) {
+        // Use the get method for accessing values in the Map
+        const oldTimeSlots = schedule.weeklyTimeSlots.get(day) || [];
+        console.log("Old weekly time slots for day:", day, oldTimeSlots);
+        await cancelObsoleteJobs(oldTimeSlots, newTimeSlots);
+      }
+    }
+
+    // Cancel jobs for obsolete monthly time slots
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      for (const [date, newTimeSlots] of Object.entries(monthlyTimeSlots)) {
+        // Use the get method for accessing values in the Map
+        const oldTimeSlots = schedule.monthlyTimeSlots.get(date) || [];
+        console.log("Old monthly time slots for date:", date, oldTimeSlots);
+        await cancelObsoleteJobs(oldTimeSlots, newTimeSlots);
+      }
+    }
+
+    // Reschedule only for updated time slots
+    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      await scheduleWeeklyPriceChange(sku, weeklySlotsWithIds);
+    }
+
+    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      await scheduleMonthlyPriceChange(sku, monthlySlotsWithIds);
+    }
+
+    // If no weekly or monthly schedules, handle single-day schedules
+    if (!weekly && !monthly) {
+      await agenda.cancel({ 'data.scheduleId': schedule._id });
+      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
+    }
+
+    res.json({ success: true, message: 'Schedule updated successfully.' });
+  } catch (error) {
+    console.error('Error updating schedule:', error);
+    res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
+
+*/
 
 
 app.delete('/api/schedule/change/:id', async (req, res) => {
@@ -541,7 +898,9 @@ app.delete('/api/schedule/change/:id', async (req, res) => {
     await schedule.save();
 
     // Cancel any associated jobs
-    await agenda.cancel({ 'data.sku': schedule.sku });
+    // await agenda.cancel({ 'data.sku': schedule.sku });
+    await agenda.cancel({ 'data.scheduleId': schedule._id}); // Ensure each job is associated with a unique scheduleId
+
 
     res.json({ success: true, message: 'Schedule marked as deleted and associated jobs canceled.' });
   } catch (error) {

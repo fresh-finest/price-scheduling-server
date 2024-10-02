@@ -131,8 +131,8 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     }
   });
 }
-/*
-const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots) => {
+
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
       console.log(day + timeSlot.startTime);     
@@ -151,16 +151,16 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots) => {
       // Pass the correct timeSlot object
       await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice,day});
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice,day,scheduleId});
       console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, day});
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, day,scheduleId});
       console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${timeSlot.endTime}`);
     }
   }
 };
-*/
 
+/*
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
@@ -202,7 +202,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
   }
 };
 
-
+*/
 
 async function defineMonthlyJob(sku, date, timeSlot) {
   const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; // Ensure unique job name for each time slot

@@ -56,8 +56,10 @@ exports.getPriceScheduleServiceId = async(id)=>{
     const schedule = await PriceSchedule.findOne({_id:id});
     return schedule;
 }
-exports.getPriceScheduleServiceByAsin = async(asin)=>{
-    const products = await PriceSchedule.find({asin:asin});
+exports.getPriceScheduleServiceBySku = async(sku)=>{
+    const decodedSku = decodeURIComponent(sku);
+    console.log("decoded"+decodedSku)
+    const products = await PriceSchedule.find({sku:decodedSku});
     return products;
 }
 

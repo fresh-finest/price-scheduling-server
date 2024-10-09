@@ -1,4 +1,4 @@
-const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByAsin, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId, deletePriceScheduleServiceById, getDeletedHistoryService } = require("../service/PriceScheduleService")
+const { createPriceScheduleService, getPriceScheduleService, getPriceScheduleServiceByUser, updatePriceScheduleServiceById, getPriceScheduleServiceId, deletePriceScheduleServiceById, getDeletedHistoryService, getPriceScheduleServiceBySku } = require("../service/PriceScheduleService")
 
 exports.createPriceSchedule = async(req,res,next)=>{
     try {
@@ -96,10 +96,10 @@ exports.getPriceScheduleById = async(req,res,next)=>{
     }
 }
 
-exports.createPriceScheduleByAsin = async(req,res,next)=>{
+exports.getPriceScheduleBySku = async(req,res,next)=>{
     try {
-    const {asin} = req.params;
-    const result = await getPriceScheduleServiceByAsin(asin);
+    const {sku} = req.params;
+    const result = await getPriceScheduleServiceBySku(sku);
     res.status(200).json({
         status: "Success",
         message: "Successfully fetch data.",

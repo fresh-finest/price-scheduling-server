@@ -231,12 +231,20 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {
       // Convert start and end times based on user time zone
-      const startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset, userTimeZone);
-      const endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset, userTimeZone);
+      console.log("time start before edt"+timeSlot.startTime)
+      let startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset, userTimeZone);
+      let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset, userTimeZone);
+     console.log("After edt:"+startTimeInEDT);
 
+     if(userTimeZone ==="America/New_York"){
+        startTimeInEDT = timeSlot.startTime;
+
+        endTimeInEDT = timeSlot.endTime;
+     }
       let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
       let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
-
+      
+     
       // No need to reduce 12 hours for New York users, apply reduction for others
       if (userTimeZone !== "America/New_York") {
         startHour = reduce12Hours(startHour);

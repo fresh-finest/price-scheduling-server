@@ -216,11 +216,31 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 }
 
 // Helper function to adjust time by reducing 12 hours (for fixing PM issues)
+/*
 const reduce12Hours = (hours) => {
+  console.log("hours value: "+hours)
   let adjustedHours = hours + 12;
-  if (adjustedHours < 0) adjustedHours += 24; // Handle negative hours by wrapping around
+  if (adjustedHours < 0) adjustedHours += 24; 
   return adjustedHours;
 };
+*/
+const reduce12Hours = (hours) => {
+  console.log("hours value: " + hours);
+
+  // If hours is more than 12, it is already PM, so no need to adjust
+  if (hours >= 12) {
+    return hours; // For PM hours (13 and above), just return the hours
+  }
+
+  // If it's AM and the hour is 12 (12 AM), we need to adjust to 0 (midnight)
+  if (hours === 12) {
+    return 0; // 12 AM is 0 in 24-hour format
+  }
+
+  // For hours less than 12, add 12 to convert to PM (e.g., 2 PM becomes 14)
+  return hours + 12;
+};
+
 
 // Schedule the weekly price change
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userTimeZone = '') => {

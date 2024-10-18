@@ -163,8 +163,13 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
 };
 */
 // Helper function to convert user time to EDT
-const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4) => {
+const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4, userTimeZone = '') => {
   const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // If the user is already in New York (America/New_York), no need to convert
+  if (userTimeZone === "America/New_York") {
+    return inputTime; // Return the time as-is for users in EDT
+  }
 
   // Convert user time to UTC
   let utcHours = hours - userTimeZoneOffset;
@@ -219,36 +224,38 @@ const reduce12Hours = (hours) => {
 };
 
 // Schedule the weekly price change
-const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
-  const userTimeZoneOffset = 6; // Assume Bangladesh UTC+6
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userTimeZone = '') => {
+  const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
   const edtOffset = -4; // EDT is UTC-4 during daylight savings
 
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-    for (const timeSlot of timeSlots) {  
-      // Convert start and end times from the user's time zone to EDT
-      const startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset);
-      const endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset);
+    for (const timeSlot of timeSlots) {
+      // Convert start and end times based on user time zone
+      const startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset, userTimeZone);
+      const endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset, userTimeZone);
 
       let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
       let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
 
-      // Reduce the time by 12 hours
-      startHour = reduce12Hours(startHour);
-      endHour = reduce12Hours(endHour);
+      // No need to reduce 12 hours for New York users, apply reduction for others
+      if (userTimeZone !== "America/New_York") {
+        startHour = reduce12Hours(startHour);
+        endHour = reduce12Hours(endHour);
+      }
 
-      // Cron expressions after reducing 12 hours
-      const updateCron = `${startMinute} ${startHour} * * ${day}`;  // e.g., "15 15 * * 5"
-      const revertCron = `${endMinute} ${endHour} * * ${day}`;  // e.g., "45 15 * * 5"
+      // Cron expressions
+      const updateCron = `${startMinute} ${startHour} * * ${day}`;
+      const revertCron = `${endMinute} ${endHour} * * ${day}`;
 
       const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
       const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
 
       // Schedule the jobs in EDT
       await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT (reduced by 12 hours)`);
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT`);
 
       await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT (reduced by 12 hours)`);
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT`);
     }
   }
 };
@@ -487,7 +494,7 @@ const singleDaySchedulePriceChange = async (sku, singleDaySlots, parentScheduleI
 
 app.post('/api/schedule/change', async (req, res) => {
   // const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate } = req.body;
-  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
+  const { userName, asin, sku, title, price, currentPrice, imageURL, startDate, endDate, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots,timeZone} = req.body;
   console.log("Request body:", JSON.stringify(req.body, null, 2));
 
 console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
@@ -510,6 +517,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
       weeklyTimeSlots,
       monthly,
       monthlyTimeSlots,
+      timeZone
     });
     await newSchedule.save();
 
@@ -547,7 +555,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     console.log("new schedule id"+newSchedule._id)
     if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
       console.log("slots: "+JSON.stringify(weeklyTimeSlots));
-      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,newSchedule._id);
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,newSchedule._id,timeZone);
     }
 
     // if (monthly && datesOfMonth && datesOfMonth.length > 0) {

@@ -36,9 +36,9 @@ app.options('*', cors()); // Enable pre-flight for all routes
 // }));
 
 
-const MONGO_URI = process.env.MONGO_URI;
+// const MONGO_URI = process.env.MONGO_URI;
 
-// const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
 
 
 mongoose
@@ -213,7 +213,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 
 // Helper function to adjust time by reducing 12 hours (for fixing PM issues)
 const reduce12Hours = (hours) => {
-  let adjustedHours = hours - 12;
+  let adjustedHours = hours + 12;
   if (adjustedHours < 0) adjustedHours += 24; // Handle negative hours by wrapping around
   return adjustedHours;
 };

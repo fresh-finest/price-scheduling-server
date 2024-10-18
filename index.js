@@ -219,14 +219,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 
 const reduce12Hours = (hours) => {
   console.log("hours value: "+hours)
-  let adjustedHours ;
- 
-    adjustedHours = hours + 12;
-
-  if(hours>12){
-    adjustedHours= hours+0;
-  }
-  
+  let adjustedHours = hours + 12;
   if (adjustedHours < 0) adjustedHours += 24; 
   return adjustedHours;
 };

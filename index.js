@@ -211,41 +211,49 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   });
 }
 
-// Schedule the weekly price change, converting times to EDT
+// Helper function to adjust time by reducing 12 hours (for fixing PM issues)
+const reduce12Hours = (hours) => {
+  let adjustedHours = hours - 12;
+  if (adjustedHours < 0) adjustedHours += 24; // Handle negative hours by wrapping around
+  return adjustedHours;
+};
+
+// Schedule the weekly price change
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
   const userTimeZoneOffset = 6; // Assume Bangladesh UTC+6
   const edtOffset = -4; // EDT is UTC-4 during daylight savings
 
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-    for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
-      console.log(day + timeSlot.startTime);     
-
+    for (const timeSlot of timeSlots) {  
       // Convert start and end times from the user's time zone to EDT
       const startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset);
       const endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset);
 
-      const [startHour, startMinute] = startTimeInEDT.split(':');
-      const [endHour, endMinute] = endTimeInEDT.split(':');
+      let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
+      let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
 
-      const updateCron = `${startMinute} ${startHour} * * ${day}`;
-      const revertCron = `${endMinute} ${endHour} * * ${day}`;
+      // Reduce the time by 12 hours
+      startHour = reduce12Hours(startHour);
+      endHour = reduce12Hours(endHour);
 
-      // Ensure unique job names for each time slot
+      // Cron expressions after reducing 12 hours
+      const updateCron = `${startMinute} ${startHour} * * ${day}`;  // e.g., "15 15 * * 5"
+      const revertCron = `${endMinute} ${endHour} * * ${day}`;  // e.g., "45 15 * * 5"
+
       const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
       const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
 
-      // Pass the correct timeSlot object
-      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
-
-      // Schedule the update and revert jobs in EDT time zone
+      // Schedule the jobs in EDT
       await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT`);
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT (reduced by 12 hours)`);
 
       await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT`);
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT (reduced by 12 hours)`);
     }
   }
 };
+
+
 
 
 

@@ -223,8 +223,8 @@ const reduce12Hours = (hours) => {
  
     adjustedHours = hours + 12;
 
-  if(hours>24){
-    adjustedHours= hours - 12;
+  if(hours>12){
+    adjustedHours= hours+0;
   }
   
   if (adjustedHours < 0) adjustedHours += 24; 

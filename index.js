@@ -768,7 +768,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
 */
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots } = req.body;
+  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots,timeZone } = req.body;
 
   console.log("Request body:", JSON.stringify(req.body, null, 2));
 
@@ -846,10 +846,14 @@ app.put('/api/schedule/change/:id', async (req, res) => {
 
     
     // Reschedule weekly jobs
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots, schedule._id);
+    if (timeZone !=="America/New_York" && weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      console.log("slots: "+JSON.stringify(weeklyTimeSlots));
+      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,schedule._id,timeZone);
     }
-
+    if (timeZone ==="America/New_York" && weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      console.log("slots from new work: "+JSON.stringify(weeklyTimeSlots));
+      await scheduleWeeklyPriceChangeFromEdt(sku, weeklyTimeSlots,schedule._id);
+    }
     // Reschedule monthly jobs
     if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
       await scheduleMonthlyPriceChange(sku, monthlyTimeSlots, schedule._id);

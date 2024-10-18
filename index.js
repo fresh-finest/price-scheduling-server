@@ -104,9 +104,8 @@ const updateProductPrice = async (sku, value) => {
   }
 };
 
-/*
 
-async function defineWeeklyJob(sku, day, timeSlot) {
+async function defineWeeklyJobEdt(sku, day, timeSlot) {
   console.log("timeSlot: "+JSON.stringify(timeSlot.startTime));
 
   const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
@@ -135,7 +134,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   });
 }
 
-const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
+const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots,scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
       console.log(day + timeSlot.startTime);     
@@ -151,7 +150,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
       const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
 
       // Pass the correct timeSlot object
-      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
+      await defineWeeklyJobEdt(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
       await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice,day,scheduleId});
       console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${timeSlot.startTime}`);
@@ -161,7 +160,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
     }
   }
 };
-*/
+
 // Helper function to convert user time to EDT
 const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4, userTimeZone = '') => {
   const [hours, minutes] = inputTime.split(':').map(Number);
@@ -561,9 +560,13 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     // }
 
     console.log("new schedule id"+newSchedule._id)
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
+    if (timeZone !=="America/New_York" && weekly && Object.keys(weeklyTimeSlots).length > 0) {
       console.log("slots: "+JSON.stringify(weeklyTimeSlots));
       await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,newSchedule._id,timeZone);
+    }
+    if (timeZone ==="America/New_York" && weekly && Object.keys(weeklyTimeSlots).length > 0) {
+      console.log("slots from new work: "+JSON.stringify(weeklyTimeSlots));
+      await scheduleWeeklyPriceChangeFromEdt(sku, weeklyTimeSlots,newSchedule._id);
     }
 
     // if (monthly && datesOfMonth && datesOfMonth.length > 0) {

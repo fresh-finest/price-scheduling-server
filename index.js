@@ -38,6 +38,9 @@ app.options('*', cors()); // Enable pre-flight for all routes
 
 const MONGO_URI = process.env.MONGO_URI;
 
+// const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+
+
 mongoose
   .connect(MONGO_URI)
   .then(() => {
@@ -101,7 +104,7 @@ const updateProductPrice = async (sku, value) => {
   }
 };
 
-
+/*
 
 async function defineWeeklyJob(sku, day, timeSlot) {
   console.log("timeSlot: "+JSON.stringify(timeSlot.startTime));
@@ -109,7 +112,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
   const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
   console.log(jobName);
   const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
-  agenda.define(jobName, async (job) => {
+  agenda.define(jobName, { priority: 5 }, async (job) => {
     const { sku, newPrice} = job.attrs.data;
 
     try {
@@ -120,7 +123,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     }
   });
 
-  agenda.define(`revert_${revertJobName}`, async (job) => {
+  agenda.define(`revert_${revertJobName}`, { priority: 5 }, async (job) => {
     const { sku, revertPrice} = job.attrs.data;
 
     try {
@@ -136,7 +139,6 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
       console.log(day + timeSlot.startTime);     
-       
       
       const [startHour, startMinute] = timeSlot.startTime.split(':');
       const [endHour, endMinute] = timeSlot.endTime.split(':');
@@ -159,6 +161,93 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
     }
   }
 };
+*/
+// Helper function to convert user time to EDT
+const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4) => {
+  const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // Convert user time to UTC
+  let utcHours = hours - userTimeZoneOffset;
+  if (utcHours < 0) utcHours += 24;
+  if (utcHours >= 24) utcHours -= 24;
+
+  // Convert UTC to EDT
+  let edtHours = utcHours + targetTimeZoneOffset;
+  if (edtHours < 0) edtHours += 24;
+  if (edtHours >= 24) edtHours -= 24;
+
+  // Return the adjusted time in EDT format (HH:mm)
+  return `${String(edtHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+// Define the weekly job with the corrected time in EDT
+async function defineWeeklyJob(sku, day, timeSlot) {
+  console.log("TimeSlot:", JSON.stringify(timeSlot.startTime));
+
+  const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
+  console.log(jobName);
+  const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
+
+  agenda.define(jobName, { priority: 5 }, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${day}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+
+  agenda.define(`revert_${revertJobName}`, { priority: 5 }, async (job) => {
+    const { sku, revertPrice } = job.attrs.data;
+
+    try {
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, day: ${day}, slot: ${timeSlot.endTime}`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}, slot: ${timeSlot.endTime}`, error);
+    }
+  });
+}
+
+// Schedule the weekly price change, converting times to EDT
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
+  const userTimeZoneOffset = 6; // Assume Bangladesh UTC+6
+  const edtOffset = -4; // EDT is UTC-4 during daylight savings
+
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const timeSlot of timeSlots) {  // Ensure you're passing the correct timeSlot object here
+      console.log(day + timeSlot.startTime);     
+
+      // Convert start and end times from the user's time zone to EDT
+      const startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset);
+      const endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset);
+
+      const [startHour, startMinute] = startTimeInEDT.split(':');
+      const [endHour, endMinute] = endTimeInEDT.split(':');
+
+      const updateCron = `${startMinute} ${startHour} * * ${day}`;
+      const revertCron = `${endMinute} ${endHour} * * ${day}`;
+
+      // Ensure unique job names for each time slot
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
+
+      // Pass the correct timeSlot object
+      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
+
+      // Schedule the update and revert jobs in EDT time zone
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT`);
+
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT`);
+    }
+  }
+};
+
+
 
 /*
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
@@ -208,7 +297,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; // Ensure unique job name for each time slot
   const revertJobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.endTime}`;
 
-  agenda.define(jobName, async (job) => {
+  agenda.define(jobName, { priority: 10 }, async (job) => {
     const { sku, newPrice,scheduleId } = job.attrs.data;
 
     try {
@@ -219,7 +308,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
     }
   });
 
-  agenda.define(`revert_${revertJobName}`, async (job) => {
+  agenda.define(`revert_${revertJobName}`, { priority: 10 }, async (job) => {
     const { sku, revertPrice} = job.attrs.data;
 
     try {
@@ -248,10 +337,10 @@ const scheduleMonthlyPriceChange = async (sku, monthlySlots, scheduleId) => {
       // Define and schedule the update and revert jobs
       await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
 
-      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date,scheduleId});
+      await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date,scheduleId}, { priority: 10 });
       console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, date,scheduleId});
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice:timeSlot.revertPrice, date,scheduleId}, { priority: 10 });
       console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${timeSlot.endTime}`);
     }
   }
@@ -287,8 +376,9 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
 
     // Define and schedule the price update job at the start date
     const updateJobName = `schedule_price_update_${sku}_${validStartDate.toISOString()}`;
+   
 
-    agenda.define(updateJobName, async (job) => {
+    agenda.define(updateJobName,{ priority: 1 }, async (job) => {
       const { sku, newPrice, scheduleId } = job.attrs.data;
       try {
         await updateProductPrice(sku, newPrice);
@@ -305,7 +395,7 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
     if (validEndDate) {
       const revertJobName = `revert_price_update_${sku}_${validEndDate.toISOString()}`;
 
-      agenda.define(revertJobName, async (job) => {
+      agenda.define(revertJobName,{ priority: 1 }, async (job) => {
         const { sku, originalPrice, scheduleId } = job.attrs.data;
         try {
           await updateProductPrice(sku, originalPrice);
@@ -324,6 +414,61 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
   }
 };
 
+const singleDaySchedulePriceChange = async (sku, singleDaySlots, parentScheduleId) => {
+  try {
+    for (const slot of singleDaySlots) {
+      const { startDate, endDate, newPrice, revertPrice, 
+        singleDayScheduleId } = slot;
+     
+      const validStartDate = new Date(startDate);
+      const validEndDate = endDate ? new Date(endDate) : null;
+
+      if (isNaN(validStartDate.getTime()) || (validEndDate && isNaN(validEndDate.getTime()))) {
+        throw new Error('Invalid start or end date');
+      }
+
+      const updateJobName = `schedule_price_update_${sku}_${validStartDate.toISOString()}`;
+
+      agenda.define(updateJobName, async (job) => {
+        const { sku, newPrice, parentScheduleId, singleDayScheduleId } = job.attrs.data;
+        try {
+          await updateProductPrice(sku, newPrice);
+        } catch (error) {
+          console.error(`Failed to update price for SKU: ${sku} (Single Day Schedule ID: ${singleDayScheduleId})`, error);
+        }
+      });
+
+      await agenda.schedule(validStartDate.toISOString(), updateJobName, { sku, newPrice, parentScheduleId, singleDayScheduleId });
+      console.log(`Scheduled price update for SKU: ${sku} at ${validStartDate} to ${newPrice} (Single Day Schedule ID: ${singleDayScheduleId})`);
+
+      if (validEndDate) {
+        const revertJobName = `revert_price_update_${sku}_${validEndDate.toISOString()}`;
+
+        agenda.define(revertJobName, async (job) => {
+          const { sku, originalPrice, singleDayScheduleId } = job.attrs.data;
+          try {
+            await updateProductPrice(sku, revertPrice || originalPrice);
+            console.log(`Price reverted for SKU: ${sku} to ${revertPrice || originalPrice} (Single Day Schedule ID: ${singleDayScheduleId})`);
+          } catch (error) {
+            console.error(`Failed to revert price for SKU: ${sku} (Single Day Schedule ID: ${singleDayScheduleId})`, error);
+          }
+        });
+
+        await agenda.schedule(validEndDate.toISOString(), revertJobName, { sku, originalPrice: revertPrice || originalPrice, parentScheduleId, singleDayScheduleId });
+        console.log(`Scheduled price revert for SKU: ${sku} at ${validEndDate} to ${revertPrice || originalPrice} (Single Day Schedule ID: ${singleDayScheduleId})`);
+      }
+
+      // Update the slot with the unique singleDayScheduleId
+      slot.singleDayScheduleId = singleDayScheduleId;
+    }
+
+    // Update the parent schedule with the modified singleDaySlots
+    await PriceSchedule.updateOne({ _id: parentScheduleId }, { $set: { singleDaySlots } });
+
+  } catch (error) {
+    console.error(`Error scheduling price changes for SKU: ${sku} (Parent Schedule ID: ${parentScheduleId})`, error);
+  }
+};
 
 
 
@@ -432,6 +577,7 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     res.status(500).json({ error: 'Failed to save schedule' });
   }
 });
+
 
 
 /*
@@ -982,7 +1128,7 @@ const fetchProductDetails = async (asin) => {
 
 
 // Schedule the task to run every day at 12:00 PM Bangladesh time
-cron.schedule('0 12 * * *', async () => {
+cron.schedule('0 15 * * *', async () => {
   const bangladeshTime = moment.tz("Asia/Dhaka").format();
   console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
   await fetchAndDownloadDataOnce();
@@ -991,7 +1137,7 @@ cron.schedule('0 12 * * *', async () => {
 });
 
 // Schedule the task to run at 1:00 PM Bangladesh time every day
-cron.schedule('0 13 * * *', async () => {
+cron.schedule('0 16 * * *', async () => {
   try {
     console.log('Scheduled task started at 1:00 PM Bangladesh time...');
 
@@ -1256,6 +1402,7 @@ app.listen(process.env.PORT,'0.0.0.0', () => {
 const scheduleRoute = require("./src/route/Schedule");
 const authRoute = require("./src/route/auth");
 const userRoute = require("./src/route/user");
+const historyRoute = require("./src/route/history")
 const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
 const sendEmail = require('./src/service/EmailService');
@@ -1275,7 +1422,7 @@ const { getListingsItemBySku } = require('./src/service/getPriceService');
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
-
+app.use("/api/histories",historyRoute);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";

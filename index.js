@@ -268,7 +268,7 @@ const convertBSTtoUTCForEDT = (inputTime) => {
   edtTime.setHours(edtHours, minutes, 0, 0);
 
   // Step 3: Convert EDT time to UTC
-  const utcTime = new Date(edtTime.getTime() + (4 * 60 * 60 * 1000)); // EDT is UTC-4, so add 4 hours
+  const utcTime = new Date(edtTime.getTime() - (4 * 60 * 60 * 1000)); // EDT is UTC-4, so add 4 hours
   console.log(`Input Time: ${inputTime} BST -> ${edtTime} EDT -> ${utcTime} UTC`);
 
   return utcTime;

@@ -36,9 +36,9 @@ app.options('*', cors()); // Enable pre-flight for all routes
 // }));
 
 
-// const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI;
 
-const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+// const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
 
 
 mongoose

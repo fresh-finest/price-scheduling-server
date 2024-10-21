@@ -259,20 +259,16 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
       let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset, userTimeZone);
      console.log("After edt:"+startTimeInEDT);
 
-     if(userTimeZone ==="America/New_York"){
-        startTimeInEDT = timeSlot.startTime;
-
-        endTimeInEDT = timeSlot.endTime;
-     }
+     
       let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
       let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
       
      
       // No need to reduce 12 hours for New York users, apply reduction for others
-      if (userTimeZone !== "America/New_York") {
+      
         startHour = reduce12Hours(startHour);
         endHour = reduce12Hours(endHour);
-      }
+      
 
       // Cron expressions
       const updateCron = `${startMinute} ${startHour} * * ${day}`;
@@ -280,6 +276,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
 
       const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
       const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
+      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
       // Schedule the jobs in EDT
       await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });

@@ -36,9 +36,9 @@ app.options('*', cors()); // Enable pre-flight for all routes
 // }));
 
 
-const MONGO_URI = process.env.MONGO_URI;
+// const MONGO_URI = process.env.MONGO_URI;
 
-// const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
 
 
 mongoose
@@ -162,6 +162,7 @@ const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots,scheduleId)
 };
 
 // Helper function to convert user time to EDT
+/*
 const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4, userTimeZone = '') => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
@@ -194,7 +195,23 @@ const reduce12Hours = (hours) => {
   if (adjustedHours < 0) adjustedHours += 24; 
   return adjustedHours;
 };
+*/
+
+const convertToUTCInNewYork = (inputTime) => {
+  const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // Create a moment object with the given time in New York time (EDT)
+  const timeInNewYork = moment.tz({ hour: hours, minute: minutes }, "America/New_York");
+
+  // Convert that time to UTC
+  const timeInUTC = timeInNewYork.clone().utc();
+
+  console.log(`Input Time: ${inputTime} (New York Time) -> UTC: ${timeInUTC.format()}`);
+
+  return timeInUTC;
+};
 // Define the weekly job with the corrected time in EDT
+/*
 async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
 
   const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
@@ -240,6 +257,45 @@ async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
     }
   });
 }
+*/
+// Define the weekly job with the corrected time in UTC (based on New York time)
+async function defineWeeklyJob(sku, day, timeSlot) {
+  // Convert start and end times to UTC (based on New York local time)
+  const startTimeInUTC = convertToUTCInNewYork(timeSlot.startTime);
+  const endTimeInUTC = convertToUTCInNewYork(timeSlot.endTime);
+
+  const startHourUTC = startTimeInUTC.hours();
+  const startMinuteUTC = startTimeInUTC.minutes();
+  const endHourUTC = endTimeInUTC.hours();
+  const endMinuteUTC = endTimeInUTC.minutes();
+
+  console.log(`Job Start Time in UTC: ${startHourUTC}:${startMinuteUTC}, End Time in UTC: ${endHourUTC}:${endMinuteUTC}`);
+
+  const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHourUTC}:${startMinuteUTC}`;
+  const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHourUTC}:${endMinuteUTC}`;
+
+  // Define the job in Agenda for price update
+  agenda.define(updateJobName, { priority: 5 }, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Price updated for SKU: ${sku} at ${startTimeInUTC.format()} UTC`);
+    } catch (error) {
+      console.error(`Failed to update price for SKU: ${sku}`, error);
+    }
+  });
+
+  // Define the job in Agenda for price revert
+  agenda.define(revertJobName, { priority: 5 }, async (job) => {
+    const { sku, revertPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku} at ${endTimeInUTC.format()} UTC`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}`, error);
+    }
+  });
+}
 
 // Helper function to adjust time by reducing 12 hours (for fixing PM issues)
 
@@ -265,6 +321,7 @@ const reduce12Hours = (hours) => {
 */
 
 // Schedule the weekly price change
+/*
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userTimeZone = '') => {
   const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
   const edtOffset = -4; // EDT is UTC-4 during daylight savings
@@ -306,6 +363,31 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
   }
 };
 
+*/
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const timeSlot of timeSlots) {
+      // Convert start and end times to UTC based on New York local time
+      const startTimeInUTC = convertToUTCInNewYork(timeSlot.startTime);
+      const endTimeInUTC = convertToUTCInNewYork(timeSlot.endTime);
+
+      const updateCron = `${startTimeInUTC.minutes()} ${startTimeInUTC.hours()} * * ${day}`;
+      const revertCron = `${endTimeInUTC.minutes()} ${endTimeInUTC.hours()} * * ${day}`;
+
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startTimeInUTC.hours()}:${startTimeInUTC.minutes()}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endTimeInUTC.hours()}:${endTimeInUTC.minutes()}`;
+
+      await defineWeeklyJob(sku, day, timeSlot);
+
+      // Schedule the jobs in UTC
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInUTC.format()} UTC`);
+
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInUTC.format()} UTC`);
+    }
+  }
+};
 
 
 

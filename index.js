@@ -195,7 +195,7 @@ const reduce12Hours = (hours) => {
   return adjustedHours;
 };
 // Define the weekly job with the corrected time in EDT
-async function defineWeeklyJob(sku, day, timeSlot) {
+async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
 
   const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
   const edtOffset = -4; // EDT is UTC-4 during daylight savings

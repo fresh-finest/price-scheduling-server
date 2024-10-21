@@ -255,7 +255,7 @@ const convertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
   // Step 1: Add 10 hours to get EDT equivalent (Bangladesh is UTC+6, EDT is UTC-4)
-  let edtHours = hours + 10;
+  let edtHours = hours + 6;
 
   // Handle edge cases where time exceeds 24 hours
   if (edtHours >= 24) {

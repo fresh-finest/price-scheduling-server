@@ -254,12 +254,12 @@ async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
 const convertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
-  // Step 1: Subtract 10 hours to get EDT equivalent (Bangladesh is UTC+6, EDT is UTC-4)
-  let edtHours = hours - 10;
+  // Step 1: Add 10 hours to get EDT equivalent (Bangladesh is UTC+6, EDT is UTC-4)
+  let edtHours = hours + 10;
 
-  // Handle edge cases where time goes negative or over 24 hours
-  if (edtHours < 0) {
-    edtHours += 24; // Wrap around if the hours go below 0
+  // Handle edge cases where time exceeds 24 hours
+  if (edtHours >= 24) {
+    edtHours -= 24; // Wrap around if the hours go above 24
   }
 
   // Step 2: Treat the result as New York time (EDT) and convert it to UTC
@@ -273,6 +273,7 @@ const convertBSTtoUTCForEDT = (inputTime) => {
 
   return utcTime;
 };
+
 
 
 // Define the weekly job with the corrected time in UTC (based on input in Bangladesh)

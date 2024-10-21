@@ -200,7 +200,7 @@ async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
   const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
   const edtOffset = -4; // EDT is UTC-4 during daylight savings
 
-      await defineWeeklyJob(sku, day, timeSlot,userTimeZone);  // Pass timeSlot, not timeSlots
+    
   let startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset,userTimeZone);
   let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset,userTimeZone);
   let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);

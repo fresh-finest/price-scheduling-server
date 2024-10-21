@@ -469,7 +469,7 @@ agenda.define('revert price update', async (job) => {
   await updateProductPrice(sku, originalPrice);
   console.log(`Price reverted for SKU: ${sku} to ${originalPrice}`);
 });*/
-
+/*
 const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate, scheduleId) => {
   try {
     // Ensure startDate and endDate are valid Date objects
@@ -520,7 +520,7 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
     console.error(`Error scheduling price changes for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
   }
 };
-
+*/
 
 // const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
 //   // Step 1: Parse the input time in Bangladesh Standard Time (BST)
@@ -542,16 +542,31 @@ const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
   const bstToEdtOffset = -10; // Bangladesh is UTC+6, EDT is UTC-4, so we subtract 10 hours
   const edtDateTime = new Date(inputDateTime.getTime() + bstToEdtOffset * 60 * 60 * 1000);
   
-  // Step 2: Add 10 hours to the EDT time for UTC job scheduling
-  const edtToUtcOffset = 16; // Increase 10 hours to EDT time for UTC scheduling
-  const finalUtcDateTime = new Date(edtDateTime.getTime() + edtToUtcOffset * 60 * 60 * 1000);
+  // Step 2: Adjust time for UTC (no additional offset needed since EDT aligns with UTC)
+  const finalUtcDateTime = edtDateTime;
 
- 
+  console.log(`Input Time: ${inputDateTime} BST -> ${edtDateTime} EDT -> ${finalUtcDateTime} UTC`);
+  
   return finalUtcDateTime;
+}*/
+const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
+  // Step 1: Treat the inputDateTime (BST) as if it were EDT (New York Time)
+  const edtDateTime = moment.tz(inputDateTime, 'Asia/Dhaka').tz('America/New_York', true); // Treat the input as EDT
+  
+  // Step 2: Convert the EDT time to UTC for job scheduling
+  const utcDateTime = edtDateTime.clone().utc(); // Convert EDT time to UTC
+  
+  console.log(`Input Time (BST): ${inputDateTime} -> Treated as EDT: ${edtDateTime.format()} -> Scheduled in UTC: ${utcDateTime.format()}`);
+  
+  return utcDateTime.toDate(); // Return the Date object in UTC
 }
 
+
+
+
+
 const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate, scheduleId, userTimeZone = '') => {
-  console.log("time zone"+userTimeZone)
+  console.log("User Time Zone:", userTimeZone);
   try {
     // Ensure startDate and endDate are valid Date objects
     const validStartDate = new Date(startDate);
@@ -561,11 +576,10 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
       throw new Error('Invalid start or end date');
     }
 
-
     let adjustedStartDate = validStartDate;
     let adjustedEndDate = validEndDate;
 
-    // If the user is in Bangladesh time zone, convert BST to EDT
+    // Convert BST to EDT if the user is in Bangladesh time zone
     if (userTimeZone === 'Asia/Dhaka') {
       adjustedStartDate = singleConvertBSTtoUTCForEDT(validStartDate);  // Convert the start time
       adjustedEndDate = validEndDate ? singleConvertBSTtoUTCForEDT(validEndDate) : null; // Convert the end time if provided
@@ -578,6 +592,7 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
       const { sku, newPrice, scheduleId } = job.attrs.data;
       try {
         await updateProductPrice(sku, newPrice);
+        console.log(`Price updated for SKU: ${sku} (Schedule ID: ${scheduleId})`);
       } catch (error) {
         console.error(`Failed to update price for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
       }
@@ -608,7 +623,8 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
     console.error(`Error scheduling price changes for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
   }
 };
-*/
+
+
 
 const singleDaySchedulePriceChange = async (sku, singleDaySlots, parentScheduleId) => {
   try {

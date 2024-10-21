@@ -161,96 +161,6 @@ const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots,scheduleId)
   }
 };
 
-// Helper function to convert user time to EDT
-/*
-const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4, userTimeZone = '') => {
-  const [hours, minutes] = inputTime.split(':').map(Number);
-
-  // If the user is already in New York (America/New_York), no need to convert
-  if (userTimeZone === "America/New_York") {
-    return inputTime; // Return the time as-is for users in EDT
-  }
-
-  // Convert user time to UTC
-  let utcHours = hours - userTimeZoneOffset;
-  if (utcHours < 0) utcHours += 24;
-  if (utcHours >= 24) utcHours -= 24;
-
-  // Convert UTC to EDT
-  let edtHours = utcHours + targetTimeZoneOffset;
-  if (edtHours < 0) edtHours += 24;
-  if (edtHours >= 24) edtHours -= 24;
-
-  // Return the adjusted time in EDT format (HH:mm)
-  return `${String(edtHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-};
-
-
-const reduce12Hours = (hours) => {
-  console.log("hours value: "+hours)
-  let adjustedHours = hours + 12;
-  if (hours>12){
-    adjustedHours = hours - 8; 
-  }
-  if (adjustedHours < 0) adjustedHours += 24; 
-  return adjustedHours;
-};
-*/
-// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
-
-
-// Define the weekly job with the corrected time in EDT
-/*
-async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
-
-  const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
-  const edtOffset = -4; // EDT is UTC-4 during daylight savings
-
-    
-  let startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset,userTimeZone);
-  let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset,userTimeZone);
-  let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
-  let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
-
-  startHour = reduce12Hours(startHour);
-  endHour = reduce12Hours(endHour);
-      
-  console.log("TimeSlot:", JSON.stringify(timeSlot.startTime));
-
-  // const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
-  const jobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
-  console.log(jobName);
-  // const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; 
-
-  const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
-
-  agenda.define(jobName, { priority: 5 }, async (job) => {
-    const { sku, newPrice } = job.attrs.data;
-
-    try {
-      await updateProductPrice(sku, newPrice);
-      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${day}, slot: ${timeSlot.startTime}`);
-    } catch (error) {
-      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${day}, slot: ${timeSlot.startTime}`, error);
-    }
-  });
-
-  agenda.define(`revert_${revertJobName}`, { priority: 5 }, async (job) => {
-    const { sku, revertPrice } = job.attrs.data;
-
-    try {
-      await updateProductPrice(sku, revertPrice);
-      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, day: ${day}, slot: ${timeSlot.endTime}`);
-    } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, day: ${day}, slot: ${timeSlot.endTime}`, error);
-    }
-  });
-}
-*/
-// Define the weekly job with the corrected time in UTC (based on New York time)
-// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
-// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
-// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
 const convertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
@@ -276,8 +186,7 @@ const convertBSTtoUTCForEDT = (inputTime) => {
 
 
 
-// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
-// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
+
 async function defineWeeklyJob(sku, day, timeSlot) {
   // Convert start and end times from Bangladesh (BST) to UTC for scheduling
   const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
@@ -318,73 +227,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 }
 
 
-// Helper function to adjust time by reducing 12 hours (for fixing PM issues)
 
-
-
-/*
-const reduce12Hours = (hours) => {
-  console.log("hours value: " + hours);
-
-  // If hours is more than 12, it is already PM, so no need to adjust
-  if (hours >= 12) {
-    return hours; // For PM hours (13 and above), just return the hours
-  }
-
-  // If it's AM and the hour is 12 (12 AM), we need to adjust to 0 (midnight)
-  if (hours === 12) {
-    return 0; // 12 AM is 0 in 24-hour format
-  }
-
-  // For hours less than 12, add 12 to convert to PM (e.g., 2 PM becomes 14)
-  return hours + 12;
-};
-*/
-
-// Schedule the weekly price change
-/*
-const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userTimeZone = '') => {
-  const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
-  const edtOffset = -4; // EDT is UTC-4 during daylight savings
-
-  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-    for (const timeSlot of timeSlots) {
-      // Convert start and end times based on user time zone
-      console.log("time start before edt"+timeSlot.startTime)
-      let startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset, userTimeZone);
-      let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset, userTimeZone);
-     console.log("After edt:"+startTimeInEDT);
-
-     
-      let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
-      let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
-      
-     
-      // No need to reduce 12 hours for New York users, apply reduction for others
-      
-        startHour = reduce12Hours(startHour);
-        endHour = reduce12Hours(endHour);
-      
-
-      // Cron expressions
-      const updateCron = `${startMinute} ${startHour} * * ${day}`;
-      const revertCron = `${endMinute} ${endHour} * * ${day}`;
-
-      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
-      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
-      await defineWeeklyJob(sku, day, timeSlot,userTimeZone);  // Pass timeSlot, not timeSlots
-
-      // Schedule the jobs in EDT
-      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInEDT} EDT`);
-
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInEDT} EDT`);
-    }
-  }
-};
-
-*/
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {
@@ -463,7 +306,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots,scheduleId) => {
 
 */
 
-async function defineMonthlyJob(sku, date, timeSlot) {
+async function defineMonthlyJobEdt(sku, date, timeSlot) {
   const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; // Ensure unique job name for each time slot
   const revertJobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.endTime}`;
 
@@ -490,7 +333,7 @@ async function defineMonthlyJob(sku, date, timeSlot) {
   });
 }
 
-const scheduleMonthlyPriceChange = async (sku, monthlySlots, scheduleId) => {
+const  scheduleMonthlyPriceChangeFromEdt = async (sku, monthlySlots, scheduleId) => {
   for (const [date, timeSlots] of Object.entries(monthlySlots)) {
     for (const timeSlot of timeSlots) {  // Pass each specific timeSlot here
      
@@ -505,7 +348,7 @@ const scheduleMonthlyPriceChange = async (sku, monthlySlots, scheduleId) => {
       const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHour}:${endMinute}`;
 
       // Define and schedule the update and revert jobs
-      await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
+      await defineMonthlyJobEdt(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
 
       await agenda.every(updateCron, updateJobName, { sku, newPrice:timeSlot.newPrice, date,scheduleId}, { priority: 10 });
       console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime}`);
@@ -516,6 +359,100 @@ const scheduleMonthlyPriceChange = async (sku, monthlySlots, scheduleId) => {
   }
 };
 
+const monthlyConvertBSTtoUTCForEDT = (inputTime) => {
+  const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // Step 1: Add 6 hours to convert from Bangladesh Standard Time (BST) to EDT
+  let edtHours = hours + 6;
+
+  // Handle edge cases where time exceeds 24 hours
+  if (edtHours >= 24) {
+    edtHours -= 24; // Wrap around if the hours go above 24
+  }
+
+  // Step 2: Treat the result as New York time (EDT) and convert it to UTC
+  const now = new Date(); // Get today's date
+  const edtTime = new Date(now);
+  edtTime.setHours(edtHours, minutes, 0, 0);
+
+  // Step 3: Convert EDT time to UTC
+  const utcTime = new Date(edtTime.getTime() + (4 * 60 * 60 * 1000)); // EDT is UTC-4, so add 4 hours
+  console.log(`Input Time: ${inputTime} BST -> ${edtTime} EDT -> ${utcTime} UTC`);
+
+  return utcTime;
+};
+
+async function defineMonthlyJob(sku, date, timeSlot) {
+  // Convert start and end times from Bangladesh (BST) to UTC for scheduling
+  const startTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.startTime);
+  const endTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.endTime);
+
+  // Get the UTC hours and minutes
+  const startHourUTC = startTimeInUTC.getUTCHours();
+  const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+  const endHourUTC = endTimeInUTC.getUTCHours();
+  const endMinuteUTC = endTimeInUTC.getUTCMinutes();
+
+  console.log(`Job Start Time in UTC: ${startHourUTC}:${startMinuteUTC}, End Time in UTC: ${endHourUTC}:${endMinuteUTC}`);
+
+  const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHourUTC}:${startMinuteUTC}`;
+  const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHourUTC}:${endMinuteUTC}`;
+
+  // Define the job in Agenda for price update
+  agenda.define(updateJobName, { priority: 10 }, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Price updated for SKU: ${sku} at ${startTimeInUTC} UTC`);
+    } catch (error) {
+      console.error(`Failed to update price for SKU: ${sku}`, error);
+    }
+  });
+
+  // Define the job in Agenda for price revert
+  agenda.define(revertJobName, { priority: 10 }, async (job) => {
+    const { sku, revertPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku} at ${endTimeInUTC} UTC`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}`, error);
+    }
+  });
+}
+
+const scheduleMonthlyPriceChange = async (sku, monthlyTimeSlots, scheduleId) => {
+  for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
+    for (const timeSlot of timeSlots) {
+      // Convert start and end times based on user time zone (Bangladesh BST -> EDT -> UTC)
+      const startTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.startTime);
+      const endTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.endTime);
+
+      // Get the UTC hours and minutes
+      const startHourUTC = startTimeInUTC.getUTCHours();
+      const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+      const endHourUTC = endTimeInUTC.getUTCHours();
+      const endMinuteUTC = endTimeInUTC.getUTCMinutes();
+
+      // Cron expressions for specific dates
+      const updateCron = `${startMinuteUTC} ${startHourUTC} ${date} * *`;
+      const revertCron = `${endMinuteUTC} ${endHourUTC} ${date} * *`;
+
+      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHourUTC}:${startMinuteUTC}`;
+      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHourUTC}:${endMinuteUTC}`;
+      await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
+
+      // Schedule the jobs in UTC (which aligns with EDT)
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, date, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startHourUTC}:${startMinuteUTC} UTC`);
+
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, date, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endHourUTC}:${endMinuteUTC} UTC`);
+    }
+  }
+};
+
+// Weekly job scheduling remains the same as provided before
 
 
 
@@ -583,6 +520,95 @@ const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, 
     console.error(`Error scheduling price changes for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
   }
 };
+
+
+// const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
+//   // Step 1: Parse the input time in Bangladesh Standard Time (BST)
+//   const bstTime = moment.tz(inputDateTime, "Asia/Dhaka"); // This represents BST (UTC+6)
+
+//   // Step 2: Convert this BST time to EDT (America/New_York timezone)
+//   const edtTime = bstTime.clone().tz("America/New_York"); // This keeps the same clock time but in EDT
+
+//   // Step 3: Convert EDT time to UTC
+//   const utcTime = edtTime.clone().utc(); // Convert the EDT time to UTC for scheduling
+
+//   console.log(`Input Time: ${bstTime.format('YYYY-MM-DD HH:mm:ss')} BST -> ${edtTime.format('YYYY-MM-DD HH:mm:ss')} EDT -> ${utcTime.format('YYYY-MM-DD HH:mm:ss')} UTC`);
+  
+//   return utcTime.toDate(); // Return the UTC Date object for job scheduling
+// };
+/*
+const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
+  // Step 1: Convert the input time (BST) to EDT
+  const bstToEdtOffset = -10; // Bangladesh is UTC+6, EDT is UTC-4, so we subtract 10 hours
+  const edtDateTime = new Date(inputDateTime.getTime() + bstToEdtOffset * 60 * 60 * 1000);
+  
+  // Step 2: Add 10 hours to the EDT time for UTC job scheduling
+  const edtToUtcOffset = 16; // Increase 10 hours to EDT time for UTC scheduling
+  const finalUtcDateTime = new Date(edtDateTime.getTime() + edtToUtcOffset * 60 * 60 * 1000);
+
+ 
+  return finalUtcDateTime;
+}
+
+const singleDayScheduleChange = async (sku, newPrice, originalPrice, startDate, endDate, scheduleId, userTimeZone = '') => {
+  console.log("time zone"+userTimeZone)
+  try {
+    // Ensure startDate and endDate are valid Date objects
+    const validStartDate = new Date(startDate);
+    const validEndDate = endDate ? new Date(endDate) : null;
+
+    if (isNaN(validStartDate.getTime()) || (validEndDate && isNaN(validEndDate.getTime()))) {
+      throw new Error('Invalid start or end date');
+    }
+
+
+    let adjustedStartDate = validStartDate;
+    let adjustedEndDate = validEndDate;
+
+    // If the user is in Bangladesh time zone, convert BST to EDT
+    if (userTimeZone === 'Asia/Dhaka') {
+      adjustedStartDate = singleConvertBSTtoUTCForEDT(validStartDate);  // Convert the start time
+      adjustedEndDate = validEndDate ? singleConvertBSTtoUTCForEDT(validEndDate) : null; // Convert the end time if provided
+    }
+
+    // Define and schedule the price update job at the start date
+    const updateJobName = `schedule_price_update_${sku}_${adjustedStartDate.toISOString()}`;
+   
+    agenda.define(updateJobName, { priority: 1 }, async (job) => {
+      const { sku, newPrice, scheduleId } = job.attrs.data;
+      try {
+        await updateProductPrice(sku, newPrice);
+      } catch (error) {
+        console.error(`Failed to update price for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
+      }
+    });
+
+    await agenda.schedule(adjustedStartDate.toISOString(), updateJobName, { sku, newPrice, scheduleId });
+    console.log(`Scheduled price update for SKU: ${sku} at ${adjustedStartDate} to ${newPrice} (Schedule ID: ${scheduleId})`);
+
+    // Define and schedule the price revert job at the end date (if provided)
+    if (adjustedEndDate) {
+      const revertJobName = `revert_price_update_${sku}_${adjustedEndDate.toISOString()}`;
+
+      agenda.define(revertJobName, { priority: 1 }, async (job) => {
+        const { sku, originalPrice, scheduleId } = job.attrs.data;
+        try {
+          await updateProductPrice(sku, originalPrice);
+          console.log(`Price reverted for SKU: ${sku} to ${originalPrice} (Schedule ID: ${scheduleId})`);
+        } catch (error) {
+          console.error(`Failed to revert price for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
+        }
+      });
+
+      await agenda.schedule(adjustedEndDate.toISOString(), revertJobName, { sku, originalPrice, scheduleId });
+      console.log(`Scheduled price revert for SKU: ${sku} at ${adjustedEndDate} to ${originalPrice} (Schedule ID: ${scheduleId})`);
+    }
+
+  } catch (error) {
+    console.error(`Error scheduling price changes for SKU: ${sku} (Schedule ID: ${scheduleId})`, error);
+  }
+};
+*/
 
 const singleDaySchedulePriceChange = async (sku, singleDaySlots, parentScheduleId) => {
   try {
@@ -721,11 +747,18 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
     //   console.log(sku+datesOfMonth+startTime+endTime);
     //   await scheduleMonthlyPriceChange(sku, price, currentPrice, datesOfMonth,startTime,endTime);
     // }
-
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
-      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,newSchedule._id);
+    if (timeZone !=="America/New_York" && monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      console.log("slots: "+JSON.stringify(monthlyTimeSlots));
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,newSchedule._id,timeZone);
     }
+    if (timeZone ==="America/New_York" && monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      console.log("slots from new work: "+JSON.stringify(monthlyTimeSlots));
+      await scheduleMonthlyPriceChangeFromEdt(sku, monthlyTimeSlots,newSchedule._id);
+    }
+    // if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+    //   console.log("Monthly slots:", JSON.stringify(monthlyTimeSlots, null, 2));
+    //   await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,newSchedule._id);
+    // }
 
 
     // Handle one-time scheduling
@@ -739,7 +772,8 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 
     if (!weekly && !monthly) {
       // Instead of scheduling separate tasks, call singleDayScheduleChange
-      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate,newSchedule._id );
+      console.log("zone: "+timeZone)
+      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate,newSchedule._id,timeZone);
     }
     
 
@@ -754,166 +788,6 @@ console.log("hit on post:"+weekly+weeklyTimeSlots+userName);
 });
 
 
-
-/*
-app.put('/api/schedule/change/:id', async (req, res) => {
-  const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL,weekly,weeklyTimeSlots, monthly, monthlyTimeSlots} = req.body;
-
-  
-  console.log("Request body:", JSON.stringify(req.body, null, 2));
-  try {
-    const schedule = await PriceSchedule.findById(id);
-    if (!schedule) {
-      return res.status(404).json({ error: 'Schedule not found' });
-    }
-
-     // Cancel existing jobs
-     const weeklySlotsWithIds = {};
-     const monthlySlotsWithIds = {};
-     for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-       weeklySlotsWithIds[day] = timeSlots.map(slot => ({
-         ...slot,
-         timeSlotScheduleId:slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Generate unique ObjectId here
-       }));
-     }
- 
-     // Add a unique ObjectId for each time slot in monthly schedules
-     for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
-       monthlySlotsWithIds[date] = timeSlots.map(slot => ({
-         ...slot,
-         timeSlotScheduleId:  slot.timeSlotScheduleId  || new mongoose.Types.ObjectId(), // Generate unique ObjectId here
-       }));
-     }
-
-    // Log the previous state of the schedule before updating
-    const previousState = {
-      startDate: schedule.startDate,
-      endDate: schedule.endDate,
-      price: schedule.price,
-      currentPrice: schedule.currentPrice,
-      status: schedule.status,
-      title: schedule.title,
-      asin: schedule.asin,
-      sku: schedule.sku,
-      imageURL: schedule.imageURL,
-      weekly: schedule.weekly,
-      weeklyTimeSlots: schedule.weeklyTimeSlots,
-      monthly:schedule.monthly,
-      monthlyTimeSlots: schedule.monthlyTimeSlots
-    };
-
-    // Update the schedule with new details
-    schedule.startDate = startDate;
-    schedule.endDate = endDate;
-    schedule.price = price;
-    schedule.currentPrice = currentPrice;
-    schedule.status = 'updated';
-    schedule.title = title || schedule.title; // Ensure title is preserved if not updated
-    schedule.asin = asin || schedule.asin; // Ensure ASIN is preserved if not updated
-    schedule.sku = sku || schedule.sku; // Ensure SKU is preserved if not updated
-    schedule.imageURL = imageURL || schedule.imageURL; // Ensure imageURL is preserved if not updated
-    schedule.weekly = weekly || false;
-    schedule.weeklyTimeSlots = weeklySlotsWithIds;
-    schedule.monthly = monthly || false;
-    schedule.monthlySlots =monthlySlotsWithIds;
-    
-    await schedule.save();
-
-    // Log the update in history with previous and updated states
-    const historyLog = new History({
-      scheduleId: schedule._id,
-      action: 'updated',
-      previousState,
-      updatedState: {
-        startDate: schedule.startDate,
-        endDate: schedule.endDate,
-        price: schedule.price,
-        currentPrice: schedule.currentPrice,
-        status: schedule.status,
-        title: schedule.title,
-        asin: schedule.asin,
-        sku: schedule.sku,
-        imageURL: schedule.imageURL,
-        imageURL: schedule.imageURL,
-        weekly: schedule.weekly,
-        weeklyTimeSlots: schedule.weeklyTimeSlots,
-        monthly: schedule.monthly,
-        monthlyTimeSlots: schedule.monthlyTimeSlots,
-      
-      },
-      userName, // Track the user who made the update
-      timestamp: new Date(),
-    });
-    await historyLog.save();
-    
-   
-    // Cancel existing jobs
-    // console.log("schedule id:"+schedule._id)
-    // await agenda.cancel({ 'data.sku': schedule.sku });
-    console.log("schedule id: "+schedule._id);
-   
-    // Re schedule
-    
-    // Cancel existing jobs only for the updated time slots
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-        for (const timeSlot of timeSlots) {
-          // Cancel the existing job for the specific timeSlotScheduleId
-          await agenda.cancel({ 'data.timeSlotScheduleId': timeSlot.timeSlotScheduleId });
-        }
-      }
-    }
-
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
-        for (const timeSlot of timeSlots) {
-          // Cancel the existing job for the specific timeSlotScheduleId
-          await agenda.cancel({ 'data.timeSlotScheduleId': timeSlot.timeSlotScheduleId });
-        }
-      }
-    }
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      // await agenda.cancel({ 'data.sku': schedule.sku });
-    
-      await scheduleWeeklyPriceChange(sku, weeklyTimeSlots,schedule._id);
-    }
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      // await agenda.cancel({ 'data.sku': schedule.sku });
-      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,schedule._id);
-    }
-
-  //   if(!weekly && !monthly){
-  //     console.log(schedule.price);
-  //     await agenda.schedule(new Date(startDate), 'schedule price update', {
-  //       sku: schedule.sku,
-  //       newPrice: schedule.price,
-  //     });
-
-  //     if (endDate) {
-  //       console.log(schedule.currentPrice);
-  //       await agenda.schedule(new Date(endDate), 'revert price update', {
-  //         sku: schedule.sku,
-  //         originalPrice: schedule.currentPrice,
-  //       });
-  //   }
-  // }
-
-  if (!weekly && !monthly) {
-    await agenda.cancel({ 'data.scheduleId': schedule._id});
-    // Instead of scheduling separate tasks, call singleDayScheduleChange
-    await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
-  }
-
-    
-    res.json({ success: true, message: 'Schedule updated successfully.' });
-  } catch (error) {
-    console.error('Error updating schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule' });
-  }
-});
-
-*/
 app.put('/api/schedule/change/:id', async (req, res) => {
   const { id } = req.params;
   const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots,timeZone } = req.body;
@@ -1003,172 +877,17 @@ app.put('/api/schedule/change/:id', async (req, res) => {
       await scheduleWeeklyPriceChangeFromEdt(sku, weeklyTimeSlots,schedule._id);
     }
     // Reschedule monthly jobs
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots, schedule._id);
+    // if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
+    //   await scheduleMonthlyPriceChange(sku, monthlyTimeSlots, schedule._id);
+    // }
+    if (timeZone !=="America/New_York" && monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      console.log("slots: "+JSON.stringify(monthlyTimeSlots));
+      await scheduleMonthlyPriceChange(sku, monthlyTimeSlots,schedule._id,timeZone);
     }
-
-    // If no weekly or monthly schedules, handle single-day schedules
-    if (!weekly && !monthly) {
-      await agenda.cancel({ 'data.scheduleId': schedule._id });
-      await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
+    if (timeZone ==="America/New_York" && monthly && Object.keys(monthlyTimeSlots).length > 0) {
+      console.log("slots from new work: "+JSON.stringify(monthlyTimeSlots));
+      await scheduleMonthlyPriceChangeFromEdt(sku, monthlyTimeSlots,schedule._id);
     }
-
-    res.json({ success: true, message: 'Schedule updated successfully.' });
-  } catch (error) {
-    console.error('Error updating schedule:', error);
-    res.status(500).json({ error: 'Failed to update schedule' });
-  }
-});
-/*
-const cancelObsoleteJobs = async (oldTimeSlots, newTimeSlots) => {
-  console.log("Old time slots:", oldTimeSlots);
-
-  // Collect the timeSlotScheduleIds as strings
-  const oldTimeSlotIds = new Set(oldTimeSlots.map(({ timeSlotScheduleId }) => timeSlotScheduleId?.toString()).filter(Boolean));
-  const newTimeSlotIds = new Set(newTimeSlots.map(({ timeSlotScheduleId }) => timeSlotScheduleId?.toString()).filter(Boolean));
-
-  for (const oldId of oldTimeSlotIds) {
-    // If the old ID no longer exists in the new schedule, cancel the job
-    if (!newTimeSlotIds.has(oldId)) {
-      console.log(`Attempting to cancel job for timeSlotScheduleId: ${oldId}`);
-
-      try {
-        // No need to convert to ObjectId, since it is stored as a string
-        console.log(`Cancel query: { 'data.timeSlotScheduleId': "${oldId}" }`);
-
-        // Attempt to cancel the job with the specific timeSlotScheduleId
-        const result = await agenda.cancel({ 'data.timeSlotScheduleId': oldId });
-
-        if (result > 0) {
-          console.log(`Successfully canceled job for timeSlotScheduleId: ${oldId}`);
-        } else {
-          console.log(`No jobs found to cancel for timeSlotScheduleId: ${oldId}`);
-        }
-      } catch (err) {
-        console.error(`Error during job cancellation for timeSlotScheduleId: ${oldId}`, err);
-      }
-    }
-  }
-};
-
-app.put('/api/schedule/change/:id', async (req, res) => {
-  const { id } = req.params;
-  const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots } = req.body;
-
-  try {
-    const schedule = await PriceSchedule.findById(id);
-    if (!schedule) {
-      return res.status(404).json({ error: 'Schedule not found' });
-    }
-
-    // Prepare updated weekly and monthly slots with preserved timeSlotScheduleId
-    const weeklySlotsWithIds = {};
-    const monthlySlotsWithIds = {};
-
-    // Process weekly time slots
-    for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
-      weeklySlotsWithIds[day] = timeSlots.map(slot => ({
-        ...slot,
-        timeSlotScheduleId: slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Preserve existing ID or generate new one
-      }));
-    }
-
-    // Process monthly time slots
-    for (const [date, timeSlots] of Object.entries(monthlyTimeSlots)) {
-      monthlySlotsWithIds[date] = timeSlots.map(slot => ({
-        ...slot,
-        timeSlotScheduleId: slot.timeSlotScheduleId || new mongoose.Types.ObjectId(), // Preserve existing ID or generate new one
-      }));
-    }
-
-    // Log the previous state of the schedule before updating
-    const previousState = {
-      startDate: schedule.startDate,
-      endDate: schedule.endDate,
-      price: schedule.price,
-      currentPrice: schedule.currentPrice,
-      status: schedule.status,
-      title: schedule.title,
-      asin: schedule.asin,
-      sku: schedule.sku,
-      imageURL: schedule.imageURL,
-      weekly: schedule.weekly,
-      weeklyTimeSlots: schedule.weeklyTimeSlots,
-      monthly: schedule.monthly,
-      monthlyTimeSlots: schedule.monthlyTimeSlots
-    };
-
-    // Update the schedule with new details
-    schedule.startDate = startDate;
-    schedule.endDate = endDate;
-    schedule.price = price;
-    schedule.currentPrice = currentPrice;
-    schedule.status = 'updated';
-    schedule.title = title || schedule.title;
-    schedule.asin = asin || schedule.asin;
-    schedule.sku = sku || schedule.sku;
-    schedule.imageURL = imageURL || schedule.imageURL;
-    schedule.weekly = weekly || false;
-    schedule.weeklyTimeSlots = weeklySlotsWithIds;
-    schedule.monthly = monthly || false;
-    schedule.monthlyTimeSlots = monthlySlotsWithIds;
-
-    await schedule.save();
-
-    // Log the update in history with previous and updated states
-    const historyLog = new History({
-      scheduleId: schedule._id,
-      action: 'updated',
-      previousState,
-      updatedState: {
-        startDate: schedule.startDate,
-        endDate: schedule.endDate,
-        price: schedule.price,
-        currentPrice: schedule.currentPrice,
-        status: schedule.status,
-        title: schedule.title,
-        asin: schedule.asin,
-        sku: schedule.sku,
-        imageURL: schedule.imageURL,
-        weekly: schedule.weekly,
-        weeklyTimeSlots: schedule.weeklyTimeSlots,
-        monthly: schedule.monthly,
-        monthlyTimeSlots: schedule.monthlyTimeSlots
-      },
-      userName,
-      timestamp: new Date(),
-    });
-    await historyLog.save();
-
-    // Cancel jobs for obsolete weekly time slots
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      for (const [day, newTimeSlots] of Object.entries(weeklyTimeSlots)) {
-        // Use the get method for accessing values in the Map
-        const oldTimeSlots = schedule.weeklyTimeSlots.get(day) || [];
-        console.log("Old weekly time slots for day:", day, oldTimeSlots);
-        await cancelObsoleteJobs(oldTimeSlots, newTimeSlots);
-      }
-    }
-
-    // Cancel jobs for obsolete monthly time slots
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      for (const [date, newTimeSlots] of Object.entries(monthlyTimeSlots)) {
-        // Use the get method for accessing values in the Map
-        const oldTimeSlots = schedule.monthlyTimeSlots.get(date) || [];
-        console.log("Old monthly time slots for date:", date, oldTimeSlots);
-        await cancelObsoleteJobs(oldTimeSlots, newTimeSlots);
-      }
-    }
-
-    // Reschedule only for updated time slots
-    if (weekly && Object.keys(weeklyTimeSlots).length > 0) {
-      await scheduleWeeklyPriceChange(sku, weeklySlotsWithIds);
-    }
-
-    if (monthly && Object.keys(monthlyTimeSlots).length > 0) {
-      await scheduleMonthlyPriceChange(sku, monthlySlotsWithIds);
-    }
-
     // If no weekly or monthly schedules, handle single-day schedules
     if (!weekly && !monthly) {
       await agenda.cancel({ 'data.scheduleId': schedule._id });
@@ -1182,7 +901,6 @@ app.put('/api/schedule/change/:id', async (req, res) => {
   }
 });
 
-*/
 
 
 app.delete('/api/schedule/change/:id', async (req, res) => {

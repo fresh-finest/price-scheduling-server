@@ -196,20 +196,9 @@ const reduce12Hours = (hours) => {
   return adjustedHours;
 };
 */
+// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
 
-const convertToUTCInNewYork = (inputTime) => {
-  const [hours, minutes] = inputTime.split(':').map(Number);
 
-  // Create a moment object with the given time in New York time (EDT)
-  const timeInNewYork = moment.tz({ hour: hours, minute: minutes }, "America/New_York");
-
-  // Convert that time to UTC
-  const timeInUTC = timeInNewYork.clone().utc();
-
-  console.log(`Input Time: ${inputTime} (New York Time) -> UTC: ${timeInUTC.format()}`);
-
-  return timeInUTC;
-};
 // Define the weekly job with the corrected time in EDT
 /*
 async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
@@ -259,15 +248,45 @@ async function defineWeeklyJob(sku, day, timeSlot,userTimeZone) {
 }
 */
 // Define the weekly job with the corrected time in UTC (based on New York time)
-async function defineWeeklyJob(sku, day, timeSlot) {
-  // Convert start and end times to UTC (based on New York local time)
-  const startTimeInUTC = convertToUTCInNewYork(timeSlot.startTime);
-  const endTimeInUTC = convertToUTCInNewYork(timeSlot.endTime);
+// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
+// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
+// Helper function to convert time from Bangladesh (BST) to EDT and then to UTC
+const convertBSTtoUTCForEDT = (inputTime) => {
+  const [hours, minutes] = inputTime.split(':').map(Number);
 
-  const startHourUTC = startTimeInUTC.hours();
-  const startMinuteUTC = startTimeInUTC.minutes();
-  const endHourUTC = endTimeInUTC.hours();
-  const endMinuteUTC = endTimeInUTC.minutes();
+  // Step 1: Subtract 10 hours to get EDT equivalent (Bangladesh is UTC+6, EDT is UTC-4)
+  let edtHours = hours - 10;
+
+  // Handle edge cases where time goes negative or over 24 hours
+  if (edtHours < 0) {
+    edtHours += 24; // Wrap around if the hours go below 0
+  }
+
+  // Step 2: Treat the result as New York time (EDT) and convert it to UTC
+  const now = new Date(); // Get today's date
+  const edtTime = new Date(now);
+  edtTime.setHours(edtHours, minutes, 0, 0);
+
+  // Step 3: Convert EDT time to UTC
+  const utcTime = new Date(edtTime.getTime() + (4 * 60 * 60 * 1000)); // EDT is UTC-4, so add 4 hours
+  console.log(`Input Time: ${inputTime} BST -> ${edtTime} EDT -> ${utcTime} UTC`);
+
+  return utcTime;
+};
+
+
+// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
+// Define the weekly job with the corrected time in UTC (based on input in Bangladesh)
+async function defineWeeklyJob(sku, day, timeSlot) {
+  // Convert start and end times from Bangladesh (BST) to UTC for scheduling
+  const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
+  const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
+
+  // Get the UTC hours and minutes
+  const startHourUTC = startTimeInUTC.getUTCHours();
+  const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+  const endHourUTC = endTimeInUTC.getUTCHours();
+  const endMinuteUTC = endTimeInUTC.getUTCMinutes();
 
   console.log(`Job Start Time in UTC: ${startHourUTC}:${startMinuteUTC}, End Time in UTC: ${endHourUTC}:${endMinuteUTC}`);
 
@@ -279,7 +298,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     const { sku, newPrice } = job.attrs.data;
     try {
       await updateProductPrice(sku, newPrice);
-      console.log(`Price updated for SKU: ${sku} at ${startTimeInUTC.format()} UTC`);
+      console.log(`Price updated for SKU: ${sku} at ${startTimeInUTC} UTC`);
     } catch (error) {
       console.error(`Failed to update price for SKU: ${sku}`, error);
     }
@@ -290,12 +309,13 @@ async function defineWeeklyJob(sku, day, timeSlot) {
     const { sku, revertPrice } = job.attrs.data;
     try {
       await updateProductPrice(sku, revertPrice);
-      console.log(`Price reverted for SKU: ${sku} at ${endTimeInUTC.format()} UTC`);
+      console.log(`Price reverted for SKU: ${sku} at ${endTimeInUTC} UTC`);
     } catch (error) {
       console.error(`Failed to revert price for SKU: ${sku}`, error);
     }
   });
 }
+
 
 // Helper function to adjust time by reducing 12 hours (for fixing PM issues)
 
@@ -367,24 +387,30 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
 const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {
-      // Convert start and end times to UTC based on New York local time
-      const startTimeInUTC = convertToUTCInNewYork(timeSlot.startTime);
-      const endTimeInUTC = convertToUTCInNewYork(timeSlot.endTime);
+      // Convert start and end times based on user time zone (Bangladesh BST -> EDT -> UTC)
+      const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
+      const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
 
-      const updateCron = `${startTimeInUTC.minutes()} ${startTimeInUTC.hours()} * * ${day}`;
-      const revertCron = `${endTimeInUTC.minutes()} ${endTimeInUTC.hours()} * * ${day}`;
+      // Get the UTC hours and minutes
+      const startHourUTC = startTimeInUTC.getUTCHours();
+      const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+      const endHourUTC = endTimeInUTC.getUTCHours();
+      const endMinuteUTC = endTimeInUTC.getUTCMinutes();
 
-      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startTimeInUTC.hours()}:${startTimeInUTC.minutes()}`;
-      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endTimeInUTC.hours()}:${endTimeInUTC.minutes()}`;
+      // Cron expressions
+      const updateCron = `${startMinuteUTC} ${startHourUTC} * * ${day}`;
+      const revertCron = `${endMinuteUTC} ${endHourUTC} * * ${day}`;
 
-      await defineWeeklyJob(sku, day, timeSlot);
+      const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHourUTC}:${startMinuteUTC}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHourUTC}:${endMinuteUTC}`;
+      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
 
-      // Schedule the jobs in UTC
-      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startTimeInUTC.format()} UTC`);
+      // Schedule the jobs in UTC (which aligns with EDT)
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${day} at ${startHourUTC}:${startMinuteUTC} UTC`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "America/New_York" });
-      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endTimeInUTC.format()} UTC`);
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${day} at ${endHourUTC}:${endMinuteUTC} UTC`);
     }
   }
 };

@@ -184,13 +184,39 @@ const getTimeInEDT = (inputTime, userTimeZoneOffset, targetTimeZoneOffset = -4, 
   return `${String(edtHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+
+const reduce12Hours = (hours) => {
+  console.log("hours value: "+hours)
+  let adjustedHours = hours + 12;
+  if (hours>12){
+    adjustedHours = hours - 8; 
+  }
+  if (adjustedHours < 0) adjustedHours += 24; 
+  return adjustedHours;
+};
 // Define the weekly job with the corrected time in EDT
 async function defineWeeklyJob(sku, day, timeSlot) {
+
+  const userTimeZoneOffset = userTimeZone === 'America/New_York' ? 0 : 6; // No offset for New York, UTC+6 for Bangladesh
+  const edtOffset = -4; // EDT is UTC-4 during daylight savings
+
+      await defineWeeklyJob(sku, day, timeSlot,userTimeZone);  // Pass timeSlot, not timeSlots
+  let startTimeInEDT = getTimeInEDT(timeSlot.startTime, userTimeZoneOffset, edtOffset,userTimeZone);
+  let endTimeInEDT = getTimeInEDT(timeSlot.endTime, userTimeZoneOffset, edtOffset,userTimeZone);
+  let [startHour, startMinute] = startTimeInEDT.split(':').map(Number);
+  let [endHour, endMinute] = endTimeInEDT.split(':').map(Number);
+
+  startHour = reduce12Hours(startHour);
+  endHour = reduce12Hours(endHour);
+      
   console.log("TimeSlot:", JSON.stringify(timeSlot.startTime));
 
-  const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
+  // const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
+  const jobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
   console.log(jobName);
-  const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; // Ensure unique job name for each time slot
+  // const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`; 
+
+  const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
 
   agenda.define(jobName, { priority: 5 }, async (job) => {
     const { sku, newPrice } = job.attrs.data;
@@ -217,15 +243,7 @@ async function defineWeeklyJob(sku, day, timeSlot) {
 
 // Helper function to adjust time by reducing 12 hours (for fixing PM issues)
 
-const reduce12Hours = (hours) => {
-  console.log("hours value: "+hours)
-  let adjustedHours = hours + 12;
-  if (hours>12){
-    adjustedHours = hours - 8; 
-  }
-  if (adjustedHours < 0) adjustedHours += 24; 
-  return adjustedHours;
-};
+
 
 /*
 const reduce12Hours = (hours) => {
@@ -276,7 +294,7 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId, userT
 
       const updateJobName = `weekly_price_update_${sku}_day_${day}_slot_${startHour}:${startMinute}`;
       const revertJobName = `revert_weekly_price_update_${sku}_day_${day}_slot_${endHour}:${endMinute}`;
-      await defineWeeklyJob(sku, day, timeSlot);  // Pass timeSlot, not timeSlots
+      await defineWeeklyJob(sku, day, timeSlot,userTimeZone);  // Pass timeSlot, not timeSlots
 
       // Schedule the jobs in EDT
       await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day, scheduleId }, { timezone: "America/New_York" });

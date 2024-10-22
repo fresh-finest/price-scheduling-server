@@ -160,7 +160,7 @@ const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots,scheduleId)
     }
   }
 };
-
+/*
 const convertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
@@ -183,12 +183,39 @@ const convertBSTtoUTCForEDT = (inputTime) => {
 
   return utcTime;
 };
+*/
+const convertBSTtoUTCForEDT = (inputTime) => {
+  // Step 1: Parse the input time from Bangladesh time zone (BST)
+  const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // Step 2: Get the current date in Bangladesh (BST)
+  const currentDateInBST = moment.tz('Asia/Dhaka').set({
+    hour: hours,
+    minute: minutes,
+    second: 0,
+    millisecond: 0
+  });
+
+  // Step 3: Treat the time as if it's in New York time (EDT)
+  const edtDateTime = currentDateInBST.tz('America/New_York', true); // Same time, but treat it as New York time
+
+  // Step 4: Convert the New York (EDT) time to UTC
+  const utcDateTime = edtDateTime.utc(); // Convert EDT to UTC
+
+  console.log(`Input Time (BST): ${inputTime} -> Treated as EDT: ${edtDateTime.format()} -> Scheduled in UTC: ${utcDateTime.format()}`);
+
+  return utcDateTime.toDate(); // Return the Date object in UTC
+};
 
 
-
+// const convertTimeToUtc = (time) => {
+//   return moment(time).utc().format("HH:mm");
+// };
 
 async function defineWeeklyJob(sku, day, timeSlot) {
   // Convert start and end times from Bangladesh (BST) to UTC for scheduling
+  // const utctStartTime = convertTimeToUtc(timeSlot.startTime);
+  // const utcEndTime = convertTimeToUtc(timeSlot.endTime);
   const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
   const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
 
@@ -232,9 +259,13 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {
       // Convert start and end times based on user time zone (Bangladesh BST -> EDT -> UTC)
+
+      console.log("startTime "+timeSlot.startTime);
+      // const utctStartTime = convertTimeToUtc(timeSlot.startTime);
+      // const utcEndTime = convertTimeToUtc(timeSlot.endTime);
       const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
       const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
-
+      console.log("startTimeInUTC "+startTimeInUTC);
       // Get the UTC hours and minutes
       const startHourUTC = startTimeInUTC.getUTCHours();
       const startMinuteUTC = startTimeInUTC.getUTCMinutes();
@@ -358,7 +389,7 @@ const  scheduleMonthlyPriceChangeFromEdt = async (sku, monthlySlots, scheduleId)
     }
   }
 };
-
+/*
 const monthlyConvertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
 
@@ -380,6 +411,29 @@ const monthlyConvertBSTtoUTCForEDT = (inputTime) => {
   console.log(`Input Time: ${inputTime} BST -> ${edtTime} EDT -> ${utcTime} UTC`);
 
   return utcTime;
+};*/
+
+const monthlyConvertBSTtoUTCForEDT = (inputTime) => {
+  // Step 1: Parse the input time from Bangladesh time zone (BST)
+  const [hours, minutes] = inputTime.split(':').map(Number);
+
+  // Step 2: Get the current date in Bangladesh (BST)
+  const currentDateInBST = moment.tz('Asia/Dhaka').set({
+    hour: hours,
+    minute: minutes,
+    second: 0,
+    millisecond: 0
+  });
+
+  // Step 3: Treat the time as if it's in New York time (EDT)
+  const edtDateTime = currentDateInBST.tz('America/New_York', true); // Same time, but treat it as New York time
+
+  // Step 4: Convert the New York (EDT) time to UTC
+  const utcDateTime = edtDateTime.utc(); // Convert EDT to UTC
+
+  console.log(`Input Time (BST): ${inputTime} -> Treated as EDT: ${edtDateTime.format()} -> Scheduled in UTC: ${utcDateTime.format()}`);
+
+  return utcDateTime.toDate(); // Return the Date object in UTC
 };
 
 async function defineMonthlyJob(sku, date, timeSlot) {

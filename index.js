@@ -1002,7 +1002,7 @@ app.put('/api/schedule/change/:id', async (req, res) => {
   const { startDate, endDate, price, currentPrice, userName, title, asin, sku, imageURL, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots,timeZone } = req.body;
 
   console.log("Request body:", JSON.stringify(req.body, null, 2));
-
+  console.log("req for update by"+id)
   try {
     const schedule = await PriceSchedule.findById(id);
     if (!schedule) {
@@ -1233,8 +1233,8 @@ const fetchProductDetails = async (asin) => {
 };
 
 
-// Schedule the task to run every day at 12:00 PM Bangladesh time
-cron.schedule('0 15 * * *', async () => {
+// Schedule the task to run every day at 8:00 am Bangladesh time
+cron.schedule('0 2 * * *', async () => {
   const bangladeshTime = moment.tz("Asia/Dhaka").format();
   console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
   await fetchAndDownloadDataOnce();
@@ -1242,10 +1242,10 @@ cron.schedule('0 15 * * *', async () => {
   timezone: "Asia/Dhaka"
 });
 
-// Schedule the task to run at 1:00 PM Bangladesh time every day
-cron.schedule('0 16 * * *', async () => {
+// Adjusted to run at 8:30 AM Bangladesh time
+cron.schedule('30 2 * * *', async () => {
   try {
-    console.log('Scheduled task started at 1:00 PM Bangladesh time...');
+    console.log('Scheduled task started at 8:30 am Bangladesh time...');
 
     // Step 1: Fetch all listings from MongoDB
     const listings = await Inventory.find();
@@ -1291,18 +1291,33 @@ cron.schedule('0 16 * * *', async () => {
 //   }
 // });
 
-cron.schedule('30 */1 * * *', async () => {
-  console.log('Scheduled task started (every two hours)...');
+cron.schedule('0 5 * * *', async () => { // Adjusted to run at 10:00 AM Bangladesh time
+  console.log('Scheduled task started (11:00 AM Bangladesh time)...');
   
   try {
     // Call your API endpoint
-    const response = await axios.get('https://api.priceobo.com/fetch-and-merge'); 
-    
+    const response = await axios.get('https://api.priceobo.com/fetch-and-merge');
+    console.log('API response:', response.data);
   } catch (error) {
     console.error('Error during cron job:', error);
   }
 }, {
-  timezone: 'Asia/Dhaka', // Set the timezone to Bangladesh (UTC+6)
+  timezone: 'Asia/Dhaka' // Set the timezone to Bangladesh (UTC+6)
+});
+
+
+// Schedule the cron job for 10:30 AM Bangladesh Time (BST)
+cron.schedule('30 5 * * *', async () => {
+  try {
+    // Call the endpoint or directly invoke the function
+    console.log('Running scheduled task to fetch and merge sales data.');
+    const response = await axios.get('https://api.priceobo.com/fetch-and-merge-sales');
+    console.log('Scheduled task completed:', response.data);
+  } catch (error) {
+    console.error('Error in scheduled task:', error);
+  }
+}, {
+  timezone: 'Asia/Dhaka'
 });
 
 // const axios = require('axios');
@@ -1347,6 +1362,17 @@ app.get('/fetch-and-merge-images', async (req, res) => {
     const listings = await Inventory.find();
     console.log(`Fetched ${listings.length} listings from MongoDB.`);
     const mergedData = await mergeAndSaveImageData(listings);
+    res.json({ message: 'Data merged and saved successfully.', result: mergedData });
+  } catch (error) {
+    console.error('Error during manual data processing:', error);
+    res.status(500).json({ error: 'Failed to fetch, merge, and save data' });
+  }
+});
+app.get('/fetch-and-merge-sales', async (req, res) => {
+  try {
+    const listings = await Stock.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+    const mergedData = await mergeAndSaveSalesData(listings);
     res.json({ message: 'Data merged and saved successfully.', result: mergedData });
   } catch (error) {
     console.error('Error during manual data processing:', error);
@@ -1418,6 +1444,19 @@ app.get('/api/history/sku/:sku', async(req,res)=>{
   });
   }
 })
+
+app.get('/sales-metrics-by-asin/:asin', async (req, res) => {
+  const { asin } = req.params;
+
+  try {
+    const results = await getMetricsForTimeRanges(asin);
+    
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch sales metrics' });
+  }
+});
+
 app.get('/api/history/:scheduleId', async (req, res) => {
   const { scheduleId } = req.params;
 
@@ -1461,7 +1500,7 @@ app.get('/api/history/', async (req, res) => {
 app.get('/fetch-all-listings', async (req, res) => {
   try {
     // const listings = await Inventory.find(); 
-    const listings = await Stock.find();
+    const listings = await SaleStock.find();
     res.json({ listings });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch all listings' });
@@ -1523,6 +1562,9 @@ const { mergeAndSaveImageData } = require('./src/merge-service/imageMergedServic
 const { fetchInventorySummaries, mergeAndSaveFbmData } = require('./src/merge-service/fbmMergedService');
 const Stock = require('./src/model/Stock');
 const { getListingsItemBySku } = require('./src/service/getPriceService');
+const { getMetricsForTimeRanges } = require('./src/service/getSaleService');
+const { mergeAndSaveSalesData } = require('./src/merge-service/saleUnitMergedService');
+const SaleStock = require('./src/model/SaleStock');
 
 
 app.use("/api/schedule", scheduleRoute);

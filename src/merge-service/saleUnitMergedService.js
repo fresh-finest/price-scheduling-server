@@ -5,15 +5,19 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Function to fetch sales metrics by ASIN using the local API, with retry logic for 'QuotaExceeded' errors
 const fetchSalesMetricsSKU = async (sku) => {
+  const encodedSku = encodeURIComponent(sku);
+  console.log(encodedSku)
     try {
       // Fetch sales metrics from the local API
       // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-asin/${sku}`);
 
-      const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${sku}`);
+      const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${encodedSku}`);
+      // const response = await axios.get(`http://localhost:3000//sales-metrics-by-sku/${encodedSku}`);
+
 
       return response.data; // Return the sales metrics from the response
     } catch (error) {
-      console.error(`Error fetching sales metrics for ASIN ${sku}:, error.message`);
+      console.error(`Error fetching sales metrics for SKU ${sku}:, error.message`);
       return null; // Return null if fetching fails
     }
   };
@@ -64,9 +68,9 @@ const mergeAndSaveSalesData = async (listings) => {
           { new: true, upsert: true } // Create a new document if none exists
         );
 
-        console.log(`Merged and saved data for ASIN: ${listing.sellerSku}`);
+        console.log(`Merged and saved data for SKU: ${listing.sellerSku}`);
       } else {
-        console.warn(`Skipping saving data for ASIN ${listing.sellerSku} as sales metrics fetch failed.`);
+        console.warn(`Skipping saving data for SKU ${listing.sellerSku} as sales metrics fetch failed.`);
       }
     } catch (error) {
       console.error(`Error processing ASIN ${listing.sellerSku}:`, error.message);

@@ -1369,7 +1369,7 @@ app.get('/fetch-and-merge-sales', async (req, res) => {
 // fetch image
 app.get('/image/:sku', async (req, res) => {
   // const { sku } = req.params;
-  const sku = decodeURIComponent(req.params.sku);
+  const sku = decodeURIComponent(req.params);
   console.log("sku:"+sku);
   try {
     const listingData = await getListingsItem(sku);
@@ -1433,8 +1433,8 @@ app.get('/api/history/sku/:sku', async(req,res)=>{
 })
 
 app.get('/sales-metrics-by-sku/:sku', async (req, res) => {
-  const { sku } = req.params;
-
+  // const { sku } = req.params;
+  const sku = decodeURIComponent(req.params.sku);
   try {
     const results = await getMetricsForTimeRanges(sku);
     

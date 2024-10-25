@@ -4,13 +4,16 @@ const SaleStock = require('../model/SaleStock');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Function to fetch sales metrics by ASIN using the local API, with retry logic for 'QuotaExceeded' errors
-const fetchSalesMetricsByASIN = async (asin) => {
+const fetchSalesMetricsSKU = async (sku) => {
     try {
       // Fetch sales metrics from the local API
-      const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-asin/${asin}`);
+      // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-asin/${sku}`);
+
+      const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${sku}`);
+
       return response.data; // Return the sales metrics from the response
     } catch (error) {
-      console.error(`Error fetching sales metrics for ASIN ${asin}:, error.message`);
+      console.error(`Error fetching sales metrics for ASIN ${sku}:, error.message`);
       return null; // Return null if fetching fails
     }
   };
@@ -22,14 +25,14 @@ const mergeAndSaveSalesData = async (listings) => {
     console.log(i);
 
     if (!listing.listingId) {
-      console.warn(`Skipping listing with SKU ${listing.asin1} due to missing listingId.`);
+      console.warn(`Skipping listing with SKU ${listing.sellerSku} due to missing listingId.`);
       continue;
     }
 
     await delay(10000); // Wait for 1 second between each request to avoid hitting the API limit
 
     try {
-      const salesMetrics = await fetchSalesMetricsByASIN(listing.asin1); // Fetch sales metrics by ASIN
+      const salesMetrics = await fetchSalesMetricsSKU(listing.sellerSku); // Fetch sales metrics by ASIN
 
       if (salesMetrics) {
         const mergedData = {
@@ -61,12 +64,12 @@ const mergeAndSaveSalesData = async (listings) => {
           { new: true, upsert: true } // Create a new document if none exists
         );
 
-        console.log(`Merged and saved data for ASIN: ${listing.asin1}`);
+        console.log(`Merged and saved data for ASIN: ${listing.sellerSku}`);
       } else {
-        console.warn(`Skipping saving data for ASIN ${listing.asin1} as sales metrics fetch failed.`);
+        console.warn(`Skipping saving data for ASIN ${listing.sellerSku} as sales metrics fetch failed.`);
       }
     } catch (error) {
-      console.error(`Error processing ASIN ${listing.asin1}:`, error.message);
+      console.error(`Error processing ASIN ${listing.sellerSku}:`, error.message);
     }
   }
 

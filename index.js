@@ -1320,20 +1320,7 @@ cron.schedule('30 5 * * *', async () => {
   timezone: 'Asia/Dhaka'
 });
 
-// const axios = require('axios');
 
-// (async () => {
-//   try {
-//     const response = await axios.get('http://localhost:3000/fetch-and-merge');
-//     console.log('Manual API call completed:', response.data);
-//   } catch (error) {
-//     console.error('Manual API call error:', error.message);
-//     if (error.response) {
-//       console.error('Response status:', error.response.status);
-//       console.error('Response data:', error.response.data);
-//     }
-//   }
-// })();
 
 
 app.get('/fetch-and-merge', async (req, res) => {
@@ -1445,11 +1432,11 @@ app.get('/api/history/sku/:sku', async(req,res)=>{
   }
 })
 
-app.get('/sales-metrics-by-asin/:asin', async (req, res) => {
-  const { asin } = req.params;
+app.get('/sales-metrics-by-sku/:sku', async (req, res) => {
+  const { sku } = req.params;
 
   try {
-    const results = await getMetricsForTimeRanges(asin);
+    const results = await getMetricsForTimeRanges(sku);
     
     res.json(results);
   } catch (error) {

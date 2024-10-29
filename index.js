@@ -1311,8 +1311,8 @@ cron.schedule('30 11 * * *', async () => {
   try {
     // Call the endpoint or directly invoke the function
     console.log('Running scheduled task to fetch and merge sales data.');
-    // const response = await axios.get('https://api.priceobo.com/fetch-and-merge-sales');
-    const response = await axios.get('http://localhost:3000/fetch-and-merge-sales');
+    const response = await axios.get('https://api.priceobo.com/fetch-and-merge-sales');
+    // const response = await axios.get('http://localhost:3000/fetch-and-merge-sales');
 
     console.log('Scheduled task completed:', response.data);
   } catch (error) {

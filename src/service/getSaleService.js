@@ -1,5 +1,5 @@
 const axios = require('axios');
-const moment = require('moment'); // Using moment.js to handle date calculations
+const moment = require('moment');
 
 const credentials = {
   refresh_token: process.env.REFRESH_TOKEN,
@@ -25,8 +25,8 @@ const fetchAccessToken = async () => {
   }
 };
 
-// Function to fetch sales metrics using ASIN and date range
-const fetchSalesMetricsByASIN = async (asin, startDate, endDate) => {
+// Function to fetch sales metrics using SKU and date range
+const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
   try {
     const accessToken = await fetchAccessToken();
     const url = `https://sellingpartnerapi-na.amazon.com/sales/v1/orderMetrics`;
@@ -38,7 +38,7 @@ const fetchSalesMetricsByASIN = async (asin, startDate, endDate) => {
       interval: interval,
       granularity: 'Day',
       granularityTimeZone: 'UTC',
-      asin: asin, // Filter by ASIN instead of SKU
+      sku: sku, // Filter by SKU instead of ASIN
     };
 
     const response = await axios.get(url, {
@@ -51,7 +51,6 @@ const fetchSalesMetricsByASIN = async (asin, startDate, endDate) => {
     });
 
     if (response.data && response.data.payload) {
-      // Extract relevant data from the response and calculate sum of unitCount and totalSales
       const metrics = response.data.payload;
       let totalUnits = 0;
       let totalSalesAmount = 0;
@@ -65,7 +64,7 @@ const fetchSalesMetricsByASIN = async (asin, startDate, endDate) => {
 
       return {
         totalUnits,
-        totalSalesAmount: totalSalesAmount.toFixed(2), // Format the total sales amount to 2 decimal places
+        totalSalesAmount: totalSalesAmount.toFixed(2),
       };
     } else {
       console.error('Unexpected API response:', response.data);
@@ -77,9 +76,11 @@ const fetchSalesMetricsByASIN = async (asin, startDate, endDate) => {
   }
 };
 
-// Function to get sales metrics for different time ranges
-const getMetricsForTimeRanges = async (asin) => {
-  const endDate = moment().format('YYYY-MM-DD'); // Current date
+// Function to get sales metrics for different time ranges using SKU
+const getMetricsForTimeRanges = async (sku) => {
+  const endDate = moment().subtract(1, 'days').utc().format('YYYY-MM-DD');
+  // const endDate = moment().format('YYYY-MM-DD');
+
 
   const timeRanges = [
     { label: '1 D', days: 1 },
@@ -96,7 +97,7 @@ const getMetricsForTimeRanges = async (asin) => {
 
   for (const range of timeRanges) {
     const startDate = moment().subtract(range.days, 'days').format('YYYY-MM-DD');
-    const metrics = await fetchSalesMetricsByASIN(asin, startDate, endDate);
+    const metrics = await fetchSalesMetricsBySKU(sku, startDate, endDate);
     results.push({
       time: range.label,
       totalUnits: metrics.totalUnits,
@@ -109,5 +110,5 @@ const getMetricsForTimeRanges = async (asin) => {
 
 // Exporting the functions to be used in other files
 module.exports = {
-  getMetricsForTimeRanges,
+  getMetricsForTimeRanges
 };

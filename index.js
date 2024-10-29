@@ -1234,7 +1234,7 @@ const fetchProductDetails = async (asin) => {
 
 
 // Schedule the task to run every day at 8:00 am Bangladesh time
-cron.schedule('0 2 * * *', async () => {
+cron.schedule('0 8 * * *', async () => {
   const bangladeshTime = moment.tz("Asia/Dhaka").format();
   console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
   await fetchAndDownloadDataOnce();
@@ -1243,7 +1243,7 @@ cron.schedule('0 2 * * *', async () => {
 });
 
 // Adjusted to run at 8:30 AM Bangladesh time
-cron.schedule('30 2 * * *', async () => {
+cron.schedule('30 8 * * *', async () => {
   try {
     console.log('Scheduled task started at 8:30 am Bangladesh time...');
 
@@ -1291,7 +1291,7 @@ cron.schedule('0 16 * * *', async () => {
 //   }
 // });
 
-cron.schedule('0 5 * * *', async () => { // Adjusted to run at 10:00 AM Bangladesh time
+cron.schedule('0 11 * * *', async () => { // Adjusted to run at 10:00 AM Bangladesh time
   console.log('Scheduled task started (11:00 AM Bangladesh time)...');
   
   try {
@@ -1307,11 +1307,13 @@ cron.schedule('0 5 * * *', async () => { // Adjusted to run at 10:00 AM Banglade
 
 
 // Schedule the cron job for 10:30 AM Bangladesh Time (BST)
-cron.schedule('30 5 * * *', async () => {
+cron.schedule('30 11 * * *', async () => {
   try {
     // Call the endpoint or directly invoke the function
     console.log('Running scheduled task to fetch and merge sales data.');
-    const response = await axios.get('https://api.priceobo.com/fetch-and-merge-sales');
+    // const response = await axios.get('https://api.priceobo.com/fetch-and-merge-sales');
+    const response = await axios.get('http://localhost:3000/fetch-and-merge-sales');
+
     console.log('Scheduled task completed:', response.data);
   } catch (error) {
     console.error('Error in scheduled task:', error);
@@ -1369,7 +1371,7 @@ app.get('/fetch-and-merge-sales', async (req, res) => {
 // fetch image
 app.get('/image/:sku', async (req, res) => {
   // const { sku } = req.params;
-  const sku = decodeURIComponent(req.params);
+  const sku = decodeURIComponent(req.params.sku);
   console.log("sku:"+sku);
   try {
     const listingData = await getListingsItem(sku);
@@ -1435,6 +1437,7 @@ app.get('/api/history/sku/:sku', async(req,res)=>{
 app.get('/sales-metrics-by-sku/:sku', async (req, res) => {
   // const { sku } = req.params;
   const sku = decodeURIComponent(req.params.sku);
+  console.log("sku"+sku)
   try {
     const results = await getMetricsForTimeRanges(sku);
     

@@ -53,6 +53,10 @@ mongoose
 
 const agenda = new Agenda({ db: { address: MONGO_URI, collection: 'jobs' } });
 
+// const agenda = new Agenda({
+//   db: { address: MONGO_URI, collection: 'jobs' },
+//   timezone: 'America/New_York', // Schedule jobs to run in New York time
+// });
 
 const credentials = {
   refresh_token: process.env.REFRESH_TOKEN,
@@ -180,6 +184,7 @@ const convertEdtToUtc = (timeString) => {
 };
 
 // Define weekly job with converted times from EDT to UTC
+/*
 async function defineWeeklyJobUtc(sku, day, timeSlot) {
   const jobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.startTime}`;
   const revertJobName = `weekly_price_update_${sku}_day_${day}_slot_${timeSlot.endTime}`;
@@ -206,8 +211,87 @@ async function defineWeeklyJobUtc(sku, day, timeSlot) {
     }
   });
 }
+  */
+const convertEdtToUtcWithDayAdjustment = (timeString, day) => {
+  const [hours, minutes] = timeString.split(":").map(Number);
+
+  // Create a moment object with the time in America/New_York timezone (EDT)
+  const edtMoment = moment.tz({ hour: hours, minute: minutes }, "America/New_York");
+
+  // Convert EDT time to UTC
+  const utcMoment = edtMoment.clone().utc();
+
+  // Calculate new day if UTC time crosses midnight
+  let newDay = day;
+  if (utcMoment.date() !== edtMoment.date()) {
+    // If the day rolled over, increment day (mod 7 to wrap around week)
+    newDay = (newDay + 1) % 7;
+  }
+
+  return {
+    hour: utcMoment.hours(),
+    minute: utcMoment.minutes(),
+    day: newDay,
+  };
+};
+
+async function defineWeeklyJobUtc(sku, startDay, endDay, timeSlot) {
+  const jobName = `weekly_price_update_${sku}_day_${startDay}_slot_${timeSlot.startTime}`;
+  const revertJobName = `revert_weekly_price_update_${sku}_day_${endDay}_slot_${timeSlot.endTime}`;
+
+  // Define the job in Agenda for price update
+  agenda.define(jobName, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Weekly price update applied for SKU: ${sku}, new price: ${newPrice}, day: ${startDay}, slot: ${timeSlot.startTime}`);
+    } catch (error) {
+      console.error(`Failed to apply weekly price update for SKU: ${sku}, day: ${startDay}, slot: ${timeSlot.startTime}`, error);
+    }
+  });
+
+  // Define the job in Agenda for price revert
+  agenda.define(revertJobName, async (job) => {
+    const { sku, revertPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, day: ${endDay}, slot: ${timeSlot.endTime}`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}, day: ${endDay}, slot: ${timeSlot.endTime}`, error);
+    }
+  });
+}
+
+const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots, scheduleId) => {
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const timeSlot of timeSlots) {
+      // Convert start and end times from EDT to UTC, adjusting days if necessary
+      const startTimeUtc = convertEdtToUtcWithDayAdjustment(timeSlot.startTime, Number(day));
+      const endTimeUtc = convertEdtToUtcWithDayAdjustment(timeSlot.endTime, Number(day));
+
+      // Build cron expressions for UTC times with adjusted day
+      const updateCron = `${startTimeUtc.minute} ${startTimeUtc.hour} * * ${startTimeUtc.day}`;
+      const revertCron = `${endTimeUtc.minute} ${endTimeUtc.hour} * * ${endTimeUtc.day}`;
+      
+      const updateJobName = `weekly_price_update_${sku}_day_${startTimeUtc.day}_slot_${timeSlot.startTime}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${endTimeUtc.day}_slot_${timeSlot.endTime}`;
+
+      // Pass the adjusted days to defineWeeklyJobUtc function
+      await defineWeeklyJobUtc(sku, startTimeUtc.day, endTimeUtc.day, timeSlot);
+
+      // Schedule the jobs in UTC timezone
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day: startTimeUtc.day, scheduleId }, { timezone: 'UTC' });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${startTimeUtc.day} at ${timeSlot.startTime} EDT (${startTimeUtc.hour}:${startTimeUtc.minute} UTC)`);
+
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day: endTimeUtc.day, scheduleId }, { timezone: 'UTC' });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${endTimeUtc.day} at ${timeSlot.endTime} EDT (${endTimeUtc.hour}:${endTimeUtc.minute} UTC)`);
+    }
+  }
+};
+
 
 // Schedule weekly price change with EDT to UTC conversion
+/*
 const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots, scheduleId) => {
   for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
     for (const timeSlot of timeSlots) {
@@ -236,7 +320,7 @@ const scheduleWeeklyPriceChangeFromEdt = async (sku, weeklyTimeSlots, scheduleId
     }
   }
 };
-
+*/
 /*
 const convertBSTtoUTCForEDT = (inputTime) => {
   const [hours, minutes] = inputTime.split(':').map(Number);
@@ -261,6 +345,8 @@ const convertBSTtoUTCForEDT = (inputTime) => {
   return utcTime;
 };
 */
+
+/*
 const convertBSTtoUTCForEDT = (inputTime) => {
   // Step 1: Parse the input time from Bangladesh time zone (BST)
   const [hours, minutes] = inputTime.split(':').map(Number);
@@ -366,7 +452,92 @@ const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
     }
   }
 };
+*/
 
+const convertBSTtoUTCForEDT = (inputTime) => {
+  const [hours, minutes] = inputTime.split(':').map(Number);
+  const currentDateInBST = moment.tz('Asia/Dhaka').set({
+    hour: hours,
+    minute: minutes,
+    second: 0,
+    millisecond: 0,
+  });
+
+  const edtDateTime = currentDateInBST.tz('America/New_York', true);
+  const utcDateTime = edtDateTime.utc();
+  return utcDateTime.toDate();
+};
+
+async function defineWeeklyJob(sku, startDay, endDay, timeSlot) {
+  const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
+  const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
+
+  const startHourUTC = startTimeInUTC.getUTCHours();
+  const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+  const endHourUTC = endTimeInUTC.getUTCHours();
+  const endMinuteUTC = endTimeInUTC.getUTCMinutes();
+
+  const updateJobName = `weekly_price_update_${sku}_day_${startDay}_slot_${timeSlot.startTime}`;
+  const revertJobName = `revert_weekly_price_update_${sku}_day_${endDay}_slot_${timeSlot.endTime}`;
+
+  agenda.define(updateJobName, { priority: 5 }, async (job) => {
+    const { sku, newPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, newPrice);
+      console.log(`Price updated for SKU: ${sku} at ${startTimeInUTC} UTC`);
+    } catch (error) {
+      console.error(`Failed to update price for SKU: ${sku}`, error);
+    }
+  });
+
+  agenda.define(revertJobName, { priority: 5 }, async (job) => {
+    const { sku, revertPrice } = job.attrs.data;
+    try {
+      await updateProductPrice(sku, revertPrice);
+      console.log(`Price reverted for SKU: ${sku} at ${endTimeInUTC} UTC`);
+    } catch (error) {
+      console.error(`Failed to revert price for SKU: ${sku}`, error);
+    }
+  });
+}
+
+const scheduleWeeklyPriceChange = async (sku, weeklyTimeSlots, scheduleId) => {
+  for (const [day, timeSlots] of Object.entries(weeklyTimeSlots)) {
+    for (const timeSlot of timeSlots) {
+      let adjustedStartDay = Number(day);
+      let adjustedEndDay = Number(day);
+
+      if (Number(timeSlot.startTime.split(":")[0]) >= 20) {
+        adjustedStartDay = (adjustedStartDay + 1) % 7;
+      }
+      if (Number(timeSlot.endTime.split(":")[0]) >= 20) {
+        adjustedEndDay = (adjustedEndDay + 1) % 7;
+      }
+
+      const startTimeInUTC = convertBSTtoUTCForEDT(timeSlot.startTime);
+      const endTimeInUTC = convertBSTtoUTCForEDT(timeSlot.endTime);
+
+      const startHourUTC = startTimeInUTC.getUTCHours();
+      const startMinuteUTC = startTimeInUTC.getUTCMinutes();
+      const endHourUTC = endTimeInUTC.getUTCHours();
+      const endMinuteUTC = endTimeInUTC.getUTCMinutes();
+
+      const updateCron = `${startMinuteUTC} ${startHourUTC} * * ${adjustedStartDay}`;
+      const revertCron = `${endMinuteUTC} ${endHourUTC} * * ${adjustedEndDay}`;
+
+      const updateJobName = `weekly_price_update_${sku}_day_${adjustedStartDay}_slot_${timeSlot.startTime}`;
+      const revertJobName = `revert_weekly_price_update_${sku}_day_${adjustedEndDay}_slot_${timeSlot.endTime}`;
+
+      await defineWeeklyJob(sku, adjustedStartDay, adjustedEndDay, timeSlot);
+
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, day: adjustedStartDay, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled weekly price update for SKU: ${sku} on day ${adjustedStartDay} at ${startHourUTC}:${startMinuteUTC} UTC`);
+
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, day: adjustedEndDay, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled weekly price revert for SKU: ${sku} on day ${adjustedEndDay} at ${endHourUTC}:${endMinuteUTC} UTC`);
+    }
+  }
+};
 
 
 
@@ -467,9 +638,33 @@ const  scheduleMonthlyPriceChangeFromEdt = async (sku, monthlySlots, scheduleId)
   }
 };*/
 // Define monthly job with converted times from EDT to UTC
-async function defineMonthlyJobUtc(sku, date, timeSlot) {
-  const jobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.startTime}`; 
-  const revertJobName = `monthly_price_update_${sku}_date_${date}_slot_${timeSlot.endTime}`;
+
+const convertEdtToUtcWithDayAdjustmentMonthly = (timeString, date) => {
+  const [hours, minutes] = timeString.split(":").map(Number);
+
+  // Create a moment object with the time in America/New_York timezone (EDT)
+  const edtMoment = moment.tz({ hour: hours, minute: minutes }, "America/New_York");
+
+  // Convert EDT time to UTC
+  const utcMoment = edtMoment.clone().utc();
+
+  // Calculate new day if UTC time crosses midnight
+  let newDay = date;
+  if (utcMoment.date() !== edtMoment.date()) {
+    // If the day rolled over, increment day (mod 7 to wrap around week)
+    newDay = (newDay + 1) % 31;
+  }
+
+  return {
+    hour: utcMoment.hours(),
+    minute: utcMoment.minutes(),
+    date: newDay,
+  };
+};
+
+async function defineMonthlyJobUtc(sku, startDate,endDate, timeSlot) {
+  const jobName = `monthly_price_update_${sku}_date_${startDate}_slot_${timeSlot.startTime}`; 
+  const revertJobName = `monthly_price_update_${sku}_date_${endDate}_slot_${timeSlot.endTime}`;
 
   // Define the job in Agenda for price update
   agenda.define(jobName, async (job) => {
@@ -477,9 +672,9 @@ async function defineMonthlyJobUtc(sku, date, timeSlot) {
 
     try {
       await updateProductPrice(sku, newPrice);
-      console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}, date: ${date}, slot: ${timeSlot.startTime}`);
+      console.log(`Monthly price update applied for SKU: ${sku}, new price: ${newPrice}, date: ${startDate}, slot: ${timeSlot.startTime}`);
     } catch (error) {
-      console.error(`Failed to apply monthly price update for SKU: ${sku}, date: ${date}, slot: ${timeSlot.startTime}`, error);
+      console.error(`Failed to apply monthly price update for SKU: ${sku}, date: ${startDate}, slot: ${timeSlot.startTime}`, error);
     }
   });
 
@@ -489,9 +684,9 @@ async function defineMonthlyJobUtc(sku, date, timeSlot) {
 
     try {
       await updateProductPrice(sku, revertPrice);
-      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, date: ${date}, slot: ${timeSlot.endTime}`);
+      console.log(`Price reverted for SKU: ${sku}, revert price: ${revertPrice}, date: ${endDate}, slot: ${timeSlot.endTime}`);
     } catch (error) {
-      console.error(`Failed to revert price for SKU: ${sku}, date: ${date}, slot: ${timeSlot.endTime}`, error);
+      console.error(`Failed to revert price for SKU: ${sku}, date: ${endDate}, slot: ${timeSlot.endTime}`, error);
     }
   });
 }
@@ -502,28 +697,29 @@ const scheduleMonthlyPriceChangeFromEdt = async (sku, monthlySlots, scheduleId) 
     for (const timeSlot of timeSlots) {
       
       // Convert start and end times from EDT to UTC
-      const startTimeUtc = convertEdtToUtc(timeSlot.startTime);
-      const endTimeUtc = convertEdtToUtc(timeSlot.endTime);
+      const startTimeUtc = convertEdtToUtcWithDayAdjustmentMonthly(timeSlot.startTime,Number(date));
+      const endTimeUtc = convertEdtToUtcWithDayAdjustmentMonthly(timeSlot.endTime,Number(date));
+
       const [startHour, startMinute] = timeSlot.startTime.split(':');
       const [endHour, endMinute] = timeSlot.endTime.split(':');
       // Build cron expressions for UTC times
-      const updateCron = `${startTimeUtc.minute} ${startTimeUtc.hour} ${date} * *`;
-      const revertCron = `${endTimeUtc.minute} ${endTimeUtc.hour} ${date} * *`;
+      const updateCron = `${startTimeUtc.minute} ${startTimeUtc.hour} ${startTimeUtc.date} * *`;
+      const revertCron = `${endTimeUtc.minute} ${endTimeUtc.hour} ${endTimeUtc.date} * *`;
 
       // const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startTimeUtc.hour}:${startTimeUtc.minute}`;
       // const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endTimeUtc.hour}:${endTimeUtc.minute}`;
 
-      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHour}:${startMinute}`;
-      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHour}:${endMinute}`;
+      const updateJobName = `monthly_price_update_${sku}_date_${startTimeUtc.date}_slot_${startHour}:${startMinute}`;
+      const revertJobName = `revert_monthly_price_update_${sku}_date_${endTimeUtc.date}_slot_${endHour}:${endMinute}`;
       // Define and schedule the update and revert jobs
-      await defineMonthlyJobUtc(sku, date, timeSlot);
+      await defineMonthlyJobUtc(sku, startTimeUtc.date,endTimeUtc.date, timeSlot);
 
       // Schedule the jobs in UTC timezone
-      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, date, scheduleId }, { timezone: 'UTC'});
-      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${timeSlot.startTime} EDT (${startTimeUtc.hour}:${startTimeUtc.minute})`);
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, date:startTimeUtc.date, scheduleId }, { timezone: 'UTC'});
+      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${startTimeUtc.date} at ${timeSlot.startTime} EDT (${startTimeUtc.hour}:${startTimeUtc.minute})`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, date, scheduleId }, { timezone: 'UTC' });
-      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${timeSlot.endTime} EDT (${endTimeUtc.hour}:${endTimeUtc.minute})`);
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, date:endTimeUtc.date, scheduleId }, { timezone: 'UTC' });
+      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${endTimeUtc.date} at ${timeSlot.endTime} EDT (${endTimeUtc.hour}:${endTimeUtc.minute})`);
     }
   }
 };
@@ -575,7 +771,7 @@ const monthlyConvertBSTtoUTCForEDT = (inputTime) => {
   return utcDateTime.toDate(); // Return the Date object in UTC
 };
 
-async function defineMonthlyJob(sku, date, timeSlot) {
+async function defineMonthlyJob(sku, startDate,endDate, timeSlot) {
   // Convert start and end times from Bangladesh (BST) to UTC for scheduling
   const startTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.startTime);
   const endTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.endTime);
@@ -588,8 +784,8 @@ async function defineMonthlyJob(sku, date, timeSlot) {
 
   console.log(`Job Start Time in UTC: ${startHourUTC}:${startMinuteUTC}, End Time in UTC: ${endHourUTC}:${endMinuteUTC}`);
 
-  const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHourUTC}:${startMinuteUTC}`;
-  const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHourUTC}:${endMinuteUTC}`;
+  const updateJobName = `monthly_price_update_${sku}_date_${startDate}_slot_${startHourUTC}:${startMinuteUTC}`;
+  const revertJobName = `revert_monthly_price_update_${sku}_date_${endDate}_slot_${endHourUTC}:${endMinuteUTC}`;
 
   // Define the job in Agenda for price update
   agenda.define(updateJobName, { priority: 10 }, async (job) => {
@@ -620,7 +816,16 @@ const scheduleMonthlyPriceChange = async (sku, monthlyTimeSlots, scheduleId) => 
       // Convert start and end times based on user time zone (Bangladesh BST -> EDT -> UTC)
       const startTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.startTime);
       const endTimeInUTC = monthlyConvertBSTtoUTCForEDT(timeSlot.endTime);
+      
+      let adjustedStartDate = Number(date);
+      let adjustedEndDate = Number(date);
 
+      if(Number(timeSlot.startTime.split(":")[0])>=20){
+        adjustedStartDate = (adjustedStartDate + 1)%31;
+      }
+      if(Number(timeSlot.endTime.split(":")[0])>=20){
+        adjustedEndDate =(adjustedEndDate+1)%31;
+      }
       // Get the UTC hours and minutes
       const startHourUTC = startTimeInUTC.getUTCHours();
       const startMinuteUTC = startTimeInUTC.getUTCMinutes();
@@ -628,19 +833,19 @@ const scheduleMonthlyPriceChange = async (sku, monthlyTimeSlots, scheduleId) => 
       const endMinuteUTC = endTimeInUTC.getUTCMinutes();
 
       // Cron expressions for specific dates
-      const updateCron = `${startMinuteUTC} ${startHourUTC} ${date} * *`;
-      const revertCron = `${endMinuteUTC} ${endHourUTC} ${date} * *`;
+      const updateCron = `${startMinuteUTC} ${startHourUTC} ${adjustedStartDate} * *`;
+      const revertCron = `${endMinuteUTC} ${endHourUTC} ${adjustedEndDate} * *`;
 
-      const updateJobName = `monthly_price_update_${sku}_date_${date}_slot_${startHourUTC}:${startMinuteUTC}`;
-      const revertJobName = `revert_monthly_price_update_${sku}_date_${date}_slot_${endHourUTC}:${endMinuteUTC}`;
-      await defineMonthlyJob(sku, date, timeSlot);  // Pass timeSlot, not timeSlots
+      const updateJobName = `monthly_price_update_${sku}_date_${adjustedStartDate}_slot_${startHourUTC}:${startMinuteUTC}`;
+      const revertJobName = `revert_monthly_price_update_${sku}_date_${adjustedEndDate}_slot_${endHourUTC}:${endMinuteUTC}`;
+      await defineMonthlyJob(sku, adjustedStartDate,adjustedEndDate, timeSlot);  // Pass timeSlot, not timeSlots
 
       // Schedule the jobs in UTC (which aligns with EDT)
-      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, date, scheduleId }, { timezone: "UTC" });
-      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${date} at ${startHourUTC}:${startMinuteUTC} UTC`);
+      await agenda.every(updateCron, updateJobName, { sku, newPrice: timeSlot.newPrice, date:adjustedStartDate, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled monthly price update for SKU: ${sku} on date ${adjustedStartDate} at ${startHourUTC}:${startMinuteUTC} UTC`);
 
-      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, date, scheduleId }, { timezone: "UTC" });
-      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${date} at ${endHourUTC}:${endMinuteUTC} UTC`);
+      await agenda.every(revertCron, revertJobName, { sku, revertPrice: timeSlot.revertPrice, date:adjustedEndDate, scheduleId }, { timezone: "UTC" });
+      console.log(`Scheduled monthly price revert for SKU: ${sku} on date ${adjustedEndDate} at ${endHourUTC}:${endMinuteUTC} UTC`);
     }
   }
 };

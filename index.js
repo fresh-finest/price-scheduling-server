@@ -13,7 +13,6 @@ const cookieParser = require('cookie-parser');
 // const { authenticateUser } = require('./src/middleware/authMiddleware');
 
 
-
 const app = express();
 app.use(express.json());
 app.use(cookieParser());  // To parse cookies
@@ -21,6 +20,7 @@ app.use(cookieParser());  // To parse cookies
 app.use(cors());
 app.options('*', cors()); // Enable pre-flight for all routes
 // const allowedOrigins = ['http://localhost:5173', 'https://api.priceobo.com'];
+
 
 // app.use(cors({
 //   origin: function (origin, callback) {
@@ -39,6 +39,15 @@ app.options('*', cors()); // Enable pre-flight for all routes
 const MONGO_URI = process.env.MONGO_URI;
 
 // const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+app.use((req, res, next) => {
+  req.marketplace_id = req.cookies.marketplace_id || "";
+  next();
+});
+app.get("/api/market", (req, res) => {
+  const marketplaceId = req.marketplace_id;
+  
+  res.json({ marketplaceId });
+});
 
 
 mongoose
@@ -1651,6 +1660,17 @@ app.get('/sales-metrics-by-sku/:sku', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch sales metrics' });
   }
 });
+// Route to fetch the last 30 days of sales metrics
+app.get('/sales-metrics/day/:sku', async (req, res) => {
+  const { sku } = req.params;
+
+  try {
+    const metrics = await fetchSalesMetricsByDay(sku);
+    res.json(metrics);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch sales metrics' });
+  }
+});
 
 app.get('/api/history/:scheduleId', async (req, res) => {
   const { scheduleId } = req.params;
@@ -1702,17 +1722,25 @@ app.get('/fetch-all-listings', async (req, res) => {
   }
 });
 
-app.get('/api/jobs/:id',async(req,res)=>{
-  const {asin}= req.params;
+app.get('/api/jobs', async (req, res) => {
+  // const { sku } = req.params;
+  // console.log('Requested scheduleId:', sku);
+  
   try {
-    const jobs = await agenda._collection.find({ 'data.asin': asin }).toArray();
-
+    // Make sure scheduleId is a string
+    const jobs = await agenda._collection.find().toArray();
+    
+    if (jobs.length === 0) {
+      console.log('No jobs found for sku:', sku);
+    }
+    
     res.json({ success: true, jobs });
   } catch (error) {
-    console.error('Error fetching jobs by id:', error);
+    console.error('Error fetching jobs by scheduleId:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
   }
-})
+});
+
 
 
 app.post('/send-email', async (req, res) => {
@@ -1743,8 +1771,10 @@ const scheduleRoute = require("./src/route/Schedule");
 const authRoute = require("./src/route/auth");
 const userRoute = require("./src/route/user");
 const historyRoute = require("./src/route/history")
+const accountRoute = require("./src/route/account")
 const PriceSchedule = require('./src/model/PriceSchedule');
 const History = require('./src/model/HistorySchedule');
+
 const sendEmail = require('./src/service/EmailService');
 // const Listing = require('./src/model/Listing');
 const Product = require("./src/model/Product");
@@ -1760,12 +1790,14 @@ const { getListingsItemBySku } = require('./src/service/getPriceService');
 const { getMetricsForTimeRanges } = require('./src/service/getSaleService');
 const { mergeAndSaveSalesData } = require('./src/merge-service/saleUnitMergedService');
 const SaleStock = require('./src/model/SaleStock');
+const fetchSalesMetricsByDay = require('./src/service/getReportService');
 
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
 app.use("/api/histories",historyRoute);
+app.use("/api/account",accountRoute);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";

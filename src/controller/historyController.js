@@ -17,6 +17,22 @@ exports.getHistoryById = async(req,res,next)=>{
     }
 }
 
+
+exports.getLimitHistory = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 15;
+  const skip = (page - 1) * limit;
+
+  const totalHistoris = await History.countDocuments();
+  const histories = await History.find().skip(skip).limit(limit);
+  res.json({ totalHistoris, histories });
+};
+
+
+  
+
+
+
 //get /api/history/
 exports.getHistory= async(req,res,next)=>{
     try {   

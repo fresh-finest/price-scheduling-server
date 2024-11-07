@@ -1,5 +1,5 @@
 const express= require("express");
-const { getHistory, getHistoryById } = require("../controller/historyController");
+const { getHistory, getHistoryById, getLimitHistory } = require("../controller/historyController");
 
 const router = express.Router();
 
@@ -7,6 +7,6 @@ const router = express.Router();
 
 router.route("/").get(getHistory);
 router.route("/:scheduledId").get(getHistoryById);
-
+router.route("/limit").get(getLimitHistory);
 
 module.exports = router;

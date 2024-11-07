@@ -55,7 +55,7 @@ const getListingsItemBySku = async (sku) => {
   try {
     const response = await axios(request);
     const itemData = response.data;
-
+  
     // Extract the offers amount
     let offerAmount = 'Offer price not available';
     if (itemData.offers && itemData.offers.length > 0) {
@@ -65,7 +65,7 @@ const getListingsItemBySku = async (sku) => {
       }
     }
 
-    return { sku, offerAmount }; // Return only the SKU and offer amount
+    return { sku, offerAmount}; // Return only the SKU and offer amount
   } catch (error) {
     console.error('Error fetching listing item:', error.response ? error.response.data : error.message);
     throw error;

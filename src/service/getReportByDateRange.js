@@ -1,21 +1,18 @@
-const credentials = require('../middleware/credentialMiddleware');
-const express = require('express');
-const axios = require('axios');
-const moment = require('moment-timezone');
-const { fetchAccessToken } = require('../middleware/accessToken');
 
 
-  // Function to fetch sales metrics for the last 30 days by SKU
-  /*
-const fetchSalesMetricsByDay = async (sku) => {
-  const { marketplace_id } = credentials;
+const axios = require("axios");
+const moment = require("moment");
+const { fetchAccessToken } = require("../middleware/accessToken");
+const { marketplace_id } = require("../middleware/credentialMiddleware");
+const credentials = require("../middleware/credentialMiddleware");
+/*
+const fetchSalesMetricsByDateRange = async (sku, startDate, endDate) => {
+    const { marketplace_id } = credentials;
     try {
       const accessToken = await fetchAccessToken();
       const url = `https://sellingpartnerapi-na.amazon.com/sales/v1/orderMetrics`;
   
-      // Calculate the interval for the last 30 days
-      const endDate = moment().utc().format('YYYY-MM-DD');
-      const startDate = moment().utc().subtract(30, 'days').format('YYYY-MM-DD');
+      // Construct the interval with the provided start and end dates
       const interval = `${startDate}T00:00:00Z--${endDate}T23:59:59Z`;
   
       const params = {
@@ -52,8 +49,7 @@ const fetchSalesMetricsByDay = async (sku) => {
     }
   };
   */
-
-  const fetchSalesMetricsByDay = async (sku) => {
+  const fetchSalesMetricsByDateRange = async (sku, startDate, endDate) => {
     const { marketplace_id } = credentials;
     const maxRetries = 7; // Maximum number of retries
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,9 +59,7 @@ const fetchSalesMetricsByDay = async (sku) => {
         const accessToken = await fetchAccessToken();
         const url = `https://sellingpartnerapi-na.amazon.com/sales/v1/orderMetrics`;
   
-        // Calculate the interval for the last 30 days
-        const endDate = moment().utc().format('YYYY-MM-DD');
-        const startDate = moment().utc().subtract(30, 'days').format('YYYY-MM-DD');
+        // Construct the interval with the provided start and end dates
         const interval = `${startDate}T00:00:00Z--${endDate}T23:59:59Z`;
   
         const params = {
@@ -91,7 +85,7 @@ const fetchSalesMetricsByDay = async (sku) => {
             date: moment(metric.interval.split('T')[0]).format('DD/MM/YYYY'), // Format date as DD/MM/YYYY
             amount: metric.averageUnitPrice ? parseFloat(metric.averageUnitPrice.amount) : 0.0,
             unitCount: metric.unitCount,
-          })); //.reverse();
+          })).reverse();
         } else {
           console.error('Unexpected API response:', response.data);
           throw new Error('Unexpected API response format');
@@ -104,7 +98,7 @@ const fetchSalesMetricsByDay = async (sku) => {
           error.response.data.errors[0].code === 'QuotaExceeded'
         ) {
           console.warn(`Quota exceeded. Attempt ${attempt} of ${maxRetries}. Retrying in 2 seconds...`);
-          await delay(3000); // Delay before retrying
+          await delay(3000); // Wait for 2 seconds before retrying
           continue;
         }
   
@@ -117,7 +111,4 @@ const fetchSalesMetricsByDay = async (sku) => {
   };
   
 
-  module.exports = fetchSalesMetricsByDay;
-  
-  
-  
+  module.exports = fetchSalesMetricsByDateRange;  

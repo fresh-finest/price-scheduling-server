@@ -1,0 +1,333 @@
+const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
+const axios = require('axios');
+const moment = require('moment-timezone');
+const { fetchInventorySummaries, mergeAndSaveFbmData } = require('../../merge-service/fbmMergedService');
+const { mergeAndSaveImageData } = require('../../merge-service/imageMergedService');
+const sendEmail = require('../../service/EmailService');
+const MergedProduct = require('../../model/MergedImage');
+const Inventory = require('../../model/Inventory');
+const { mergeAndSaveSalesData } = require('../../merge-service/saleUnitMergedService');
+const { getListingsItem } = require('../../service/ImageService');
+const { getListingsItemBySku } = require('../../service/getPriceService');
+const fetchProductPricing = require('../fetchApi/ProductPricing');
+const fetchProductDetails = require('../fetchApi/ProductDetails');
+const History = require('../../model/HistorySchedule');
+const { getMetricsForTimeRanges } = require('../../service/getSaleService');
+const fetchSalesMetricsByDateRange = require('../../service/getReportByDateRange');
+const fetchSalesMetricsByDay = require('../../service/getReportService');
+const fetchWeeklySalesMetrics = require('../../service/getReportWeeklyService');
+const fetchMontlySalesMetrics = require('../../service/getReportMonthlyService');
+const SaleStock = require('../../model/SaleStock');
+const processReport = require('../../service/reportService');
+const Report = require('../../model/Report');
+const Stock = require('../../model/Stock');
+const agenda = require('../Agenda');
+
+
+router.get('/fetch-and-merge', async (req, res) => {
+    try {
+      // Step 1: Fetch all listings from MongoDB
+      const listings = await MergedProduct.find();
+      console.log(`Fetched ${listings.length} listings from MongoDB.`);
+  
+      // Step 2: Fetch inventory summaries from the Amazon API
+      const inventorySummaries = await fetchInventorySummaries();
+      console.log(`Fetched ${inventorySummaries.length} inventory summaries.`);
+  
+      // Step 3: Merge listings with inventory summaries based on asin1 and save to the Product collection
+      const mergedData = await mergeAndSaveFbmData(listings, inventorySummaries);
+  
+      // Step 4: Return the merged data as a response
+      res.json(mergedData);
+    } catch (error) {
+      console.error('Error during data processing:', error);
+      res.status(500).json({ error: 'Failed to fetch, merge, and store data' });
+    }
+  });
+  
+  router.get('/fetch-and-merge-images', async (req, res) => {
+    try {
+      const listings = await Inventory.find();
+      console.log(`Fetched ${listings.length} listings from MongoDB.`);
+      const mergedData = await mergeAndSaveImageData(listings);
+      res.json({ message: 'Data merged and saved successfully.', result: mergedData });
+    } catch (error) {
+      console.error('Error during manual data processing:', error);
+      res.status(500).json({ error: 'Failed to fetch, merge, and save data' });
+    }
+  });
+  router.get('/fetch-and-merge-sales', async (req, res) => {
+    try {
+      const listings = await Stock.find();
+      console.log(`Fetched ${listings.length} listings from MongoDB.`);
+      const mergedData = await mergeAndSaveSalesData(listings);
+      res.json({ message: 'Data merged and saved successfully.', result: mergedData });
+    } catch (error) {
+      console.error('Error during manual data processing:', error);
+      res.status(500).json({ error: 'Failed to fetch, merge, and save data' });
+    }
+  });
+  // fetch image
+  router.get('/image/:sku', async (req, res) => {
+    // const { sku } = req.params;
+    const sku = decodeURIComponent(req.params.sku);
+    console.log("sku:"+sku);
+    try {
+      const listingData = await getListingsItem(sku);
+      res.json(listingData);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch product price' });
+    }
+  });
+  
+  router.get('/list/:sku',async(req,res)=>{
+    const { sku } = req.params;
+  
+    try {
+      const listingData = await getListingsItemBySku(sku);
+      res.json(listingData);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch listing item' });
+    }
+  })
+  
+  
+  // fetch product using asin
+  router.get('/product/:asin', async (req, res) => {
+    const { asin } = req.params;
+    try {
+      const productPricing = await fetchProductPricing(asin);
+      res.json(productPricing);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch product pricing' });
+    }
+  });
+  
+  
+  // Express.js route to fetch product details
+  router.get('/details/:asin', async (req, res) => {
+    const { asin } = req.params;
+    try {
+      const productDetails = await fetchProductDetails(asin);
+      res.json(productDetails);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch product details' });
+    }
+  });
+  
+  
+  router.get('/api/history/sku/:sku', async(req,res)=>{
+    const {sku} = req.params;
+    console.log(sku)
+  
+    try {
+      
+      const result = await History.find({sku:sku});
+      res.json(result);
+    }  catch (error) {
+      res.status(400).json({
+        status: "Fail",
+        message: "Couldn't fetch data.",
+        error: error.message
+    });
+    }
+  })
+  
+  
+  router.get('/sales-metrics-by-sku/:sku', async (req, res) => {
+    // const { sku } = req.params;
+    const sku = decodeURIComponent(req.params.sku);
+    console.log("sku"+sku)
+    try {
+      const results = await getMetricsForTimeRanges(sku);
+      
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  // Route to fetch the last 30 days of sales metrics
+  
+  router.get('/sales-metrics/range/:sku', async (req, res) => {
+    const { sku } = req.params;
+    const { startDate, endDate } = req.query;
+  
+    // Validate that both startDate and endDate are provided
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required query parameters' });
+    }
+  
+    try {
+      const metrics = await fetchSalesMetricsByDateRange(sku, startDate, endDate);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  router.get('/sales-metrics/day/:sku', async (req, res) => {
+    const { sku } = req.params;
+  
+    try {
+      const metrics = await fetchSalesMetricsByDay(sku);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  router.get('/sales-metrics/week/:sku', async (req, res) => {
+    const { sku } = req.params;
+  
+    try {
+      const metrics = await fetchWeeklySalesMetrics(sku);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  router.get('/sales-metrics/month/:sku', async (req, res) => {
+    const { sku } = req.params;
+  
+    try {
+      const metrics = await fetchMontlySalesMetrics(sku);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  
+  router.get('/api/history/:scheduleId', async (req, res) => {
+    const { scheduleId } = req.params;
+  
+    if (!mongoose.Types.ObjectId.isValid(scheduleId)) {
+      return res.status(400).json({ error: 'Invalid scheduleId format' });
+    }
+  
+    try {
+      const history = await History.find({ scheduleId: new mongoose.Types.ObjectId(scheduleId) }).sort({ createdAt: -1 });
+  
+      if (!history || history.length === 0) {
+        return res.status(404).json({ message: 'No history found for this scheduleId' });
+      }
+  
+      res.json(history);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      res.status(500).json({ error: 'Failed to fetch history' });
+    }
+  });
+
+  router.get('/api/history/', async (req, res) => {
+    
+    try {
+      
+      const result = await History.find().sort({ createdAt: -1 });
+      
+      res.status(200).json({
+        status: "Success",
+        message: "Successfully fetch data.",
+        result,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "Fail",
+        message: "Couldn't fetch data.",
+        error: error.message
+    });
+    }
+  });
+  
+  router.get('/fetch-all-listings', async (req, res) => {
+    try {
+      // const listings = await Inventory.find(); 
+      const listings = await SaleStock.find();
+      res.json({ listings });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch all listings' });
+    }
+  });
+  
+  router.get('/api/jobs', async (req, res) => {
+    // const { sku } = req.params;
+    // console.log('Requested scheduleId:', sku);
+    
+    try {
+      // Make sure scheduleId is a string
+      const jobs = await agenda._collection.find().toArray();
+      
+      if (jobs.length === 0) {
+        console.log('No jobs found for sku:', sku);
+      }
+      
+      res.json({ success: true, jobs });
+    } catch (error) {
+      console.error('Error fetching jobs by scheduleId:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
+    }
+  });
+  
+  
+  router.get('/api/sales-report',async(req,res)=>{
+    try {
+      const scheduleResponse = await axios.get('https://api.priceobo.com/api/schedule');
+      // const scheduleResponse = await axios.get('http://localhost:3000/api/schedule');
+    const schedules = scheduleResponse.data.result;
+  
+    const report = await processReport(schedules);
+    res.json(report);
+    } catch (error) {
+      res.status(500).json({error:'Failed to fetch and mergee sales metrics and schedule',message:error.message});
+    }
+  
+  })
+  
+  router.get('/api/report/:sku', async (req, res) => {
+    const { sku } = req.params;
+  
+    if (!sku) {
+      return res.status(400).json({ error: 'SKU parameter is required' });
+    }
+  
+    try {
+      const metrics = await Report.find({ sku: sku });
+  
+      if (!metrics || metrics.length === 0) {
+        return res.status(404).json({ error: 'No sales metrics found for this SKU' });
+      }
+  
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching sales metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  
+  router.get('/api/report', async (req, res) => {
+    
+  
+    try {
+      const metrics = await Report.find();
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  
+  router.post('/send-email', async (req, res) => {
+    const { to, subject, text, html } = req.body;
+  
+  
+    try {
+      // Call the sendEmail function
+      await sendEmail(to, subject, text, html);
+      res.status(200).send('Email sent successfully');
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Error sending email');
+    }
+  });
+  
+
+
+module.exports = router;

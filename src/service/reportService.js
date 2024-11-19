@@ -268,8 +268,14 @@ const processReport = async (reports) => {
     if (weekly && !monthly) {
       for (const [dayOfWeek, timeSlots] of Object.entries(weeklyTimeSlots)) {
         for (const timeSlot of timeSlots) {
-          let currentWeek = createdAtDate.clone().day(parseInt(dayOfWeek)); // Start from the week of createdAt
+          // Calculate the first applicable date based on the createdAt date
+          let firstApplicableDate = createdAtDate.clone().day(parseInt(dayOfWeek));
+          if (firstApplicableDate.isBefore(createdAtDate)) {
+            firstApplicableDate.add(7, 'days'); // Move to the next applicable week
+          }
 
+          // Process each applicable week
+          let currentWeek = firstApplicableDate.clone();
           while (!currentWeek.isAfter(today)) {
             const formattedDate = currentWeek.format('YYYY-MM-DD');
             const newPrice = timeSlot.newPrice;
@@ -306,8 +312,14 @@ const processReport = async (reports) => {
     if (monthly && !weekly) {
       for (const [dateOfMonth, timeSlots] of Object.entries(monthlyTimeSlots)) {
         for (const timeSlot of timeSlots) {
-          let currentMonth = createdAtDate.clone().date(parseInt(dateOfMonth)); // Start from the month of createdAt
+          // Calculate the first applicable date based on the createdAt date
+          let firstApplicableDate = createdAtDate.clone().date(parseInt(dateOfMonth));
+          if (firstApplicableDate.isBefore(createdAtDate)) {
+            firstApplicableDate.add(1, 'month'); // Move to the next applicable month
+          }
 
+          // Process each applicable month
+          let currentMonth = firstApplicableDate.clone();
           while (!currentMonth.isAfter(today)) {
             const formattedDate = currentMonth.format('YYYY-MM-DD');
             const newPrice = timeSlot.newPrice;
@@ -343,6 +355,7 @@ const processReport = async (reports) => {
 
   return result;
 };
+
 
 
 

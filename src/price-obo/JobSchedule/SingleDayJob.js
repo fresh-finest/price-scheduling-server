@@ -2,7 +2,7 @@
 const moment = require('moment-timezone');
 
 const updateProductPrice = require("../UpdatePrice/UpdatePrice");
-const agenda = require('../Agenda');
+const {agenda} = require('../Agenda');
 
 const singleConvertBSTtoUTCForEDT = (inputDateTime) => {
    

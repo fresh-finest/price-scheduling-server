@@ -2,7 +2,7 @@
 const moment = require('moment-timezone');
 
 const updateProductPrice = require("../UpdatePrice/UpdatePrice");
-const agenda = require('../Agenda');
+const {agenda} = require('../Agenda');
 
 const convertEdtToUtcWithDayAdjustment = (timeString, day) => {
     const [hours, minutes] = timeString.split(":").map(Number);

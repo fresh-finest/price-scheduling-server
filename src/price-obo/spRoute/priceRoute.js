@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const agenda = require('../Agenda');
+const {agenda} = require('../Agenda');
 const PriceSchedule = require('../../model/PriceSchedule');
 const History = require('../../model/HistorySchedule');
 const singleDayScheduleChange = require('../JobSchedule/SingleDayJob');

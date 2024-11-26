@@ -1,7 +1,7 @@
 const moment = require('moment-timezone');
 
 const updateProductPrice = require("../UpdatePrice/UpdatePrice");
-const agenda = require('../Agenda');
+const {agenda} = require('../Agenda');
 
 const convertEdtToUtcWithDayAdjustmentMonthly = (timeString, date) => {
     const [hours, minutes] = timeString.split(":").map(Number);

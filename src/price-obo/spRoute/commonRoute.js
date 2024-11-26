@@ -23,7 +23,8 @@ const SaleStock = require('../../model/SaleStock');
 const processReport = require('../../service/reportService');
 const Report = require('../../model/Report');
 const Stock = require('../../model/Stock');
-const agenda = require('../Agenda');
+const {agenda} = require('../Agenda');
+const updateProductSalePrice = require('../UpdatePrice/UpdateSalePrice');
 
 
 router.get('/fetch-and-merge', async (req, res) => {
@@ -149,7 +150,7 @@ router.get('/fetch-and-merge', async (req, res) => {
     }
   });
   // Route to fetch the last 30 days of sales metrics
-  
+  /*
   router.get('/sales-metrics/range/:sku', async (req, res) => {
     const { sku } = req.params;
     const { startDate, endDate } = req.query;
@@ -166,6 +167,30 @@ router.get('/fetch-and-merge', async (req, res) => {
       res.status(500).json({ error: 'Failed to fetch sales metrics' });
     }
   });
+*/
+router.get('/sales-metrics/range/:identifier', async (req, res) => {
+  const { identifier} = req.params;
+  const { startDate, endDate, type="sku" } = req.query; // Default type is "sku"
+
+  // Validate that both startDate and endDate are provided
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required query parameters' });
+  }
+
+  // Validate that the type is either "sku" or "asin"
+  if (!["sku", "asin"].includes(type)) {
+    return res.status(400).json({ error: 'Invalid type. Allowed values are "sku" or "asin".' });
+  }
+
+  try {
+    const metrics = await fetchSalesMetricsByDateRange(identifier, startDate, endDate, type);
+    res.json(metrics);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch sales metrics', message: error.message });
+  }
+});
+
+  /*
   router.get('/sales-metrics/day/:sku', async (req, res) => {
     const { sku } = req.params;
   
@@ -176,6 +201,24 @@ router.get('/fetch-and-merge', async (req, res) => {
       res.status(500).json({ error: 'Failed to fetch sales metrics' });
     }
   });
+  */
+  router.get('/sales-metrics/day/:identifier', async (req, res) => {
+    const { identifier } = req.params; // Identifier can be SKU or ASIN
+   
+    const {  type="sku" } = req.query; // Default type is "sku"
+    if (!["sku", "asin"].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type. Allowed values are "sku" or "asin".' });
+    }
+  
+    try {
+      const metrics = await fetchSalesMetricsByDay(identifier, type);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics', message: error.message });
+    }
+  });
+  
+
   router.get('/sales-metrics/week/:sku', async (req, res) => {
     const { sku } = req.params;
   
@@ -186,6 +229,7 @@ router.get('/fetch-and-merge', async (req, res) => {
       res.status(500).json({ error: 'Failed to fetch sales metrics' });
     }
   });
+  /*
   router.get('/sales-metrics/month/:sku', async (req, res) => {
     const { sku } = req.params;
   
@@ -194,6 +238,22 @@ router.get('/fetch-and-merge', async (req, res) => {
       res.json(metrics);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch sales metrics' });
+    }
+  });
+  */
+  router.get('/sales-metrics/month/:identifier', async (req, res) => {
+    const { identifier} = req.params;
+    const {  type="sku" } = req.query; 
+  
+    if (!["sku", "asin"].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type. Allowed values are "sku" or "asin".' });
+    }
+  
+    try {
+      const metrics = await fetchMontlySalesMetrics(identifier, type);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch sales metrics', message: error.message });
     }
   });
   
@@ -328,6 +388,30 @@ router.get('/fetch-and-merge', async (req, res) => {
     }
   });
   
+  router.patch('/sale-price', async (req, res) => {
 
+    const { value, startDate, endDate, sku} = req.body;
+
+  if (!sku || !value || !startDate || !endDate) {
+    return res.status(400).json({
+      error: 'sku, salePrice, startDate, and endDate are required.',
+    });
+  }
+
+  try {
+    const response = await updateProductSalePrice(sku, value, startDate, endDate);
+    res.status(200).json({
+      message: 'Sale price updated successfully',
+      data: response,
+    });
+  } catch (error) {
+    console.error('Error:', error.response ? error.response.data : error.message);
+    res.status(500).json({
+      error: 'Failed to update sale price',
+      details: error.response ? error.response.data : error.message,
+    });
+  }
+  });
+  
 
 module.exports = router;

@@ -11,9 +11,10 @@ require('dotenv').config();
 const cookieParser = require('cookie-parser');
 
 // const { authenticateUser } = require('./src/middleware/authMiddleware');
-const agenda = require('./src/price-obo/Agenda');
+const {agenda,autoJobsAgenda } = require('./src/price-obo/Agenda');
 const routes = require('./src/price-obo/spRoute/priceRoute');
-const commonRoutes = require('./src/price-obo/spRoute/commonRoute'); // Import the routes
+const commonRoutes = require('./src/price-obo/spRoute/commonRoute'); 
+const autoPriceRoute=  require('./src/price-obo/spRoute/autoPriceRoute')
 
 const { scheduleCronJobs } = require('./src/price-obo/spRoute/cronJobRoute');
 const app = express();
@@ -43,6 +44,7 @@ app.options('*', cors()); // Enable pre-flight for all routes
 const MONGO_URI = process.env.MONGO_URI;
 
 // const MONGO_URI = "mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+
 app.use((req, res, next) => {
   req.marketplace_id = req.cookies.marketplace_id || "";
   next();
@@ -69,14 +71,14 @@ agenda.on('ready', async () => {
 
 
   await agenda.start();
-
+  // await autoJobsAgenda.start();
   reinitializeJobs();
 });
 
 const reinitializeJobs = async () => {
   try {
     const jobs = await agenda.jobs({});  
-
+    // const autoJobs = await autoJobsAgenda.autoJobs({});
     jobs.forEach((job) => {
       const { name, data } = job.attrs;
       agenda.define(name, { priority: 10 }, async (job) => {
@@ -106,6 +108,8 @@ const reinitializeJobs = async () => {
         }
       });
     });
+
+    
   } catch (error) {
     console.error('Failed to fetch jobs from the database', error);
   }
@@ -121,6 +125,7 @@ const reinitializeJobs = async () => {
 
 app.use(routes);
 app.use(commonRoutes);
+app.use(autoPriceRoute);
 scheduleCronJobs();
 
 app.get('/', (req, res) => {

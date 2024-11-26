@@ -91,128 +91,10 @@ const fetchSalesMetrics = async (
     throw error;
   }
 };
-/*
+
 const processReport = async (reports) => {
   const result = [];
-  const today = moment().utc().startOf('day');
-
-  for (const report of reports) {
-      const { sku, title: itemName, imageURL: imageUrl, price, weekly, weeklyTimeSlots, monthly, monthlyTimeSlots, startDate, endDate, timeZone, createdAt } = report;
-
-      // Use createdAt as the base date
-      const createdAtDate = moment(createdAt).tz(timeZone).startOf('day');
-
-      // Handle single-day schedules
-      if (!weekly && !monthly) {
-          const date = moment(startDate).tz(timeZone).startOf('day');
-          if (date.isAfter(today)) continue;
-
-          const formattedDate = date.format('YYYY-MM-DD');
-          const startTime = moment(startDate).tz(timeZone).format('HH:mm:ss');
-          const endTime = moment(endDate).tz(timeZone).format('HH:mm:ss');
-
-          const metrics = await fetchSalesMetrics(sku, formattedDate, formattedDate, startTime, endTime);
-          const reportData = {
-              sku,
-              itemName,
-              imageUrl,
-              price,
-              scheduleType: 'single',
-              interval: `${formattedDate} ${startTime} - ${formattedDate} ${endTime}`,
-              weekly: false,
-              monthly: false,
-              ...metrics,
-          };
-
-          await Report.updateOne(
-              { sku, interval: reportData.interval, scheduleType: 'single' },
-              { $set: reportData },
-              { upsert: true }
-          );
-
-          result.push(reportData);
-          await delay(1000);
-      }
-
-      // Handle weekly schedules
-      if (weekly && !monthly) {
-          for (const [dayOfWeek, timeSlots] of Object.entries(weeklyTimeSlots)) {
-              for (const timeSlot of timeSlots) {
-                  const weekDate = createdAtDate.clone().day(parseInt(dayOfWeek));
-                  const newPrice = timeSlot.newPrice;
-
-                  if (weekDate.isAfter(today)) continue;
-
-                  const formattedDate = weekDate.format('YYYY-MM-DD');
-                  const metrics = await fetchSalesMetrics(sku, formattedDate, formattedDate, timeSlot.startTime, timeSlot.endTime);
-                  const reportData = {
-                      sku,
-                      itemName,
-                      imageUrl,
-                      price: newPrice,
-                      scheduleType: 'weekly',
-                      interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
-                      weekly: true,
-                      monthly: false,
-                      dayOfWeek: parseInt(dayOfWeek), // Include dayOfWeek
-                      ...metrics,
-                  };
-
-                  await Report.updateOne(
-                      { sku, interval: reportData.interval, scheduleType: 'weekly', dayOfWeek: reportData.dayOfWeek },
-                      { $set: reportData },
-                      { upsert: true }
-                  );
-
-                  result.push(reportData);
-                  await delay(1000);
-              }
-          }
-      }
-
-      // Handle monthly schedules
-      if (monthly && !weekly) {
-          for (const [dateOfMonth, timeSlots] of Object.entries(monthlyTimeSlots)) {
-              for (const timeSlot of timeSlots) {
-                  const monthDate = createdAtDate.clone().date(parseInt(dateOfMonth));
-                  const newPrice = timeSlot.newPrice;
-
-                  if (monthDate.isAfter(today)) continue;
-
-                  const formattedDate = monthDate.format('YYYY-MM-DD');
-                  const metrics = await fetchSalesMetrics(sku, formattedDate, formattedDate, timeSlot.startTime, timeSlot.endTime);
-                  const reportData = {
-                      sku,
-                      itemName,
-                      imageUrl,
-                      price: newPrice,
-                      scheduleType: 'monthly',
-                      interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
-                      weekly: false,
-                      monthly: true,
-                      dateOfMonth: parseInt(dateOfMonth), // Include dateOfMonth
-                      ...metrics,
-                  };
-
-                  await Report.updateOne(
-                      { sku, interval: reportData.interval, scheduleType: 'monthly', dateOfMonth: reportData.dateOfMonth },
-                      { $set: reportData },
-                      { upsert: true }
-                  );
-
-                  result.push(reportData);
-                  await delay(1000);
-              }
-          }
-      }
-  }
-
-  return result;
-};
-*/
-const processReport = async (reports) => {
-  const result = [];
-  const today = moment().utc().startOf('day'); // Today's date in UTC
+  const today = moment().utc().startOf("day"); // Today's date in UTC
 
   for (const report of reports) {
     const {
@@ -230,9 +112,10 @@ const processReport = async (reports) => {
       createdAt,
     } = report;
 
-    const createdAtDate = moment(createdAt).tz(timeZone).startOf('day'); // Base date for schedules
+    const createdAtDate = moment(createdAt).tz(timeZone).startOf("day"); // Base date for schedules
 
     // Handle single-day schedules
+    /*
     if (!weekly && !monthly) {
       const date = moment(startDate).tz(timeZone).startOf('day');
       if (date.isAfter(today)) continue;
@@ -263,30 +146,82 @@ const processReport = async (reports) => {
       result.push(reportData);
       await delay(1000);
     }
+*/
 
-    // Handle weekly schedules
+    // Handle single schedules with specific startDate and endDate
+    if (!weekly && !monthly) {
+      const startMoment = moment(startDate).tz(timeZone);
+      const endMoment = moment(endDate).tz(timeZone);
+
+      // Skip if the start date is in the future
+      if (startMoment.isAfter(today)) continue;
+
+      // Fetch metrics for the entire interval
+      const metrics = await fetchSalesMetrics(
+        sku,
+        startMoment.format("YYYY-MM-DD"),
+        endMoment.format("YYYY-MM-DD"),
+        startMoment.format("HH:mm:ss"),
+        endMoment.format("HH:mm:ss")
+      );
+
+      // Format the interval for the report
+      const interval = `${startMoment.format(
+        "MMM D, YYYY, h:mm A"
+      )} - ${endMoment.format("MMM D, YYYY, h:mm A")}`;
+
+      const reportData = {
+        sku,
+        itemName,
+        imageUrl,
+        price,
+        scheduleType: "single",
+        interval,
+        weekly: false,
+        monthly: false,
+        ...metrics,
+      };
+
+      await Report.updateOne(
+        { sku, interval: reportData.interval, scheduleType: "single" },
+        { $set: reportData },
+        { upsert: true }
+      );
+
+      result.push(reportData);
+      continue; // Skip processing for other schedule types
+    }
+
     if (weekly && !monthly) {
       for (const [dayOfWeek, timeSlots] of Object.entries(weeklyTimeSlots)) {
         for (const timeSlot of timeSlots) {
           // Calculate the first applicable date based on the createdAt date
-          let firstApplicableDate = createdAtDate.clone().day(parseInt(dayOfWeek));
+          let firstApplicableDate = createdAtDate
+            .clone()
+            .day(parseInt(dayOfWeek));
           if (firstApplicableDate.isBefore(createdAtDate)) {
-            firstApplicableDate.add(7, 'days'); // Move to the next applicable week
+            firstApplicableDate.add(7, "days"); // Move to the next applicable week
           }
 
           // Process each applicable week
           let currentWeek = firstApplicableDate.clone();
           while (!currentWeek.isAfter(today)) {
-            const formattedDate = currentWeek.format('YYYY-MM-DD');
+            const formattedDate = currentWeek.format("YYYY-MM-DD");
             const newPrice = timeSlot.newPrice;
 
-            const metrics = await fetchSalesMetrics(sku, formattedDate, formattedDate, timeSlot.startTime, timeSlot.endTime);
+            const metrics = await fetchSalesMetrics(
+              sku,
+              formattedDate,
+              formattedDate,
+              timeSlot.startTime,
+              timeSlot.endTime
+            );
             const reportData = {
               sku,
               itemName,
               imageUrl,
               price: newPrice,
-              scheduleType: 'weekly',
+              scheduleType: "weekly",
               interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
               weekly: true,
               monthly: false,
@@ -295,13 +230,18 @@ const processReport = async (reports) => {
             };
 
             await Report.updateOne(
-              { sku, interval: reportData.interval, scheduleType: 'weekly', dayOfWeek: reportData.dayOfWeek },
+              {
+                sku,
+                interval: reportData.interval,
+                scheduleType: "weekly",
+                dayOfWeek: reportData.dayOfWeek,
+              },
               { $set: reportData },
               { upsert: true }
             );
 
             result.push(reportData);
-            currentWeek.add(7, 'days'); // Move to the next week
+            currentWeek.add(7, "days"); // Move to the next week
             await delay(1000);
           }
         }
@@ -313,24 +253,32 @@ const processReport = async (reports) => {
       for (const [dateOfMonth, timeSlots] of Object.entries(monthlyTimeSlots)) {
         for (const timeSlot of timeSlots) {
           // Calculate the first applicable date based on the createdAt date
-          let firstApplicableDate = createdAtDate.clone().date(parseInt(dateOfMonth));
+          let firstApplicableDate = createdAtDate
+            .clone()
+            .date(parseInt(dateOfMonth));
           if (firstApplicableDate.isBefore(createdAtDate)) {
-            firstApplicableDate.add(1, 'month'); // Move to the next applicable month
+            firstApplicableDate.add(1, "month"); // Move to the next applicable month
           }
 
           // Process each applicable month
           let currentMonth = firstApplicableDate.clone();
           while (!currentMonth.isAfter(today)) {
-            const formattedDate = currentMonth.format('YYYY-MM-DD');
+            const formattedDate = currentMonth.format("YYYY-MM-DD");
             const newPrice = timeSlot.newPrice;
 
-            const metrics = await fetchSalesMetrics(sku, formattedDate, formattedDate, timeSlot.startTime, timeSlot.endTime);
+            const metrics = await fetchSalesMetrics(
+              sku,
+              formattedDate,
+              formattedDate,
+              timeSlot.startTime,
+              timeSlot.endTime
+            );
             const reportData = {
               sku,
               itemName,
               imageUrl,
               price: newPrice,
-              scheduleType: 'monthly',
+              scheduleType: "monthly",
               interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
               weekly: false,
               monthly: true,
@@ -339,13 +287,18 @@ const processReport = async (reports) => {
             };
 
             await Report.updateOne(
-              { sku, interval: reportData.interval, scheduleType: 'monthly', dateOfMonth: reportData.dateOfMonth },
+              {
+                sku,
+                interval: reportData.interval,
+                scheduleType: "monthly",
+                dateOfMonth: reportData.dateOfMonth,
+              },
               { $set: reportData },
               { upsert: true }
             );
 
             result.push(reportData);
-            currentMonth.add(1, 'month'); // Move to the next month
+            currentMonth.add(1, "month"); // Move to the next month
             await delay(1000);
           }
         }
@@ -356,7 +309,217 @@ const processReport = async (reports) => {
   return result;
 };
 
+/*
+const processReport = async (reports) => {
+  const result = [];
+  const today = moment().utc().startOf("day"); // Today's date in UTC
 
+  for (const report of reports) {
+    const {
+      sku,
+      title: itemName,
+      imageURL: imageUrl,
+      price,
+      weekly,
+      weeklyTimeSlots,
+      monthly,
+      monthlyTimeSlots,
+      startDate,
+      endDate,
+      timeZone,
+      createdAt,
+    } = report;
 
+    const createdAtDate = moment(createdAt).tz(timeZone).startOf("day"); // Base date for schedules
+
+    // Handle single-day schedules
+    if (!weekly && !monthly) {
+      const startMoment = moment(startDate).tz(timeZone);
+      const endMoment = moment(endDate).tz(timeZone);
+
+      // Skip if the start date is in the future
+      if (startMoment.isAfter(today)) continue;
+
+      const formattedStartDate = startMoment.format("YYYY-MM-DD");
+      const formattedEndDate = endMoment.format("YYYY-MM-DD");
+      const startTime = startMoment.format("HH:mm:ss");
+      const endTime = endMoment.format("HH:mm:ss");
+
+      // If the start and end dates are the same
+      if (formattedStartDate === formattedEndDate) {
+        const metrics = await fetchSalesMetrics(
+          sku,
+          formattedStartDate,
+          formattedEndDate,
+          startTime,
+          endTime
+        );
+        const reportData = {
+          sku,
+          itemName,
+          imageUrl,
+          price,
+          scheduleType: "single",
+          interval: `${formattedStartDate} ${startTime} - ${formattedEndDate} ${endTime}`,
+          weekly: false,
+          monthly: false,
+          ...metrics,
+        };
+
+        await Report.updateOne(
+          { sku, interval: reportData.interval, scheduleType: "single" },
+          { $set: reportData },
+          { upsert: true }
+        );
+
+        result.push(reportData);
+      } else {
+        // Handle when startDate and endDate are different
+        let currentDay = startMoment.clone().startOf("day");
+        while (!currentDay.isAfter(endMoment, "day")) {
+          const dayStart = currentDay.clone();
+          const dayEnd =
+            currentDay.isSame(endMoment, "day") && endMoment.format("HH:mm:ss") !== "00:00:00"
+              ? endMoment
+              : currentDay.clone().endOf("day");
+
+          const metrics = await fetchSalesMetrics(
+            sku,
+            dayStart.format("YYYY-MM-DD"),
+            dayStart.format("YYYY-MM-DD"),
+            dayStart.isSame(startMoment, "day") ? startMoment.format("HH:mm:ss") : "00:00:00",
+            dayEnd.isSame(endMoment, "day") ? endMoment.format("HH:mm:ss") : "23:59:59"
+          );
+
+          const reportData = {
+            sku,
+            itemName,
+            imageUrl,
+            price,
+            scheduleType: "single",
+            interval: `${dayStart.format("YYYY-MM-DD")} ${
+              dayStart.isSame(startMoment, "day") ? startMoment.format("HH:mm:ss") : "00:00:00"
+            } - ${dayStart.format("YYYY-MM-DD")} ${
+              dayEnd.isSame(endMoment, "day") ? endMoment.format("HH:mm:ss") : "23:59:59"
+            }`,
+            weekly: false,
+            monthly: false,
+            ...metrics,
+          };
+
+          await Report.updateOne(
+            { sku, interval: reportData.interval, scheduleType: "single" },
+            { $set: reportData },
+            { upsert: true }
+          );
+
+          result.push(reportData);
+          currentDay.add(1, "day");
+          await delay(1000); // Delay to avoid rate limits
+        }
+      }
+    }
+
+    // Handle weekly schedules
+    if (weekly && !monthly) {
+      for (const [dayOfWeek, timeSlots] of Object.entries(weeklyTimeSlots)) {
+        for (const timeSlot of timeSlots) {
+          let firstApplicableDate = createdAtDate.clone().day(parseInt(dayOfWeek));
+          if (firstApplicableDate.isBefore(createdAtDate)) {
+            firstApplicableDate.add(7, "days");
+          }
+
+          let currentWeek = firstApplicableDate.clone();
+          while (!currentWeek.isAfter(today)) {
+            const formattedDate = currentWeek.format("YYYY-MM-DD");
+            const newPrice = timeSlot.newPrice;
+
+            const metrics = await fetchSalesMetrics(
+              sku,
+              formattedDate,
+              formattedDate,
+              timeSlot.startTime,
+              timeSlot.endTime
+            );
+            const reportData = {
+              sku,
+              itemName,
+              imageUrl,
+              price: newPrice,
+              scheduleType: "weekly",
+              interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
+              weekly: true,
+              monthly: false,
+              dayOfWeek: parseInt(dayOfWeek),
+              ...metrics,
+            };
+
+            await Report.updateOne(
+              { sku, interval: reportData.interval, scheduleType: "weekly", dayOfWeek: reportData.dayOfWeek },
+              { $set: reportData },
+              { upsert: true }
+            );
+
+            result.push(reportData);
+            currentWeek.add(7, "days");
+            await delay(1000);
+          }
+        }
+      }
+    }
+
+    // Handle monthly schedules
+    if (monthly && !weekly) {
+      for (const [dateOfMonth, timeSlots] of Object.entries(monthlyTimeSlots)) {
+        for (const timeSlot of timeSlots) {
+          let firstApplicableDate = createdAtDate.clone().date(parseInt(dateOfMonth));
+          if (firstApplicableDate.isBefore(createdAtDate)) {
+            firstApplicableDate.add(1, "month");
+          }
+
+          let currentMonth = firstApplicableDate.clone();
+          while (!currentMonth.isAfter(today)) {
+            const formattedDate = currentMonth.format("YYYY-MM-DD");
+            const newPrice = timeSlot.newPrice;
+
+            const metrics = await fetchSalesMetrics(
+              sku,
+              formattedDate,
+              formattedDate,
+              timeSlot.startTime,
+              timeSlot.endTime
+            );
+            const reportData = {
+              sku,
+              itemName,
+              imageUrl,
+              price: newPrice,
+              scheduleType: "monthly",
+              interval: `${formattedDate} ${timeSlot.startTime} - ${formattedDate} ${timeSlot.endTime}`,
+              weekly: false,
+              monthly: true,
+              dateOfMonth: parseInt(dateOfMonth),
+              ...metrics,
+            };
+
+            await Report.updateOne(
+              { sku, interval: reportData.interval, scheduleType: "monthly", dateOfMonth: reportData.dateOfMonth },
+              { $set: reportData },
+              { upsert: true }
+            );
+
+            result.push(reportData);
+            currentMonth.add(1, "month");
+            await delay(1000);
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+};
+
+*/
 
 module.exports = processReport;

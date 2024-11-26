@@ -25,6 +25,7 @@ const Report = require('../../model/Report');
 const Stock = require('../../model/Stock');
 const {agenda} = require('../Agenda');
 const updateProductSalePrice = require('../UpdatePrice/UpdateSalePrice');
+const getSalePrice = require('../fetchApi/SalePrice');
 
 
 router.get('/fetch-and-merge', async (req, res) => {
@@ -373,6 +374,19 @@ router.get('/sales-metrics/range/:identifier', async (req, res) => {
       res.status(500).json({ error: 'Failed to fetch sales metrics' });
     }
   });
+
+  router.get('/sale-price/:sku', async (req, res) => {
+    //decodeURIComponent(
+    const sku = req.params.sku;
+   
+    try {
+      const salePrice = await getSalePrice(sku);
+      res.json(salePrice);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch  sale price' });
+    }
+  });
+  
   
   router.post('/send-email', async (req, res) => {
     const { to, subject, text, html } = req.body;

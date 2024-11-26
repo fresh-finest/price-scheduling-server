@@ -42,7 +42,8 @@ const fetchSalesMetrics = async (
       marketplaceIds: marketplace_id,
       interval: interval,
       granularity: "Hour",
-      granularityTimeZone: "UTC",
+      // granularityTimeZone: "UTC",
+      granularityTimeZone : 'America/Los_Angeles',
       sku: sku,
     };
 

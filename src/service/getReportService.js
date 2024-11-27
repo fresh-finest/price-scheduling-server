@@ -52,7 +52,7 @@ const fetchSalesMetricsByDay = async (sku) => {
     }
   };
   */
-/*
+
   const fetchSalesMetricsByDay = async (identifier,identifierType='sku') => {
     const { marketplace_id } = credentials;
     const maxRetries = 7; // Maximum number of retries
@@ -73,7 +73,8 @@ const fetchSalesMetricsByDay = async (sku) => {
           marketplaceIds: marketplace_id,
           interval: interval,
           granularity: 'Day',
-          granularityTimeZone: 'UTC',
+          // granularityTimeZone: 'UTC',
+          granularityTimeZone : 'America/Los_Angeles',
           [identifierType]:identifier
         };
   
@@ -116,8 +117,8 @@ const fetchSalesMetricsByDay = async (sku) => {
   
     throw new Error(`Failed to fetch sales metrics after ${maxRetries} attempts due to quota limits.`);
   };
- */
-
+ 
+/*
   const fetchSalesMetricsByDay = async (identifier, identifierType = 'sku') => {
     const { marketplace_id } = credentials;
     const maxRetries = 7; // Maximum number of retries
@@ -183,7 +184,7 @@ const fetchSalesMetricsByDay = async (sku) => {
 
     throw new Error(`Failed to fetch sales metrics after ${maxRetries} attempts due to quota limits.`);
 };
-
+*/
 
   
   module.exports = fetchSalesMetricsByDay;

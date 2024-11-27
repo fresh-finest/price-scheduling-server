@@ -207,7 +207,8 @@ const fetchMontlySalesMetrics = async (identifier, type = "sku") => {
         marketplaceIds: marketplace_id,
         interval: interval,
         granularity: "Day",
-        granularityTimeZone: "UTC",
+        // granularityTimeZone: "UTC",
+        granularityTimeZone : 'America/Los_Angeles',
       };
 
       // Set SKU or ASIN based on the type

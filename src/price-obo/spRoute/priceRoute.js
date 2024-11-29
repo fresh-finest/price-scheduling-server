@@ -57,7 +57,7 @@ router.post('/api/schedule/change', async (req, res) => {
         weeklyTimeSlots,
         monthly,
         monthlyTimeSlots,
-      
+        timeZone,
         timestamp: new Date(),
       });
       await historyLog.save();
@@ -131,6 +131,7 @@ router.post('/api/schedule/change', async (req, res) => {
         weeklyTimeSlots: schedule.weeklyTimeSlots,
         monthly: schedule.monthly,
         monthlyTimeSlots: schedule.monthlyTimeSlots,
+        timeZone:schedule.timeZone
       };
   
       // Update the schedule with new details
@@ -147,7 +148,7 @@ router.post('/api/schedule/change', async (req, res) => {
       schedule.weeklyTimeSlots = weeklyTimeSlots || [];
       schedule.monthly = monthly || false;
       schedule.monthlyTimeSlots = monthlyTimeSlots || [];
-  
+      schedule.timeZone  = timeZone;
       await schedule.save();
   
       // Log the update in history with previous and updated states
@@ -169,6 +170,7 @@ router.post('/api/schedule/change', async (req, res) => {
           weeklyTimeSlots: schedule.weeklyTimeSlots,
           monthly: schedule.monthly,
           monthlyTimeSlots: schedule.monthlyTimeSlots,
+          timeZone:schedule.timeZone
         },
         userName,
         timestamp: new Date(),

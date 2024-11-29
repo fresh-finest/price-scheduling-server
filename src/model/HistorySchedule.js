@@ -36,6 +36,10 @@ const historySchema = new mongoose.Schema({
     of:[timeSlotSchema],
     default:{}
   },
+  timeZone: { 
+    type: String, 
+    default: 'UTC' // Default to UTC if no time zone is provided
+  },
   // startTime:{type:String},
   // endTime:{type:String}
 }, { timestamps: true });

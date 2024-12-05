@@ -207,7 +207,7 @@ router.post('/api/schedule/change', async (req, res) => {
       // If no weekly or monthly schedules, handle single-day schedules
       if (!weekly && !monthly) {
         await agenda.cancel({ 'data.scheduleId': schedule._id });
-        await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id);
+        await singleDayScheduleChange(sku, price, currentPrice, startDate, endDate, schedule._id,timeZone);
       }
   
       res.json({ success: true, message: 'Schedule updated successfully.' });

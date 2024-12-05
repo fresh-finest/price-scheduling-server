@@ -1,4 +1,5 @@
 const Agenda = require('agenda');
+const CachedJob = require('../model/CachedJob');
 require('dotenv').config();
 
 

@@ -15,14 +15,30 @@ const autoScheduleSchema =  new mongoose.Schema({
     imageUrl:{
         type:String,
     },
-    price:{
-        type:Number,
-    },
+   
     maxUnit:{
         type:Number,
         min:0
     },
-    maxPrices:[Number],
+    Prices:[Number],
+    maxPrice:{
+        type:Number
+    },
+    minPrice:{
+        type:Number,
+    },
+    randomPrice:{
+        type:Number,
+    },
+    startDate:{
+        type: Date,
+    },
+    endDate:{
+        type: Date
+    },
+    executionDateTime:{
+        type:Date
+    },
     status:{
         type:String
     }

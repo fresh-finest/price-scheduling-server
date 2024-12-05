@@ -21,11 +21,11 @@ const fetchSalesMetrics = async (
       .tz(
         `${startDate} ${startTime}`,
         "YYYY-MM-DD HH:mm:ss",
-        "America/New_York"
+        "America/Los_Angeles"
       )
       .utc();
     let endDateTimeUTC = moment
-      .tz(`${endDate} ${endTime}`, "YYYY-MM-DD HH:mm:ss", "America/New_York")
+      .tz(`${endDate} ${endTime}`, "YYYY-MM-DD HH:mm:ss", "America/Los_Angeles")
       .utc();
 
     if (startDateTimeUTC.isSameOrAfter(endDateTimeUTC)) {

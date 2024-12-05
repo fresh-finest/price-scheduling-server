@@ -1,3 +1,4 @@
+const PriceSchedule = require("../model/PriceSchedule");
 const User = require("../model/User");
 
 exports.createUserService = async(data)=>{
@@ -19,7 +20,19 @@ exports.getAllUserService = async()=>{
     return updateUser;
  }
 
+ exports.updateUserServiceById = async(id,data)=>{
+    const user = await User.updateOne(
+        {_id:id},
+        {
+            $set:data,
+        },
+        {runValidators:true}
+    )
+    return user;
+ }
+
  exports.deleteUserServiceById = async(id)=>{
     const deletedUser = await User.deleteOne({_id:id});
     return deletedUser;
  }
+

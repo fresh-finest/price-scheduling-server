@@ -164,7 +164,7 @@ agenda.on("complete", async (job) => {
 
 app.use(routes);
 app.use(commonRoutes);
-app.use(autoPriceRoute);
+// app.use(autoPriceRoute);
 scheduleCronJobs();
 
 app.get("/", (req, res) => {

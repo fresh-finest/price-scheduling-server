@@ -1,5 +1,5 @@
 const SaleStock = require("../model/SaleStock");
-const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateSaleStock } = require("../service/productService");
+const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateSaleStock, filteProductService } = require("../service/productService");
 
 
 // exports.getLimitProduct = async(req,res)=>{
@@ -416,3 +416,42 @@ exports.getFilteredSortedAndPaginatedSaleStock = async (req, res) => {
         });
     }
 };
+exports.getFilteredProduct = async (req, res) => {
+    try {
+      const { fulfillmentChannel, stockCondition, salesCondition, page = 1, limit = 20 } = req.query;
+  
+      // Parse stock and sales conditions if provided
+      const parsedStockCondition = stockCondition
+        ? JSON.parse(stockCondition) // { condition: '<', value: 100 } or { condition: 'between', value: [100, 200] }
+        : null;
+  
+      const parsedSalesCondition = salesCondition
+        ? JSON.parse(salesCondition) // { time: '7 D', condition: '>', value: 100 }
+        : null;
+  
+      const result = await filteProductService(
+        { fulfillmentChannel, stockCondition: parsedStockCondition, salesCondition: parsedSalesCondition },
+        parseInt(page, 10),
+        parseInt(limit, 10)
+      );
+  
+      res.status(200).json({
+        status: "Success",
+        message: "Filtered and paginated SaleStock data retrieved successfully.",
+        
+        metadata: {
+          totalProducts: result.totalResults,
+          currentPage: result.currentPage,
+          totalPages: result.totalPages,
+          listings: result.data,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: "Failed",
+        message: "Error occurred while retrieving filtered SaleStock data.",
+        error: error.message,
+      });
+    }
+  };
+  

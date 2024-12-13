@@ -299,3 +299,95 @@ exports.filterSortAndPaginateSaleStock = async (sortOrder = "asc", page = 1, lim
         throw new Error("Error while filtering, sorting, and paginating SaleStock data: " + error.message);
     }
 };
+
+
+exports.filteProductService = async (
+    { fulfillmentChannel, stockCondition, salesCondition },
+    page = 1,
+    limit = 20
+  ) => {
+    try {
+      const skip = (page - 1) * limit;
+  
+      // Fetch all SaleStock data
+      let query = {};
+  
+      // Apply fulfillmentChannel filter (FBA/FBM)
+      if (fulfillmentChannel) {
+        query.fulfillmentChannel =
+          fulfillmentChannel === "AMAZON_NA" ? { $ne: "DEFAULT" } : "DEFAULT";
+      }
+  
+      // Fetch matching products
+      let saleStockData = await SaleStock.find(query);
+  
+      // Filter by stock condition
+      if (stockCondition) {
+        saleStockData = saleStockData.filter(product => {
+          const productStock =
+            (product.fulfillableQuantity || 0) +
+            (product.pendingTransshipmentQuantity || 0) +
+            (product.quantity || 0);
+  
+          switch (stockCondition.condition) {
+            case ">":
+              return productStock > stockCondition.value;
+            case "<":
+              return productStock < stockCondition.value;
+            case "==":
+              return productStock === stockCondition.value;
+            case "between":
+              return (
+                productStock >= stockCondition.value[0] &&
+                productStock <= stockCondition.value[1]
+              );
+            default:
+              return true;
+          }
+        });
+      }
+  
+      // Filter by sales metrics
+      if (salesCondition) {
+        saleStockData = saleStockData.filter(product => {
+          const matchingMetric = product.salesMetrics.find(
+            metric => metric.time === salesCondition.time
+          );
+  
+          if (!matchingMetric) return false;
+  
+          const totalUnits = matchingMetric.totalUnits;
+          switch (salesCondition.condition) {
+            case ">":
+              return totalUnits > salesCondition.value;
+            case "<":
+              return totalUnits < salesCondition.value;
+            case "==":
+              return totalUnits === salesCondition.value;
+            case "between":
+              return (
+                totalUnits >= salesCondition.value[0] &&
+                totalUnits <= salesCondition.value[1]
+              );
+            default:
+              return true;
+          }
+        });
+      }
+  
+      // Total results after filtering
+      const totalResults = saleStockData.length;
+  
+      // Paginate results
+      const paginatedData = saleStockData.slice(skip, skip + limit);
+  
+      return {
+        data: paginatedData,
+        totalResults,
+        currentPage: page,
+        totalPages: Math.ceil(totalResults / limit),
+      };
+    } catch (error) {
+      throw new Error("Error while filtering and paginating SaleStock: " + error.message);
+    }
+  };

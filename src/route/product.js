@@ -6,10 +6,12 @@ const {
   getFilteredByMetrics,
   getFilteredByStock,
   getFilteredSchedulesAndStocks,
-  getFilteredSortedAndPaginatedSaleStock
+  getFilteredSortedAndPaginatedSaleStock,
+  getFilteredProduct
 } = require("../controller/productController");
 
 const router = express.Router();
+router.route("/sale-stock").get(getFilteredProduct)
 router.route("/sort").get(getFilteredSortedAndPaginatedSaleStock)
 router.route("/schedule").get(getFilteredSchedulesAndStocks)
 router.route("/filter/unit").get(getFilteredByMetrics);

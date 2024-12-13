@@ -11,6 +11,10 @@ exports.getAllUserService = async()=>{
     return user;
 }
 
+exports.getUserServiceById = async(id)=>{
+  const user = await User.find({_id:id})
+  return  user;
+}
  exports.updateUserRoleService = async(userId,role,permissions)=>{
     const updateUser = await User.findByIdAndUpdate(
         userId,
@@ -28,6 +32,7 @@ exports.getAllUserService = async()=>{
         },
         {runValidators:true}
     )
+    console.log(user);
     return user;
  }
 

@@ -85,7 +85,7 @@ const fetchInventorySummaries = async () => {
         details: true,
         granularityType: 'Marketplace',
         granularityId: credentials.marketplace_id,
-        startDateTime: '2023-05-01T00:00:00Z',
+        startDateTime: '2024-05-01T00:00:00Z',
         ...(nextToken && { nextToken }),  // Include nextToken in the request if available
       },
     };

@@ -15,10 +15,11 @@ const { agenda, autoJobsAgenda } = require("./src/price-obo/Agenda");
 const routes = require("./src/price-obo/spRoute/priceRoute");
 const commonRoutes = require("./src/price-obo/spRoute/commonRoute");
 const autoPriceRoute = require("./src/price-obo/spRoute/autoPriceRoute");
-
+const rotateClientSecret = require("./src/price-obo/rotateClientSecret");
 const { scheduleCronJobs } = require("./src/price-obo/spRoute/cronJobRoute");
-// const { reinitializeAutoJobs } = require('./src/price-obo/JobSchedule/AutoPricingJob');
-const app = express();
+const { checkStockVsSales } = require("./src/notifications/stockAgainstSale");
+
+const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express();
 app.use(express.json());
 app.use(cookieParser()); // To parse cookies
 
@@ -112,16 +113,18 @@ autoJobsAgenda.on("ready", async () => {
   reinitializeAutoJobs();
 });
 
-agenda.on("ready", async () => {
-  cron.schedule("*/1 * * * *", async () => {
-    try {
-      await agenda.start();
-      await loadAndCacheJobs();
-    } catch (error) {
-      console.error("Error during cron job execution:", error);
-    }
-  });
-});
+
+
+// agenda.on("ready", async () => {
+//   cron.schedule("*/1 * * * *", async () => {
+//     try {
+//       await agenda.start();
+//       await loadAndCacheJobs();
+//     } catch (error) {
+//       console.error("Error during cron job execution:", error);
+//     }
+//   });
+// });
 
 agenda.on("start", async (job) => {
   try {
@@ -162,10 +165,14 @@ agenda.on("complete", async (job) => {
   }
 });
 
+// rotateClientSecret();
+// stockVsSaleCronJobs()
+// checkStockVsSales()
+
+
 app.use(routes);
 app.use(commonRoutes);
-// app.use(autoPriceRoute);
-scheduleCronJobs();
+app.use(autoPriceRoute);
 
 app.get("/", (req, res) => {
   res.send("Server is running!");
@@ -211,6 +218,7 @@ const fetchSalesMetricsByDateRange = require("./src/service/getReportByDateRange
 const processReport = require("./src/service/reportService");
 const Report = require("./src/model/Report");
 const updateProductPrice = require("./src/price-obo/UpdatePrice/UpdatePrice");
+const productRoute = require("./src/route/product")
 const singleDayScheduleChange = require("./src/price-obo/JobSchedule/SingleDayJob");
 const {
   scheduleWeeklyPriceChange,
@@ -227,12 +235,15 @@ const reinitializeAutoJobs = require("./src/price-obo/JobSchedule/InitializeJobs
 const CachedJob = require("./src/model/CachedJob");
 const loadAndCacheJobs = require("./src/caching/cacheJob");
 
+
+
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
 app.use("/api/histories", historyRoute);
 app.use("/api/account", accountRoute);
 app.use("/api/notification", notificationRoute);
+app.use("/api/product",productRoute);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

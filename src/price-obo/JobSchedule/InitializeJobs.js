@@ -15,7 +15,7 @@ const reinitializeAutoJobs = async () => {
           
           const { sku,minPrice,maxPrice, startDate,endDate} = job.attrs.data;
           const randomPrice = (Math.random() * (maxPrice - minPrice) + minPrice).toFixed(2);
-          await updateProductSalePrice(sku, parseFloat(randomPrice), startDate,endDate);
+          // await updateProductSalePrice(sku, parseFloat(randomPrice), startDate,endDate);
           try {
             if (name.startsWith(`UpdateAutoPriceChange ${sku}`)) {
               console.log(sku);

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
-const { createUserService, getAllUserService, updateUserRoleService, deleteUserServiceById, updateUserServiceById} = require('../service/userService');
+const { createUserService, getAllUserService, updateUserRoleService, deleteUserServiceById, updateUserServiceById, getUserServiceById} = require('../service/userService');
 const sendEmail = require('../service/EmailService');
 const { errorHandler } = require("../utils/errorHandler");
 
@@ -42,7 +42,6 @@ exports.createUser = async (req, res, next) => {
     }
 };
 
-
 exports.getAllUser=async(req,res,next)=>{
     try {
         const result = await getAllUserService();
@@ -66,7 +65,24 @@ exports.getAllUser=async(req,res,next)=>{
         })
     }
 }
+exports.getUserById= async(req,res,next)=>{
+    try {
+        const {id} = req.params;
 
+        const result = await getUserServiceById(id);
+        res.status(200).json({
+            status:"Success",
+            message:"Succcessfully get user",
+            result
+        })
+    } catch (error) {
+        res.status(500).json({
+            status:"Failed",
+            message:"Failed to fetch the user.",
+            error:error.message
+        })
+    }
+}
 exports.updateUserRole = async(req,res,next)=>{
     try {
         const {userId}  = req.params;

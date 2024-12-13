@@ -37,7 +37,7 @@ const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
       marketplaceIds: credentials.marketplace_id,
       interval: interval,
       granularity: 'Day',
-      granularityTimeZone: 'UTC',
+      granularityTimeZone: 'America/Los_Angeles',
       sku: sku, // Filter by SKU instead of ASIN
     };
 
@@ -78,8 +78,8 @@ const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
 
 // Function to get sales metrics for different time ranges using SKU
 const getMetricsForTimeRanges = async (sku) => {
-  const endDate = moment().subtract(1, 'days').utc().format('YYYY-MM-DD');
-  // const endDate = moment().format('YYYY-MM-DD');
+  // const endDate = moment().subtract(1, 'days').utc().format('YYYY-MM-DD');
+  const endDate = moment().format('YYYY-MM-DD');
 
 
   const timeRanges = [

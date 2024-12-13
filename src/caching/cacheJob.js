@@ -30,7 +30,27 @@ async function loadAndCacheJobs(){
         if (!agenda._collection) {
             throw new Error("Agenda collection is not initialized. Ensure Agenda is started.");
         }
-        const jobs = await agenda._collection.find().toArray();
+        // const jobs = await agenda._collection.find().toArray();
+        const jobs = [];
+        const batchSize = 100; // Number of jobs per batch
+        let skip = 0;
+
+        while (true) {
+            // Fetch jobs in batches to avoid cursor timeout
+            const batch = await agenda._collection
+                .find({})
+                .skip(skip)
+                .limit(batchSize)
+                .toArray();
+
+            if (batch.length === 0) break; // Exit the loop when no more jobs
+
+            jobs.push(...batch); // Add batch to the jobs array
+            skip += batchSize; // Move to the next batch
+        }
+
+       
+
 
         await CachedJob.deleteMany({});
   

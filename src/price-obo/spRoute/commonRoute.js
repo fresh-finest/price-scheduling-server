@@ -40,6 +40,7 @@ const {
 } = require("../../merge-service/jobScheduleMergeService");
 const { createClient } = require("redis");
 const CachedJob = require("../../model/CachedJob");
+const TimeZone = require("../../model/TimeZone");
 
 const app = express();
 
@@ -546,5 +547,61 @@ router.patch("/sale-price", async (req, res) => {
   }
 });
 
+
+router.put("/api/time-zone", async (req, res) => {
+  const { timeZone } = req.body;
+
+  try {
+      
+      if (!moment.tz.zone(timeZone)) {
+          return res.status(400).json({ error: 'Invalid time zone' });
+      }
+
+      
+      const result = await TimeZone.updateOne(
+          {}, 
+          { $set: { timeZone } }, 
+          { upsert: true, runValidators: true } 
+      );
+
+      res.status(200).json({ 
+          status: "Success",
+          message: "Successfully updated timezone",
+          result
+      });
+  } catch (error) {
+      res.status(500).json({
+          status: "Failed",
+          message: "Failed to update timeZone",
+          error: error.message
+      });
+  }
+});
+
+router.get("/api/time-zone",async(req,res)=>{
+  try {
+    const result = await TimeZone.find({});
+    res.status(200).json({
+      status:"Success",
+      message:"Successfully get timezone",
+      result
+    })
+  } catch (error) {
+    res.status(500).json({
+      status:"Failed",
+      message:"Failed to get timeZone",
+      error:error.message
+    })
+  }
+})
+
+router.post("/api/time-zone",async(req,res)=>{
+  try {
+    const result = await TimeZone.create(req.body);
+    res.json({result});
+  } catch (error) {
+    res.json({error:error.message})
+  }
+})
 
 module.exports = router;

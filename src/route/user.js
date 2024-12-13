@@ -1,10 +1,11 @@
 const express= require("express");
-const { createUser, getAllUser, updateUserRole,deleteUserById,inviteUser, updateUserById} = require("../controller/userController");
+const { createUser, getAllUser, updateUserRole,deleteUserById,inviteUser, updateUserById, getUserById} = require("../controller/userController");
 
 
 const router = express.Router();
 
 
+router.route("/:id").get(getUserById)
 router.route("/invite").post(inviteUser)
 router.route("/:userId/role").patch(updateUserRole)
 router.route("/:id").put(updateUserById)

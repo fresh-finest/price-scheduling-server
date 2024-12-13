@@ -419,7 +419,7 @@ exports.getFilteredSortedAndPaginatedSaleStock = async (req, res) => {
 exports.getFilteredProduct = async (req, res) => {
     try {
       const { fulfillmentChannel, stockCondition, salesCondition, page = 1, limit = 20 } = req.query;
-  
+       console.log("hit on merge filter");
       // Parse stock and sales conditions if provided
       const parsedStockCondition = stockCondition
         ? JSON.parse(stockCondition) // { condition: '<', value: 100 } or { condition: 'between', value: [100, 200] }

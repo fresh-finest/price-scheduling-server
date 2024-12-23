@@ -300,16 +300,145 @@ exports.filterSortAndPaginateSaleStock = async (sortOrder = "asc", page = 1, lim
     }
 };
 
-
 exports.filteProductService = async (
-    { fulfillmentChannel, stockCondition, salesCondition },
+  { fulfillmentChannel, stockCondition, salesCondition, uid},
+  page = 1,
+  limit = 20
+) => {
+  try {
+    const skip = (page - 1) * limit;
+
+    // Build the query object
+    let query = {};
+
+    // Apply fulfillmentChannel filter (FBA/FBM)
+    if (fulfillmentChannel) {
+      query.fulfillmentChannel =
+        fulfillmentChannel === "AMAZON_NA" ? { $ne: "DEFAULT" } : "DEFAULT";
+    }
+    let sku = null;
+    let asin = null;
+    if (uid !== undefined) {
+      if (uid.startsWith("B0") && uid.length === 10) {
+        asin = uid;
+      } else {
+        sku = uid;
+      }
+    }
+    // Apply SKU/ASIN filters
+    if (sku) {
+      query.sellerSku = { $regex: sku, $options: "i" };
+    }
+    if (asin) {
+      query.asin1 = { $regex: asin, $options: "i" };
+    }
+
+    // Fetch initial matching products from the database
+    let saleStockData = await SaleStock.find(query);
+
+    // Filter by stock condition
+    if (stockCondition) {
+      saleStockData = saleStockData.filter((product) => {
+        const productStock =
+          (product.fulfillableQuantity || 0) +
+          (product.pendingTransshipmentQuantity || 0) +
+          (product.quantity || 0);
+
+        switch (stockCondition.condition) {
+          case ">":
+            return productStock > stockCondition.value;
+          case "<":
+            return productStock < stockCondition.value;
+          case "==":
+            return productStock === stockCondition.value;
+          case ">=":
+            return productStock >= stockCondition.value;
+          case "<=":
+            return productStock <= stockCondition.value;
+          case "!=" :
+            return productStock !== stockCondition.value;
+          case "blank":
+            return productStock === 0;
+          case "notblank":
+            return productStock !== 0;
+          case "between":
+            return (
+              productStock >= stockCondition.value[0] &&
+              productStock <= stockCondition.value[1]
+            );
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Filter by sales metrics
+    if (salesCondition) {
+      saleStockData = saleStockData.filter((product) => {
+        const matchingMetric = product.salesMetrics.find(
+          (metric) => metric.time === salesCondition.time
+        );
+
+        if (!matchingMetric) return false;
+
+        const totalUnits = matchingMetric.totalUnits;
+        switch (salesCondition.condition) {
+          case ">":
+            return totalUnits > salesCondition.value;
+          case "<":
+            return totalUnits < salesCondition.value;
+          case "==":
+            return totalUnits === salesCondition.value;
+          case ">=":
+            return totalUnits >= salesCondition.value;
+          case "<=":
+            return totalUnits <= salesCondition.value;
+          case "!=" :
+            return totalUnits !== salesCondition.value;
+          case "blank":
+            return totalUnits === 0;
+          case "notblank":
+            return totalUnits !== 0;
+          case "between":
+            return (
+              totalUnits >= salesCondition.value[0] &&
+              totalUnits <= salesCondition.value[1]
+            );
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Total results after filtering
+    const totalResults = saleStockData.length;
+
+    // Paginate results
+    const paginatedData = saleStockData.slice(skip, skip + limit);
+
+    return {
+      data: paginatedData,
+      totalResults,
+      currentPage: page,
+      totalPages: Math.ceil(totalResults / limit),
+    };
+  } catch (error) {
+    throw new Error(
+      "Error while filtering and paginating SaleStock: " + error.message
+    );
+  }
+};
+
+/*
+  exports.filteProductService = async (
+    { fulfillmentChannel, stockCondition, salesCondition, uid},
     page = 1,
     limit = 20
   ) => {
     try {
       const skip = (page - 1) * limit;
   
-      // Fetch all SaleStock data
+      // Build the query object
       let query = {};
   
       // Apply fulfillmentChannel filter (FBA/FBM)
@@ -317,13 +446,29 @@ exports.filteProductService = async (
         query.fulfillmentChannel =
           fulfillmentChannel === "AMAZON_NA" ? { $ne: "DEFAULT" } : "DEFAULT";
       }
+      let sku=null; let asin=null;
+      if(uid!==undefined){
+        if (uid.startsWith("B0") && uid.length === 10) {
+          asin= uid;
+    } else{
+      sku=uid;
+    }
+      }
+      // Apply SKU/ASIN filters
+      console.log(sku);
+      if (sku) {
+        query.sellerSku = { $regex: sku, $options: "i" };
+      }
+      if (asin) {
+        query.asin1 = { $regex: asin, $options: "i" };
+      }
   
-      // Fetch matching products
+      // Fetch initial matching products from the database
       let saleStockData = await SaleStock.find(query);
   
       // Filter by stock condition
       if (stockCondition) {
-        saleStockData = saleStockData.filter(product => {
+        saleStockData = saleStockData.filter((product) => {
           const productStock =
             (product.fulfillableQuantity || 0) +
             (product.pendingTransshipmentQuantity || 0) +
@@ -349,9 +494,9 @@ exports.filteProductService = async (
   
       // Filter by sales metrics
       if (salesCondition) {
-        saleStockData = saleStockData.filter(product => {
+        saleStockData = saleStockData.filter((product) => {
           const matchingMetric = product.salesMetrics.find(
-            metric => metric.time === salesCondition.time
+            (metric) => metric.time === salesCondition.time
           );
   
           if (!matchingMetric) return false;
@@ -377,7 +522,7 @@ exports.filteProductService = async (
   
       // Total results after filtering
       const totalResults = saleStockData.length;
-  
+    console.log(query);
       // Paginate results
       const paginatedData = saleStockData.slice(skip, skip + limit);
   
@@ -388,6 +533,9 @@ exports.filteProductService = async (
         totalPages: Math.ceil(totalResults / limit),
       };
     } catch (error) {
-      throw new Error("Error while filtering and paginating SaleStock: " + error.message);
+      throw new Error(
+        "Error while filtering and paginating SaleStock: " + error.message
+      );
     }
   };
+  */

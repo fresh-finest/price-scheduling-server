@@ -8,14 +8,14 @@ const { agenda } = require("../price-obo/Agenda");
       
 //         await agenda.start();           
 //         await loadAndCacheJobs();
-//         cron.schedule('*/5 * * * *', async () => {
-//             try {    
-//                 await agenda.start();           
-//                 await loadAndCacheJobs();
-//             } catch (error) {
-//                 console.error("Error during cron job execution:", error);
-//             }
-//         });
+//         // cron.schedule('*/5 * * * *', async () => {
+//         //     try {    
+//         //         await agenda.start();           
+//         //         await loadAndCacheJobs();
+//         //     } catch (error) {
+//         //         console.error("Error during cron job execution:", error);
+//         //     }
+//         // });
 
 //         console.log("Cron run for CachedJob db.");
 //     } catch (error) {

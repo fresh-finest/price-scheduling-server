@@ -18,7 +18,7 @@ exports.getLimitProduct = async (req, res) => {
     try {
         
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const limit = parseInt(req.query.limit) || 50;
 
         if (page < 1 || limit < 1) {
             return res.status(400).json({
@@ -465,7 +465,7 @@ exports.getFilteredProduct = async (req, res) => {
         salesCondition,
         uid,
         page = 1,
-        limit = 20,
+        limit = 50,
       } = req.query;
   
       // Parse stock and sales conditions if provided

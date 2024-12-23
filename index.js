@@ -207,7 +207,7 @@ const sellerRoute = require("./src/route/seller");
 const subscriptionRoute = require("./src/route/subscription");
 const pricingplanRoute = require("./src/route/pricingplan");
 const messageRoute = require("./src/route/message");
-const billingRoute = require("./src/route/billing");
+// const billingRoute = require("./src/route/billing");
 
 const Message = require("./src/model/Message");
 
@@ -222,7 +222,7 @@ app.use("/api/ownernotification",ownerNotificationRoute);
 app.use("/api/seller",sellerRoute);app.use("/api/subscription",subscriptionRoute);
 app.use("/api/pricing",pricingplanRoute);
 app.use("/api/message",messageRoute);
-app.use("/api/billing",billingRoute);
+// app.use("/api/billing",billingRoute);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

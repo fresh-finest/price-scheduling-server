@@ -303,7 +303,7 @@ exports.filterSortAndPaginateSaleStock = async (sortOrder = "asc", page = 1, lim
 exports.filteProductService = async (
   { fulfillmentChannel, stockCondition, salesCondition, uid},
   page = 1,
-  limit = 20
+  limit = 50
 ) => {
   try {
     const skip = (page - 1) * limit;

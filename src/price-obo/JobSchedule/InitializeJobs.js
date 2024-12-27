@@ -3,6 +3,7 @@ const moment = require('moment');
 const AutoSchedule = require("../../model/AutoSchedule");
 const { autoJobsAgenda } = require("../Agenda");
 const updateProductSalePrice = require("../UpdatePrice/UpdateSalePrice");
+const generatePrice = require('../oboService/generatePrice');
 
 const reinitializeAutoJobs = async () => {
     try {
@@ -13,9 +14,10 @@ const reinitializeAutoJobs = async () => {
        
         autoJobsAgenda.define(name, async (job) => {
           
-          const { sku,minPrice,maxPrice, startDate,endDate} = job.attrs.data;
-          const randomPrice = (Math.random() * (maxPrice - minPrice) + minPrice).toFixed(2);
-          // await updateProductSalePrice(sku, parseFloat(randomPrice), startDate,endDate);
+          const { sku,minPrice,maxPrice, startDate,endDate,perchantage,amount,category} = job.attrs.data;
+          // const randomPrice = (Math.random() * (maxPrice - minPrice) + minPrice).toFixed(2);
+          const randomPrice = await generatePrice(sku,maxPrice,minPrice,perchantage,amount,category);
+        
           try {
             if (name.startsWith(`UpdateAutoPriceChange ${sku}`)) {
               console.log(sku);

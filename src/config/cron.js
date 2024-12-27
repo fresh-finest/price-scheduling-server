@@ -7,7 +7,10 @@ const stockVsSaleCronJobs = () => {
       await checkStockVsSales();
     });
   };
-  
+
+module.exports = { stockVsSaleCronJobs };
 
 
-  module.exports = { stockVsSaleCronJobs };
+
+
+

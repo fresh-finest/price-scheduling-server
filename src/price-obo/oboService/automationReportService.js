@@ -61,7 +61,7 @@ const fetchSalesMetrics = async (sku, startDateTime, endDateTime) => {
     throw error;
   }
 };
-
+/*
 const processAndStoreData = async (autoScheduleResponse) => {
   console.log("called");
   try {
@@ -132,5 +132,113 @@ const processAndStoreData = async (autoScheduleResponse) => {
     throw new Error("Processing failed.");
   }
 };
+*/
+const mongoose = require("mongoose");
+const { unique } = require("agenda/dist/job/unique");
 
+const lastProcessedSchema = new mongoose.Schema({
+  key:{
+    type:String,
+    required:true,
+    unique:true
+  },
+  value:{
+    type:Date,
+    required:true
+  }
+},{timestamps:true});
+
+const LastProcessed = mongoose.model("LastProcessed",lastProcessedSchema);
+
+const processAndStoreData = async (autoScheduleResponse) => {
+  console.log("called");
+  try {
+    // Retrieve last processed time
+    const lastProcessedEntry = await LastProcessed.findOne({ key: "lastProcessedTime" });
+    const lastProcessedTime = lastProcessedEntry ? lastProcessedEntry.value : null;
+
+    const autoSchedules = autoScheduleResponse.data.result;
+
+    if (!Array.isArray(autoSchedules) || autoSchedules.length === 0) {
+      console.log("No auto-schedule data available.");
+      return { message: "No data to process." };
+    }
+
+    // Filter schedules based on last processed time
+    const newSchedules = autoSchedules.filter(schedule =>
+      !lastProcessedTime || moment(schedule.executionDateTime).isAfter(lastProcessedTime)
+    );
+
+    if (newSchedules.length === 0) {
+      console.log("No new data to process.");
+      return { message: "No new data to process." };
+    }
+
+    const storedResults = []; // To store all successful reports
+
+    for (let i = 0; i < newSchedules.length - 1; i++) {
+      const current = newSchedules[i];
+      const next = newSchedules[i + 1];
+
+      const startDateTime = moment
+        .tz(current.executionDateTime, "America/Los_Angeles")
+        .toISOString();
+      const endDateTime = moment
+        .tz(next.executionDateTime, "America/Los_Angeles")
+        .toISOString();
+
+      console.log(
+        `Processing interval: ${startDateTime} to ${endDateTime} for SKU: ${current.sku}`
+      );
+
+      try {
+        const unitCount = await fetchSalesMetrics(
+          current.sku,
+          startDateTime,
+          endDateTime
+        );
+        console.log(unitCount);
+
+        const reportData = {
+          sku: current.sku,
+          randomPrice: current.randomPrice,
+          unitCount: unitCount,
+          executionDateTime: current.executionDateTime,
+        };
+
+        const filter = {
+          sku: reportData.sku,
+          randomPrice: reportData.randomPrice,
+          executionDateTime: reportData.executionDateTime,
+        };
+        const result = await AutoPriceReport.updateOne(
+          filter,
+          { $set: reportData },
+          { upsert: true }
+        );
+
+        storedResults.push(result); // Push to storedResults array
+      } catch (error) {
+        console.error(
+          `Failed to fetch and store data for SKU: ${current.sku}`,
+          error.message
+        );
+      }
+    }
+
+    // Update last processed time
+    const latestProcessedTime = newSchedules[newSchedules.length - 1].executionDateTime;
+    await LastProcessed.updateOne(
+      { key: "lastProcessedTime" },
+      { $set: { value: latestProcessedTime } },
+      { upsert: true }
+    );
+
+    console.log("Processing completed.");
+    return { message: "Processing completed", storedResults };
+  } catch (error) {
+    console.error("Error processing and storing data:", error.message);
+    throw new Error("Processing failed.");
+  }
+};
 module.exports = processAndStoreData;

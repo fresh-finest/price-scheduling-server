@@ -101,7 +101,7 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
     try {
         const { uid } = req.params;
         const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 20;
+        const limit = parseInt(req.query.limit, 10) || 100;
 
         console.log(uid);
         let result;

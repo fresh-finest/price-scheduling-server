@@ -4,7 +4,7 @@ const { fetchAccessToken } = require("../middleware/accessToken");
 const { marketplace_id } = require("../middleware/credentialMiddleware");
 const AutoPriceReport = require("../model/AutoPriceReport");
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
+/*
 const fetchSalesMetrics = async (sku, startDateTime, endDateTime) => {
   try {
     const accessToken = await fetchAccessToken();
@@ -129,5 +129,10 @@ const processAndStoreData = async (autoScheduleResponse) => {
     throw new Error("Processing failed.");
   }
 };
+*/
+
+
+
+
 
 module.exports = processAndStoreData;

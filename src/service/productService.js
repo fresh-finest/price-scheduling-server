@@ -23,7 +23,7 @@ exports.getLimitProductService = async(page,limit)=>{
 //     return products;
 // }
 
-exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 20) => {
+exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
     console.log("search asin sku");
     const query = {};
     if (sku) {

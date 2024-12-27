@@ -37,6 +37,7 @@ const scheduleCronJobs=()=>{
     console.log('Scheduled task started (11:00 AM Bangladesh time)...');
     try {
       const response = await axios.get('https://api.priceobo.com/fetch-and-merge');
+      // const response = await axios.get('http://localhost:3000/fetch-and-merge');
       console.log('API response:', response.data);
     } catch (error) {
       console.error('Error during cron job:', error);
@@ -62,6 +63,8 @@ const scheduleCronJobs=()=>{
 
 
 };
+
+
 
 
 // Export the function

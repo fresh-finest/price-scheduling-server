@@ -31,13 +31,29 @@ const scheduleCronJobs=()=>{
   });
 
   // Adjusted to run at 11:00 AM Bangladesh time
-  cron.schedule('0 11 * * *', async () => {
-    console.log('Scheduled task started (11:00 AM Bangladesh time)...');
-    
-    try {
-      const response = await axios.get('https://api.priceobo.com/fetch-and-merge');
+  // cron.schedule('30 14 * * *', async () => {
+  //   console.log('Scheduled task started (11:00 AM Bangladesh time)...');
+  //   // http://localhost:3000
+  //   // https://api.priceobo.com
+  //   try {
+  //     const response = await axios.get(' http://localhost:3000/fetch-and-merge');
   
 
+  //     console.log('API response:', response.data);
+  //   } catch (error) {
+  //     console.error('Error during cron job:', error);
+  //   }
+  // }, {
+  //   timezone: 'Asia/Dhaka'
+  // });
+
+  cron.schedule('30 14 * * *', async () => {
+    console.log('Scheduled task started (2:30 PM Bangladesh time)...');
+    // Replace the URL with your actual endpoint
+    // http://localhost:3000
+    // https://api.priceobo.com
+    try {
+      const response = await axios.get('http://localhost:3000/fetch-and-merge');
       console.log('API response:', response.data);
     } catch (error) {
       console.error('Error during cron job:', error);
@@ -45,7 +61,6 @@ const scheduleCronJobs=()=>{
   }, {
     timezone: 'Asia/Dhaka'
   });
-
   // Schedule the cron job for 11:30 AM Bangladesh Time (BST)
 
   // 30 11

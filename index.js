@@ -122,16 +122,16 @@ autoJobsAgenda.on("ready", async () => {
 
 
 
-// agenda.on("ready", async () => {
-//   cron.schedule("*/1 * * * *", async () => {
-//     try {
-//       await agenda.start();
-//       await loadAndCacheJobs();
-//     } catch (error) {
-//       console.error("Error during cron job execution:", error);
-//     }
-//   });
-// });
+agenda.on("ready", async () => {
+  cron.schedule("*/60 * * * *", async () => {
+    try {
+      await agenda.start();
+      await loadAndCacheJobs();
+    } catch (error) {
+      console.error("Error during cron job execution:", error);
+    }
+  });
+});
 
 agenda.on("start", async (job) => {
   try {
@@ -209,6 +209,7 @@ const pricingplanRoute = require("./src/route/pricingplan");
 const messageRoute = require("./src/route/message");
 // const billingRoute = require("./src/route/billing");
 
+const automationRoute = require("./src/route/automation");
 const Message = require("./src/model/Message");
 
 app.use("/api/schedule", scheduleRoute);
@@ -223,6 +224,7 @@ app.use("/api/seller",sellerRoute);app.use("/api/subscription",subscriptionRoute
 app.use("/api/pricing",pricingplanRoute);
 app.use("/api/message",messageRoute);
 // app.use("/api/billing",billingRoute);
+app.use("/api/automation",automationRoute);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

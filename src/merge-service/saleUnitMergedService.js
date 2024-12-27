@@ -11,8 +11,8 @@ const fetchSalesMetricsSKU = async (sku) => {
       // Fetch sales metrics from the local API
       // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-asin/${sku}`);
 
-      const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${encodedSku}`);
-      // const response = await axios.get(`http://localhost:3000/sales-metrics-by-sku/${encodedSku}`);
+      // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${encodedSku}`);
+      const response = await axios.get(`http://localhost:3000/sales-metrics-by-sku/${encodedSku}`);
 
 
       return response.data; // Return the sales metrics from the response

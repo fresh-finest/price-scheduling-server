@@ -8,6 +8,7 @@ const processAndStoreData = require('../oboService/automationReportService');
 const { autoJobsAgenda } = require('../Agenda');
 const ActiveAutoJob = require('../../model/ActiveAutoJob');
 const Rule = require('../../model/Rule');
+const AddPoduct = require('../../model/AddProduct');
 // const processAndStoreData = require('../../service/AutoPriceReportService');
 
 router.get("/auto-pricing-report", async (req, res) => {
@@ -166,7 +167,7 @@ router.get(`/auto-schedule`, async (req, res) => {
   router.get("/api/active-auto-job/:sku/sku",async(req,res)=>{
     const {sku} = req.params;
     try {
-        const job = await ActiveAutoJob.findOne({sku});
+        const job = await AddPoduct.findOne({sku});
         res.status(200).json({job});    
     } catch (error) {       
         res.status(500).json({error:error.message});

@@ -46,25 +46,25 @@ const generatePrice = async (
   } else if (type === "increasing") {
     if (priceAmount) {
       console.log("amount");
-      newPrice = lastPrice + amount;
+      newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-        newPrice = minPrice + amount;
+        newPrice = parseFloat(minPrice) + parseFloat(amount);
       }
     } else {
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log("last and new price: " + lastPrice , newPrice);
       if (newPrice > maxPrice) {
-        newPrice = minPrice + priceDifference * parseFloat(percentage);
+        newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
       }
     }
   } else if (type === "decreasing") {
     console.log("decreasing");
 
     if (priceAmount) {
-      newPrice = lastPrice - amount;
+      newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-        newPrice = maxPrice - amount;
+        newPrice = maxPrice - parseFloat(amount);
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);

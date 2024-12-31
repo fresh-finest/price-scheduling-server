@@ -1,6 +1,7 @@
 const PriceSchedule = require("../model/PriceSchedule");
 const User = require("../model/User");
 const HistorySchedule = require("../model/HistorySchedule");
+const Rule = require("../model/Rule");
 
 exports.createUserService = async (data) => {
   const user = await User.create(data);
@@ -60,9 +61,13 @@ exports.updateUserServiceById = async (id, data) => {
                 { userName: oldUserName },
                 { $set: { userName: newUserName } }
             );
+            const ruleUpdateResult = await Rule.updateMany(
+              { userName: oldUserName },
+              { $set: { userName: newUserName } }
+          );
 
             console.log(
-                `Updated username in related collections: History (${historyUpdateResult.modifiedCount} documents), PriceSchedule (${priceScheduleUpdateResult.modifiedCount} documents).`
+                `Updated username in related collections: History (${historyUpdateResult.modifiedCount} documents), Automation rule (${priceScheduleUpdateResult.modifiedCount} documents,PriceSchedule (${ruleUpdateResult.modifiedCount} documents).`
             );
         }
 

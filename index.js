@@ -133,25 +133,25 @@ agenda.on("ready", async () => {
   });
 });
 
-agenda.on("start", async (job) => {
-  try {
-    await CachedJob.updateOne(
-      { name: job.attrs.name, nextRunAt: job.attrs.nextRunAt },
-      {
-        $set: {
-          lastRunAt: job.attrs.lastRunAt,
-          nextRunAt: job.attrs.nextRunAt,
-          data: job.attrs.data,
-          updatedAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-    console.log(`Cached job started: ${job.attrs.name}`);
-  } catch (error) {
-    console.error("Error updating cache on job start:", error);
-  }
-});
+// agenda.on("start", async (job) => {
+//   try {
+//     await CachedJob.updateOne(
+//       { name: job.attrs.name, nextRunAt: job.attrs.nextRunAt },
+//       {
+//         $set: {
+//           lastRunAt: job.attrs.lastRunAt,
+//           nextRunAt: job.attrs.nextRunAt,
+//           data: job.attrs.data,
+//           updatedAt: new Date(),
+//         },
+//       },
+//       { upsert: true }
+//     );
+//     console.log(`Cached job started: ${job.attrs.name}`);
+//   } catch (error) {
+//     console.error("Error updating cache on job start:", error);
+//   }
+// });
 
 agenda.on("complete", async (job) => {
   try {

@@ -36,10 +36,16 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
     const skip = (page - 1) * limit;
 
     // Fetch products with pagination
-    const products = await SaleStock.find(query).skip(skip).limit(limit);
+    let products = await SaleStock.find(query).skip(skip).limit(limit);
 
     // Get the total count of matching products
-    const totalResults = await SaleStock.countDocuments(query);
+    let totalResults = await SaleStock.countDocuments(query);
+
+    if (totalResults === 0){
+      searchQuery = { itemName: { $regex: sku, $options: "i" } };
+      products = await SaleStock.find(searchQuery).skip(skip).limit(limit);
+      totalResults = await SaleStock.countDocuments(searchQuery);
+    }
 
     return {
         products,

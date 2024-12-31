@@ -37,6 +37,10 @@ const ruleSchema = mongoose.Schema({
     enum: ["created", "updated", "deleted"],
     default: "created",
   },
+  mute:{
+    type:Boolean,
+    default:false,
+  }
 },{ timestamps: true });
 
 

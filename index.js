@@ -21,7 +21,8 @@ const { checkStockVsSales } = require("./src/notifications/stockAgainstSale");
 
 const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express();
 
-
+const { loadSaleStockToFavourite } = require("./src/controller/favouriteController");
+const { loadInventoryToProduct } = require("./src/controller/productController");
 
 app.use(express.json());
 app.use(cookieParser()); // To parse cookies
@@ -71,9 +72,12 @@ agenda.on("ready", async () => {
   console.log("Agenda is connected and ready.");
   await agenda.start();
   reinitializeJobs();
+  
 });
 
 //socket io connection
+loadSaleStockToFavourite();
+loadInventoryToProduct();
 
 
 const reinitializeJobs = async () => {
@@ -208,9 +212,10 @@ const subscriptionRoute = require("./src/route/subscription");
 const pricingplanRoute = require("./src/route/pricingplan");
 const messageRoute = require("./src/route/message");
 // const billingRoute = require("./src/route/billing");
-
+const favouriteRoute = require("./src/route/favourite");
 const automationRoute = require("./src/route/automation");
-const Message = require("./src/model/Message");
+const tagRoute = require("./src/route/tag");
+
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
@@ -225,6 +230,8 @@ app.use("/api/pricing",pricingplanRoute);
 app.use("/api/message",messageRoute);
 // app.use("/api/billing",billingRoute);
 app.use("/api/automation",automationRoute);
+app.use("/api/favourite",favouriteRoute);
+app.use("/api/tag",tagRoute);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

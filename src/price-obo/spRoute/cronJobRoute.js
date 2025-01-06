@@ -4,6 +4,7 @@ const axios = require('axios');
 const { mergeAndSaveImageData } = require('../../merge-service/imageMergedService');
 const Inventory = require('../../model/Inventory');
 const { fetchAndDownloadDataOnce } = require('../../service/inventoryService');
+const { loadInventoryToProduct } = require('../../controller/productController');
 
 const scheduleCronJobs=()=>{
      // Schedule the task to run every day at 8:00 am Bangladesh time
@@ -61,6 +62,16 @@ const scheduleCronJobs=()=>{
     timezone: 'Asia/Dhaka'
   });
 
+
+
+  cron.schedule('0 7 * * *', async () => {
+    try {
+      await loadInventoryToProduct();
+      success('Inventory data loaded to Product collection.');
+    } catch (error) {
+      console.error('Error loading inventory data to Product collection:', error);
+    }
+  },{timezone:'Asia/Dhaka'});
 
 };
 

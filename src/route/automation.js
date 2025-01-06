@@ -1,13 +1,16 @@
 
 
 const express = require('express');
-const { createRule, addProductsToRule, createRuleWithProduct, getRuleWithProductsByRuleId, getRule,updateRule,getRuleByRuleId,deleteProductBySku, updateProductBySku,deleteRule, muteRule, resumeRule, getActiveJob} = require('../controller/automationController');
+const { createRule, addProductsToRule, createRuleWithProduct, getRuleWithProductsByRuleId, getRule,updateRule,getRuleByRuleId,deleteProductBySku, updateProductBySku,deleteRule, muteRule, resumeRule, getActiveJob, getActiveProductBySku} = require('../controller/automationController');
 
 const router = express.Router();
 
 router.post("/rules",createRule);
 router.get("/rules",getRule);
 router.get("/active",getActiveJob);
+router.get("/active/:sku",getActiveProductBySku);
+
+
 router.post("/rules/:ruleId/products",addProductsToRule)
 router.get("/rules/:ruleId",getRuleByRuleId);
 router.put("/rules/:ruleId/update", updateRule)

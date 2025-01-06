@@ -7,7 +7,7 @@ const { fetchAndDownloadDataOnce } = require('../service/inventoryService');
 
 const scheduleCronJobs=()=>{
      // Schedule the task to run every day at 8:00 am Bangladesh time
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('40 18 * * *', async () => {
     const bangladeshTime = moment.tz("Asia/Dhaka").format();
     console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
     await fetchAndDownloadDataOnce();

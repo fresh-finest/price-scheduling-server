@@ -49,7 +49,7 @@ exports.addProductsToRule = async (req, res) => {
 
     const createdProducts = await AddPoduct.insertMany(productsToCreate);
 //https://api.priceobo.com
-//`http://localhost:3000
+//https://api.priceobo.com
     if (hitAutoPricing) {
       const autoPricingPromises = createdProducts.map((product) =>
         axios.post(`https://api.priceobo.com/auto-pricing`, {
@@ -135,6 +135,19 @@ exports.getRuleByRuleId=async(req,res)=>{
     })
   } catch (error) {
     res.status(400).json({error:error.message});
+  }
+}
+
+exports.getActiveProductBySku = async(req,res)=>{
+  const {sku} = req.params;
+  try {
+    const job = await AddPoduct.findOne({sku});
+    res.status(200).json({
+      success:true,
+      job
+    })
+  } catch (error) {
+    res.status(500).json({error:error.message});
   }
 }
 
@@ -418,11 +431,7 @@ exports.muteRule = async(req,res)=>{
   const {ruleId} = req.params;
   try {
     const rule = await Rule.findOne({ruleId});
-    await Rule.findOneAndUpdate(
-      {ruleId},
-      {mute:true},
-      {new:true}
-    )
+   
 
     if(!rule){
       return res.status(404).json({error:"Rule not found"});
@@ -434,7 +443,11 @@ exports.muteRule = async(req,res)=>{
     if(products.length ===0){
       return res.status(404).json({error:"No products found for this rule"});
     }
-
+    await Rule.findOneAndUpdate(
+      {ruleId},
+      {mute:true},
+      {new:true}
+    )
     const cancelJobPromises = products.map((product)=> cancelAutoJobs(product.sku));
 
     await Promise.all(cancelJobPromises);
@@ -455,11 +468,7 @@ exports.resumeRule = async(req,res)=>{
   try {
     const rule = await Rule.findOne({ruleId});
     const {percentage,amount,category,interval} = rule;
-    await Rule.findOneAndUpdate(
-      {ruleId},
-      {mute:false},
-      {new:true}
-    )
+    
 
     if(!rule){
       return res.status(404).json({ruleId:rule._id});
@@ -469,7 +478,11 @@ exports.resumeRule = async(req,res)=>{
     if(products.length ===0){
       return res.status(404).json({error:"No products found for thie rule"});
     }
-
+    await Rule.findOneAndUpdate(
+      {ruleId},
+      {mute:false},
+      {new:true}
+    )
 
 // await AutoPricingJob(sku,maxPrice,minPrice,percentage,amount,category,interval);
     const createJobPromises = products.map((product)=>
@@ -488,7 +501,7 @@ exports.resumeRule = async(req,res)=>{
     await Promise.all(createJobPromises);
   // console.log(interval);
   //   const autoPricingPromises = products.map((product)=>
-  //     axios.post(`http://localhost:3000/auto-pricing`,{
+  //     axios.post(`https://api.priceobo.com/auto-pricing`,{
   //       sku:product.sku,
   //       maxPrice:product.maxPrice,
   //       minPrice:product.minPrice,

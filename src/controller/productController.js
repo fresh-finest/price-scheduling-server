@@ -1,6 +1,50 @@
+const Inventory = require("../model/Inventory");
+const Product = require("../model/Product");
 const SaleStock = require("../model/SaleStock");
-const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateSaleStock, filteProductService } = require("../service/productService");
+const { fetchSaeMetricsForSkus } = require("../service/getComparisionSaleService");
+const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateSaleStock, filteProductService, updateTagService, deleteTagService } = require("../service/productService");
 
+
+
+
+
+const mapInventoryToProduct = async (inventories) => {
+    const existingProducts = await Product.find();
+    
+    const newProducts = inventories.filter(item =>
+        !existingProducts.some(product => product.sellerSku === item.sellerSku)
+    ).map(item => ({
+        itemName: item.itemName,
+        itemDescription: item.itemDescription,
+        sellerSku: item.sellerSku,
+        price: item.price,
+        quantity: item.quantity,
+        asin1: item.asin1,
+        fullfillmentChannel: item.fullfillmentChannel,
+        status: item.status,
+    }));
+
+    return newProducts;
+};
+
+exports.loadInventoryToProduct = async () => {
+    try {
+        const inventories = await Inventory.find();
+        const newProducts = await mapInventoryToProduct(inventories);
+
+        if (newProducts.length > 0) {
+            await Product.insertMany(newProducts);
+            console.log(`${newProducts.length} new products added.`);
+        } else {
+            console.log("No new products to add.");
+        }
+
+        return newProducts;
+    } catch (error) {
+        console.error("Error loading Inventory to Products:", error);
+        throw error;
+    }
+};
 
 // exports.getLimitProduct = async(req,res)=>{
 //     const page = parseInt(req.query.page) || 1;
@@ -13,6 +57,96 @@ const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUn
 //     const products = await SaleStock.find().skip(skip).limit(limit);
 //     res.json({totalProducts,products});
 // }
+/*
+exports.getSalesComparision = async(req,res)=>{
+    try {
+        const {startDate,endDate, page=1,limit=20} = req.query;
+      
+        console.log(req.query + " " + startDate + " " + endDate + " " + page + " " + limit);
+        if(!startDate || !endDate){
+            return res.status(400).json({
+                status:"Failed",
+                message:"Missing required query parameters"
+            })
+        }
+
+        const skip = (page-1)*limit;
+
+        const skus = await SaleStock.find({}, { sellerSku: 1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean();
+
+        const skuList = skus.map((item)=>item.sellerSku);
+
+        metrics = await fetchSaeMetricsForSkus(skuList,startDate,endDate);
+
+        res.status(200).json({
+            status:"Success",
+            message:"Sales comparison data fetched successfully",
+            data:metrics
+        })
+
+    } catch (error) {
+        res.status(500).json({
+            status:"Failed",
+            message:"An error occured",
+            error:error.message
+        })
+    }
+}
+*/
+
+exports.getSalesComparision = async (req, res) => {
+    try {
+      const { startDate, endDate,  skus } = req.query;
+
+      console.log(startDate + " " + endDate + " " + skus);
+    //   let startDateObj = new Date(startDate);
+    //   startDateObj.setDate(startDateObj.getDate() - 1);
+    //   const decreasedDate = startDateObj.toISOString().split('T')[0];
+      // Validate required parameters
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          status: "Failed",
+          message: "Missing required query parameters: startDate and endDate",
+        });
+      }
+  
+      let skuList = [];
+  
+      // If SKUs are provided, parse them
+      if (skus) {
+        skuList = Array.isArray(skus) ? skus : skus.split(",");
+      } else {
+       res.status(400).json({error:"No sku found"});
+      }
+  
+      // Ensure SKU list is not empty
+      if (skuList.length === 0) {
+        return res.status(404).json({
+          status: "Failed",
+          message: "No SKUs available for sales comparison",
+        });
+      }
+  
+      // Fetch sales metrics for the SKUs
+      const metrics = await fetchSaeMetricsForSkus(skuList, startDate, endDate);
+      console.log(metrics);
+      res.status(200).json({
+        status: "Success",
+        message: "Sales comparison data fetched successfully",
+        data: metrics,
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: "Failed",
+        message: "An error occurred",
+        error: error.message,
+      });
+    }
+  };
+  
 exports.getLimitProduct = async (req, res) => {
     console.log("get limit hit")
     try {
@@ -464,6 +598,7 @@ exports.getFilteredProduct = async (req, res) => {
         stockCondition,
         salesCondition,
         uid,
+        tag,
         page = 1,
         limit = 50,
       } = req.query;
@@ -483,7 +618,8 @@ exports.getFilteredProduct = async (req, res) => {
           fulfillmentChannel,
           stockCondition: parsedStockCondition,
           salesCondition: parsedSalesCondition,
-          uid
+          uid,
+          tag
         },
         parseInt(page, 10),
         parseInt(limit, 10)
@@ -505,6 +641,41 @@ exports.getFilteredProduct = async (req, res) => {
         message: "Error occurred while retrieving filtered SaleStock data.",
         error: error.message,
       });
+    }
+  };
+  
+
+  exports.updateTag = async (req, res) => {
+    const { sku } = req.params;
+    const { tags} = req.body;
+    try {
+      const updatedTag = await updateTagService(sku, tags);
+      res.status(200).json({
+        status: "Success",
+        message: "Tag updated successfully",
+        data: updatedTag,
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  exports.deleteTag = async (req, res) => {
+    const { sku } = req.params;
+    const { tag, colorCode } = req.body;
+  
+    try {
+      const updatedStock = await deleteTagService(sku, tag, colorCode);
+      if (!updatedStock) {
+        return res.status(404).json({ message: "Item not found or tag not present" });
+      }
+      res.status(200).json({
+        status: "Success",
+        message: "Tag deleted successfully",
+        data: updatedStock,
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   };
   

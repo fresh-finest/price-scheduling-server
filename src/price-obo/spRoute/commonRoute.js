@@ -41,6 +41,10 @@ const {
 const { createClient } = require("redis");
 const CachedJob = require("../../model/CachedJob");
 const TimeZone = require("../../model/TimeZone");
+const { mergeImageToProduct } = require("../../merge-service/imageMergingToProduct");
+const Product = require("../../model/Product");
+const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require("../../merge-service/stockMergingToProduct");
+const { mergeSaleUnitoProduct } = require("../../merge-service/saleUnitMergetoProduct");
 
 const app = express();
 
@@ -66,6 +70,24 @@ router.get("/fetch-and-merge", async (req, res) => {
   }
 });
 
+router.get("/stock-merge-to-product", async (req, res) => {
+  try {
+    // Step 1: Fetch all listings from MongoDB
+    const listings = await Product.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+
+    const inventorySummaries = await fetchFbaInventorySummaries();
+    console.log(`Fetched ${inventorySummaries.length} inventory summaries.`);
+    const mergedData = await mergeAndSaveFbaData(listings, inventorySummaries);
+    res.json(mergedData);
+  } catch (error) {
+    console.error("Error during data processing:", error);
+    res.status(500).json({ error: "Failed to fetch, merge, and store data" });
+  }
+});
+
+
+
 router.get("/fetch-and-merge-images", async (req, res) => {
   try {
     const listings = await Inventory.find();
@@ -80,11 +102,39 @@ router.get("/fetch-and-merge-images", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch, merge, and save data" });
   }
 });
+router.get("/image-merge-to-porduct", async (req, res) => {
+  try {
+    const listings = await Product.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+    const mergedData = await mergeImageToProduct(listings);
+    res.json({
+      message: "Data merged and saved successfully.",
+      result: mergedData,
+    });
+  } catch (error) {
+    console.error("Error during manual data processing:", error);
+    res.status(500).json({ error: "Failed to fetch, merge, and save data" });
+  }
+});
 router.get("/fetch-and-merge-sales", async (req, res) => {
   try {
     const listings = await Stock.find();
     console.log(`Fetched ${listings.length} listings from MongoDB.`);
     const mergedData = await mergeAndSaveSalesData(listings);
+    res.json({
+      message: "Data merged and saved successfully.",
+      result: mergedData,
+    });
+  } catch (error) {
+    console.error("Error during manual data processing:", error);
+    res.status(500).json({ error: "Failed to fetch, merge, and save data" });
+  }
+});
+router.get("/saleunit-merge-to-product", async (req, res) => {
+  try {
+    const listings = await Product.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+    const mergedData = await mergeSaleUnitoProduct(listings);
     res.json({
       message: "Data merged and saved successfully.",
       result: mergedData,

@@ -1,5 +1,7 @@
 const axios = require('axios');
 const SaleStock = require('../model/SaleStock');
+const Product = require('../model/Product');
+const { getMetricsForTimeRanges } = require('../service/getSaleService');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -12,23 +14,26 @@ const fetchSalesMetricsSKU = async (sku) => {
       // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-asin/${sku}`);
 
       // const response = await axios.get(`https://api.priceobo.com/sales-metrics-by-sku/${encodedSku}`);
-      const response = await axios.get(`http://localhost:3000/sales-metrics-by-sku/${encodedSku}`);
+      // const response = await axios.get(`http://localhost:3000/sales-metrics-by-sku/${encodedSku}`);
 
+      const response = await getMetricsForTimeRanges(sku);
+     
+     
 
-      return response.data; // Return the sales metrics from the response
+      return response; // Return the sales metrics from the response
     } catch (error) {
-      console.error(`Error fetching sales metrics for SKU ${sku}:, error.message`);
+      console.error(`Error fetching sales metrics for SKU ${sku}:, ${error.message}`);
       return null; // Return null if fetching fails
     }
   };
 
 // Function to merge listing data with sales metrics and save to new schema
-const mergeAndSaveSalesData = async (listings) => {
+const mergeSaleUnitoProduct = async (listings) => {
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i];
     console.log(i);
 
-    if (!listing.listingId) {
+    if (!listing.sellerSku) {
       console.warn(`Skipping listing with SKU ${listing.sellerSku} due to missing listingId.`);
       continue;
     }
@@ -37,35 +42,12 @@ const mergeAndSaveSalesData = async (listings) => {
 
     try {
       const salesMetrics = await fetchSalesMetricsSKU(listing.sellerSku); // Fetch sales metrics by ASIN
-
-      if (salesMetrics) {
-        const mergedData = {
-          asin1: listing.asin1,
-          itemName: listing.itemName,
-          itemDescription: listing.itemDescription,
-          quantity:listing.quantity,
-          fulfillableQuantity:listing.fulfillableQuantity,
-          fulfillmentChannel: listing.fulfillmentChannel,
-          pendingQuantity:listing.pendingQuantity,
-          pendingTransshipmentQuantity:listing.pendingTransshipmentQuantity,
-          price: listing.price,
-          imageUrl:listing.imageUrl,
-          sellerSku: listing.sellerSku,
-          fnSku:listing.fnSku,
-          listingId: listing.listingId,
-          quantity: listing.quantity,
-          createdAt: listing.createdAt,
-          updatedAt: listing.updatedAt,
-          status: listing.status,
-          salesMetrics: salesMetrics,
-         
-        };
-
       
-        await SaleStock.findOneAndUpdate(
+      if (salesMetrics) {    
+        await Product.findOneAndUpdate(
           { sellerSku:listing.sellerSku },
-          mergedData,
-          { new: true, upsert: true } 
+          { salesMetrics: salesMetrics},
+          { new: true, upsert: true }
         );
 
         console.log(`Merged and saved data for SKU: ${listing.sellerSku}`);
@@ -81,5 +63,5 @@ const mergeAndSaveSalesData = async (listings) => {
 };
 
 module.exports = {
-  mergeAndSaveSalesData,
+    mergeSaleUnitoProduct,
 };

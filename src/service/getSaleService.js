@@ -30,7 +30,7 @@ const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
   const maxTries = 7; 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve,ms));
   
-  for(let attempt = 1; attempt <= maxTries;attempt){
+  for(let attempt = 1; attempt <= maxTries;attempt++){
   try {
     const accessToken = await fetchAccessToken();
     const url = `https://sellingpartnerapi-na.amazon.com/sales/v1/orderMetrics`;
@@ -81,7 +81,7 @@ const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
       error.response.data.errors &&
       error.response.data.errors[0].code === 'QuotaExceeded'
     ) {
-      console.warn(`Quota exceeded. Attempt ${attempt} of ${maxRetries}. Retrying in 2 seconds...`);
+      console.warn(`Quota exceeded. Attempt ${attempt} of ${maxTries}. Retrying in 2 seconds...`);
       await delay(3000); // Wait for 2 seconds before retrying
       continue;
     }
@@ -91,7 +91,7 @@ const fetchSalesMetricsBySKU = async (sku, startDate, endDate) => {
   }
   
 }
-throw new Error(`Failed to fetch sales metrics after ${maxRetries} attempts due to quota limits.`);
+throw new Error(`Failed to fetch sales metrics after ${maxTries} attempts due to quota limits.`);
 };
 
 // Function to get sales metrics for different time ranges using SKU

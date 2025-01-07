@@ -10,6 +10,9 @@ const cron = require("node-cron");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
 
+const passport = require('passport');
+const OAuth2Strategy = require('passport-oauth2').Strategy;
+
 // const { authenticateUser } = require('./src/middleware/authMiddleware');
 const { agenda, autoJobsAgenda } = require("./src/price-obo/Agenda");
 const routes = require("./src/price-obo/spRoute/priceRoute");
@@ -23,6 +26,7 @@ const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express
 
 const { loadSaleStockToFavourite } = require("./src/controller/favouriteController");
 const { loadInventoryToProduct } = require("./src/controller/productController");
+const { saveUserTokens } = require("./src/controller/accountController");
 
 app.use(express.json());
 app.use(cookieParser()); // To parse cookies
@@ -43,9 +47,9 @@ app.use(cors());
 //   },
 //   credentials: true,
 // }));
-
+// bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db
 const MONGO_URI = process.env.MONGO_URI;
-
+// const MONGO_URI = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db`
 // const MONGO_URI ="mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
 
 app.use((req, res, next) => {
@@ -66,6 +70,57 @@ mongoose
   .catch((err) => {
     console.log(err);
   });
+
+  const credentials = {
+    refresh_token: process.env.REFRESH_TOKEN,
+    lwa_app_id: process.env.LWA_APP_ID,
+    lwa_client_secret: process.env.LWA_CLIENT_SECRET,
+    seller_id: process.env.SELLER_ID,
+    marketplace_id: process.env.MARKETPLACE_ID,
+  };
+
+  passport.use(new OAuth2Strategy({
+    authorizationURL: 'https://sellercentral.amazon.com/apps/authorize',
+    tokenURL: 'https://api.amazon.com/auth/o2/token',
+    clientID: credentials.lwa_app_id,
+    clientSecret:  credentials.lwa_client_secret,
+    callbackURL: 'https://api.priceobo.com/auth/callback'
+  },
+  async function(accessToken, refreshToken, profile, cb) {
+    // Save the tokens and profile information
+    console.log("acc token "+accessToken+"ref token: "+refreshToken+" profile: "+profile+" cb: "+cb);
+
+    await saveUserTokens({accessToken,refreshToken,profile});
+
+    return cb(null, { accessToken, refreshToken, profile });
+  }
+  ));
+  
+  // test
+  // saveUserTokens({accessToken:"xxxxxxx",refreshToken:"yyyyy",profile:"zzzzz"});
+
+  app.get('/auth/amazon', passport.authenticate('oauth2'));
+  
+  app.get('/auth/callback', 
+    passport.authenticate('oauth2', { failureRedirect: '/' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      res.redirect('https://app.priceobo.com/account');
+    }
+  );
+  
+  const refreshAccessToken = async (refreshToken) => {
+    const response = await axios.post('https://api.amazon.com/auth/o2/token', {
+      grant_type: 'refresh_token',
+      client_id: credentials.lwa_app_id,
+      client_secret: credentials.lwa_client_secret,
+      refresh_token: refreshToken,
+    });
+    return response.data.access_token;
+  };
+
+
+
 
 
 agenda.on("ready", async () => {

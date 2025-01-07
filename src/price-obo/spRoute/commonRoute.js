@@ -45,9 +45,19 @@ const { mergeImageToProduct } = require("../../merge-service/imageMergingToProdu
 const Product = require("../../model/Product");
 const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require("../../merge-service/stockMergingToProduct");
 const { mergeSaleUnitoProduct } = require("../../merge-service/saleUnitMergetoProduct");
+const { fetchAndDownloadDataOnce } = require("../../service/inventoryService");
 
 const app = express();
 
+
+router.get("/report-data",async(req,res)=>{
+  try {
+    const reports = await fetchAndDownloadDataOnce();
+    res.status(200).json({reports});
+  } catch (error) {
+    res.status(500).json({message:error.message});
+  }
+})
 
 router.get("/fetch-and-merge", async (req, res) => {
   try {

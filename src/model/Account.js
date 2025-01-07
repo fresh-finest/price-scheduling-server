@@ -1,13 +1,22 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const accountSchema = mongoose.Schema({
-    MARKETPLACE_ID:{
-        type:String,
-        unique:true,
-        required:true
+const accountSchema = mongoose.Schema(
+  {
+    accessToken: {
+      type: String,
     },
-
-}, { timestamps: true });
+    refreshToken: {
+      type: String,
+    },
+    profile: {
+      type: String,
+    },
+    MARKETPLACE_ID: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+);
 
 const Account = mongoose.model("Account", accountSchema);
 module.exports = Account;

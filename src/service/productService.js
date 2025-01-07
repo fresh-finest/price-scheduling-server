@@ -320,10 +320,12 @@ exports.filterSortAndPaginateSaleStock = async (
 };
 
 exports.filteProductService = async (
-  { fulfillmentChannel, stockCondition, salesCondition, uid, tag },
+  { fulfillmentChannel, stockCondition, salesCondition, uid, tags },
   page = 1,
   limit = 50
 ) => {
+
+  console.log(tags);
   try {
     const skip = (page - 1) * limit;
 
@@ -351,8 +353,8 @@ exports.filteProductService = async (
     if (asin) {
       query.asin1 = { $regex: asin, $options: "i" };
     }
-    if (tag) {
-      query.tag = { $regex: tag, $options: "i" };
+    if (tags && tags.length > 0) {
+      query["tags.tag"] = { $in: tags };
     }
     // Fetch initial matching products from the database
     let saleStockData = await SaleStock.find(query);

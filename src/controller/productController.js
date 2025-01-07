@@ -598,11 +598,12 @@ exports.getFilteredProduct = async (req, res) => {
         stockCondition,
         salesCondition,
         uid,
-        tag,
+        tags,
         page = 1,
         limit = 50,
       } = req.query;
   
+      console.log(tags);
       // Parse stock and sales conditions if provided
       const parsedStockCondition = stockCondition
         ? JSON.parse(stockCondition)
@@ -612,6 +613,9 @@ exports.getFilteredProduct = async (req, res) => {
         ? JSON.parse(salesCondition)
         : null; // { time: '7 D', condition: '>', value: 100 }
   
+        const parsedTags = tags ? tags.split(",") : [];
+
+        console.log("parsed: ",parsedTags);
       // Combine all filters and fetch results
       const result = await filteProductService(
         {
@@ -619,7 +623,7 @@ exports.getFilteredProduct = async (req, res) => {
           stockCondition: parsedStockCondition,
           salesCondition: parsedSalesCondition,
           uid,
-          tag
+          tags:parsedTags
         },
         parseInt(page, 10),
         parseInt(limit, 10)
@@ -678,4 +682,16 @@ exports.getFilteredProduct = async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   };
+
+  exports.getSingleProduct = async(req,res)=>{
+    const {sku} = req.params;
+    try {
+        const result = await SaleStock.findOne({sellerSku:sku})
+        res.status(200).json({
+            result
+        })
+        } catch (error) {
+        res.status(500).json({error:error.message})
+    }
+  }
   

@@ -36,6 +36,8 @@ exports.getTag = async (req, res) => {
 exports.updateTag = async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+
+  
   try {
     const oldTag = await Tag.findById({ _id: id });
 
@@ -43,36 +45,28 @@ exports.updateTag = async (req, res) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
+    // Update `colorCode` in SaleStock
     if (data.colorCode && data.colorCode !== oldTag.colorCode) {
       const oldColorCode = oldTag.colorCode;
       const newColorCode = data.colorCode;
+
+      console.log(data.tagName);
       await SaleStock.updateMany(
-        { colorCode: oldColorCode },
-        { $set: { colorCode: newColorCode } }
+        { "tags.colorCode": oldColorCode },
+        { $set: { "tags.$[elem].colorCode": newColorCode } },
+        { arrayFilters: [{ "elem.colorCode": oldColorCode }] }
       );
     }
-
-    if (data.tag) {
-      const addedTags = data.tag.filter((newTag) => !oldTag.tag.includes(newTag));
-      const removedTags = oldTag.tag.filter((oldTagItem) => !data.tag.includes(oldTagItem));
-
-      if (addedTags.length > 0) {
-        for (const newTag of addedTags) {
-          await SaleStock.updateMany(
-            { tag: { $in: oldTag.tag } },
-            { $addToSet: { tag: newTag } }
-          );
-        }
-      }
-
-      if (removedTags.length > 0) {
-        for (const oldTagItem of removedTags) {
-          await SaleStock.updateMany(
-            { tag: oldTagItem },
-            { $pull: { tag: oldTagItem } }
-          );
-        }
-      }
+   
+    if (data.tagName && data.tagName !== oldTag.tagName) {
+      const oldTagName = oldTag.tagName;
+      const newTagName = data.tagName;
+      console.log("tag name"+data.tagName+ "old tag "+oldTagName);
+      await SaleStock.updateMany(
+        { "tags.tag": oldTagName },
+        { $set: { "tags.$[elem].tag": newTagName } },
+        { arrayFilters: [{ "elem.tag": oldTagName }] }
+      );
     }
 
     const updatedTag = await Tag.findByIdAndUpdate({ _id: id }, req.body, {
@@ -94,11 +88,10 @@ exports.deleteTag = async (req, res) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
-    const { tagName, colorCode } = tag;
-
+    const { tagName} = tag;
     await SaleStock.updateMany(
-      { tag: tagName, colorCode },
-      { $pull: { tag: tagName }, $unset: { colorCode: "" } }
+      { "tags.tag": tagName },
+      { $pull: { tags: { tag: tagName } } }
     );
     await Tag.findByIdAndDelete({ _id: id });
     res.status(200).json({ message: "Tag deleted successfully" });

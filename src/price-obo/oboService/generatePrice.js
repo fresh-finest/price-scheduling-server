@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { autoJobsAgenda } = require("../Agenda");
 
 const skuStateSchema = new mongoose.Schema({
   sku: { type: String, required: true, unique: true },
@@ -36,7 +37,7 @@ const generatePrice = async (
     await skuState.save();
   }
 
-  let lastPrice = skuState.lastPrice;
+  let lastPrice = parseFloat(skuState.lastPrice);
 
   let newPrice;
 
@@ -49,13 +50,18 @@ const generatePrice = async (
       newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-        newPrice = parseFloat(minPrice) + parseFloat(amount);
+        // newPrice = parseFloat(minPrice) + parseFloat(amount);
+        newPrice = parseFloat(maxPrice);
+        await cancelAutoJobs(sku);
       }
     } else {
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log("last and new price: " + lastPrice , newPrice);
       if (newPrice > maxPrice) {
-        newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
+        // newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
+        newPrice = parseFloat(maxPrice);
+        await cancelAutoJobs(sku);
+
       }
     }
   } else if (type === "decreasing") {
@@ -64,12 +70,18 @@ const generatePrice = async (
     if (priceAmount) {
       newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-        newPrice = maxPrice - parseFloat(amount);
+        // newPrice = maxPrice - parseFloat(amount);
+        newPrice = parseFloat(minPrice);
+        await cancelAutoJobs(sku);
+
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
-        newPrice = maxPrice - priceDifference * parseFloat(percentage);
+        // newPrice = maxPrice - priceDifference * parseFloat(percentage);
+        newPrice = parseFloat(minPrice);
+        await cancelAutoJobs(sku);
+
       }
     }
   }
@@ -79,6 +91,10 @@ const generatePrice = async (
 
   return parseFloat(newPrice).toFixed(2);
 };
+
+const cancelAutoJobs = async(sku)=>{
+  await autoJobsAgenda.cancel({'data.sku':sku});
+}
 
 module.exports = generatePrice;
 

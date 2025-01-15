@@ -48,11 +48,11 @@ router.get("/auto-report/:sku",async(req,res)=>{
     }
 })
 router.post(`/auto-pricing`,async(req,res)=>{
-    const {sku,maxPrice,minPrice,percentage,amount,category,interval} = req.body;
+    const {sku,maxPrice,minPrice,percentage,amount,category,interval,sale} = req.body;
     console.log("req body",req.body);
     try {
 
-        await AutoPricingJob(sku,maxPrice,minPrice,percentage,amount,category,interval);
+        await AutoPricingJob(sku,maxPrice,minPrice,percentage,amount,category,interval,sale);
         // await ActiveAutoJob.create(req.body);
 
         res.status(200).json({

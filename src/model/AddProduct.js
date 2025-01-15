@@ -25,6 +25,10 @@ const addProductSchema = new mongoose.Schema({
     type:Number,
     required:true
    },
+   sale:{
+    type:Boolean,
+    default:false
+   },
     status: {
         type: String,
         enum: ["created", "updated", "deleted"],

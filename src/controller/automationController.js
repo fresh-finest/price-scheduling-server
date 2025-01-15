@@ -60,6 +60,7 @@ exports.addProductsToRule = async (req, res) => {
           amount: rule.amount,
           category: rule.category,
           interval: rule.interval,
+          sale:product?.sale
         })
       );
 
@@ -103,7 +104,8 @@ exports.createRuleWithProduct= async(req,res)=>{
                     percentage: rule.percentage,
                     amount: rule.amount,
                     category:rule.category,
-                    interval:rule.interval
+                    interval:rule.interval,
+                    sale:product?.sale
 
                 })
             )
@@ -234,7 +236,8 @@ exports.updateProductBySku = async(req,res)=>{
       percentage:rule.percentage,
       amount:rule.amount,
       category:rule.category,
-      interval:rule.interval
+      interval:rule.interval,
+      sale:product?.sale
     })
 
     const updatedProduct = await AddPoduct.findOneAndUpdate(
@@ -322,19 +325,20 @@ exports.updateProductBySku = async(req,res)=>{
     if(!rule){
       return res.status(404).json({error:"Rule not found"});
     }
-    const product = await Product.findOne({ruleId:rule._id,sku});
+    const product = await AddPoduct.findOne({ruleId:rule._id,sku});
     if(!product){
       return res.status(404).json({error:"Product not found"});
     }
 
-    await axios.post(`/auto-pricing`,{
+    await axios.post(`https://api.priceobo.com/auto-pricing`,{
       sku:product.sku,
       maxPrice:product.maxPrice,
       minPrice: product.minPrice,
       percentage:rule.percentage,
       amount: rule.amount,
       category:rule.category,
-      interval:rule.interval
+      interval:rule.interval,
+      sale:product?.sale
     })
 
     res.status(200).json({
@@ -378,7 +382,8 @@ exports.updateRule=async(req,res)=>{
         percentage,
         amount,
         category,
-        interval
+        interval,
+        sale:product?.sale
       })
     );
     await Promise.all(autoPricingPromises);
@@ -493,7 +498,8 @@ exports.resumeRule = async(req,res)=>{
         percentage,
         amount,
         category,
-        interval
+        interval,
+        product?.sale
       )
        
     )
@@ -519,6 +525,16 @@ exports.resumeRule = async(req,res)=>{
     })
   } catch (error) {
     res.status(500).json({error:"Failed to resume rule", details:error.message});
+  }
+}
+
+exports.getAutoJobBySku = async(req,res,next)=>{
+  const {sku} = req.params;
+  try {
+    const jobs = await autoJobsAgenda.jobs({'data.sku':sku});
+    res.status(200).json({jobs});
+  } catch (error) {
+    next(error);
   }
 }
 const cancelAutoJobs = async(sku)=>{

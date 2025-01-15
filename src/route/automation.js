@@ -1,7 +1,7 @@
 
 
 const express = require('express');
-const { createRule, addProductsToRule, createRuleWithProduct, getRuleWithProductsByRuleId, getRule,updateRule,getRuleByRuleId,deleteProductBySku, updateProductBySku,deleteRule, muteRule, resumeRule, getActiveJob, getActiveProductBySku} = require('../controller/automationController');
+const { createRule, addProductsToRule, createRuleWithProduct, getRuleWithProductsByRuleId, getRule,updateRule,getRuleByRuleId,deleteProductBySku, updateProductBySku,deleteRule, muteRule, resumeRule, getActiveJob, getActiveProductBySku, pauseAutoPricing, resumeProductAutomation, getAutoJobBySku} = require('../controller/automationController');
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ router.post("/rules",createRule);
 router.get("/rules",getRule);
 router.get("/active",getActiveJob);
 router.get("/active/:sku",getActiveProductBySku);
-
+router.get("/job/:sku",getAutoJobBySku);
 
 router.post("/rules/:ruleId/products",addProductsToRule)
 router.get("/rules/:ruleId",getRuleByRuleId);
@@ -24,6 +24,10 @@ router.post("/rules-with-products",createRuleWithProduct)
 router.get("/products/:ruleId",getRuleWithProductsByRuleId);
 router.delete("/products/:ruleId/:sku/delete",deleteProductBySku);
 router.put("/products/:ruleId/:sku/update",updateProductBySku);
+router.post("/products/:ruleId/:sku/pause",pauseAutoPricing);
+router.post("/products/:ruleId/:sku/resume",resumeProductAutomation)
+
+
 
 
 module.exports = router;

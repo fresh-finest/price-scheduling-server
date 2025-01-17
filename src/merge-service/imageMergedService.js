@@ -7,8 +7,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fetchImageBySKU = async (sku) => {
     const encodedSku = encodeURIComponent(sku);
   try {
-    const response = await axios.get(`https://api.priceobo.com/image/${encodedSku}`);
-    // const response = await axios.get(`http://localhost:3000/image/${encodedSku}`);
+    // const response = await axios.get(`https://api.priceobo.com/image/${encodedSku}`);
+    const response = await axios.get(`http://localhost:3000/image/${encodedSku}`);
     const summary = response.data?.summaries[0];
     const mainImageUrl = summary?.mainImage?.link || null;
     const fnSku = summary.fnSku || null;

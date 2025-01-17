@@ -1,4 +1,5 @@
-const SaleStock = require("../model/SaleStock");
+const Product = require("../model/Product");
+
 const Tag = require("../model/Tag");
 
 // exports.createTag = async (req, res) => {
@@ -45,13 +46,13 @@ exports.updateTag = async (req, res) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
-    // Update `colorCode` in SaleStock
+ 
     if (data.colorCode && data.colorCode !== oldTag.colorCode) {
       const oldColorCode = oldTag.colorCode;
       const newColorCode = data.colorCode;
 
       console.log(data.tagName);
-      await SaleStock.updateMany(
+      await Product.updateMany(
         { "tags.colorCode": oldColorCode },
         { $set: { "tags.$[elem].colorCode": newColorCode } },
         { arrayFilters: [{ "elem.colorCode": oldColorCode }] }
@@ -62,7 +63,7 @@ exports.updateTag = async (req, res) => {
       const oldTagName = oldTag.tagName;
       const newTagName = data.tagName;
       console.log("tag name"+data.tagName+ "old tag "+oldTagName);
-      await SaleStock.updateMany(
+      await Product.updateMany(
         { "tags.tag": oldTagName },
         { $set: { "tags.$[elem].tag": newTagName } },
         { arrayFilters: [{ "elem.tag": oldTagName }] }
@@ -89,7 +90,7 @@ exports.deleteTag = async (req, res) => {
     }
 
     const { tagName} = tag;
-    await SaleStock.updateMany(
+    await Product.updateMany(
       { "tags.tag": tagName },
       { $pull: { tags: { tag: tagName } } }
     );

@@ -5,8 +5,35 @@ const { mergeAndSaveImageData } = require('../../merge-service/imageMergedServic
 const Inventory = require('../../model/Inventory');
 const { fetchAndDownloadDataOnce } = require('../../service/inventoryService');
 const { loadInventoryToProduct } = require('../../controller/productController');
+const Product = require('../../model/Product');
+const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require('../../merge-service/stockMergingToProduct');
+const { mergeImageToProduct } = require('../../merge-service/imageMergingToProduct');
+const { mergeSaleUnitoProduct } = require('../../merge-service/saleUnitMergetoProduct');
 
 const scheduleCronJobs=()=>{
+
+
+  cron.schedule('0 8 * * *', async () => {
+    const bangladeshTime = moment.tz("Asia/Dhaka").format();
+    console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
+    await fetchAndDownloadDataOnce();
+    
+    await loadInventoryToProduct();
+    const listings = await Product.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+
+    const inventorySummaries = await fetchFbaInventorySummaries();
+    console.log(`Fetched ${inventorySummaries.length} inventory summaries.`);
+     await mergeAndSaveFbaData(listings, inventorySummaries);
+     await mergeImageToProduct(listings);
+     await mergeSaleUnitoProduct(listings);
+
+
+  }, {
+    timezone: "Asia/Dhaka"
+  });
+
+  /*
      // Schedule the task to run every day at 8:00 am Bangladesh time
   cron.schedule('0 8 * * *', async () => {
     const bangladeshTime = moment.tz("Asia/Dhaka").format();
@@ -15,6 +42,7 @@ const scheduleCronJobs=()=>{
   }, {
     timezone: "Asia/Dhaka"
   });
+
 
   // Adjusted to run at 8:30 AM Bangladesh time
   //30 8
@@ -72,6 +100,7 @@ const scheduleCronJobs=()=>{
       console.error('Error loading inventory data to Product collection:', error);
     }
   },{timezone:'Asia/Dhaka'});
+  */
 
 };
 

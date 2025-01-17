@@ -1,50 +1,76 @@
 const Inventory = require("../model/Inventory");
 const Product = require("../model/Product");
-const SaleStock = require("../model/SaleStock");
 const { fetchSaeMetricsForSkus } = require("../service/getComparisionSaleService");
-const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateSaleStock, filteProductService, updateTagService, deleteTagService } = require("../service/productService");
+const { searchBySkuAsinService, getProductByFbaFbmService, filterProductBySaleUnitWithDay, filterProductByStock,filterBySkuAndStatus,filterSortAndPaginateProduct, filteProductService, updateTagService, deleteTagService, updateGroupService, deleteGroupService, updateProductToFovouriteService, updateProductToHideService } = require("../service/productService");
 
 
 
 
 
 const mapInventoryToProduct = async (inventories) => {
-    const existingProducts = await Product.find();
-    
-    const newProducts = inventories.filter(item =>
-        !existingProducts.some(product => product.sellerSku === item.sellerSku)
-    ).map(item => ({
-        itemName: item.itemName,
-        itemDescription: item.itemDescription,
-        sellerSku: item.sellerSku,
-        price: item.price,
-        quantity: item.quantity,
-        asin1: item.asin1,
-        fullfillmentChannel: item.fullfillmentChannel,
-        status: item.status,
-    }));
+  const existingProducts = await Product.find();
 
-    return newProducts;
+  // Separate new products and updates
+  const updates = [];
+  const newProducts = inventories.filter(item => {
+      const existingProduct = existingProducts.find(
+          product => product.sellerSku === item.sellerSku
+      );
+
+      if (existingProduct) {
+          // If product exists, prepare update
+          updates.push({
+              updateOne: {
+                  filter: { sellerSku: item.sellerSku },
+                  update: { $set: { price: item.price, quantity: item.quantity } },
+              },
+          });
+          return false; // Skip adding as a new product
+      }
+
+      return true; // Add as a new product
+  }).map(item => ({
+      itemName: item.itemName,
+      itemDescription: item.itemDescription,
+      sellerSku: item.sellerSku,
+      price: item.price,
+      quantity: item.quantity,
+      asin1: item.asin1,
+      fulfillmentChannel: item.fulfillmentChannel,
+      status: item.status,
+  }));
+
+  return { newProducts, updates };
 };
 
 exports.loadInventoryToProduct = async () => {
-    try {
-        const inventories = await Inventory.find();
-        const newProducts = await mapInventoryToProduct(inventories);
+  try {
+      const inventories = await Inventory.find();
+      const { newProducts, updates } = await mapInventoryToProduct(inventories);
 
-        if (newProducts.length > 0) {
-            await Product.insertMany(newProducts);
-            console.log(`${newProducts.length} new products added.`);
-        } else {
-            console.log("No new products to add.");
-        }
+      // Insert new products
+      if (newProducts.length > 0) {
+          await Product.insertMany(newProducts);
+          console.log(`${newProducts.length} new products added.`);
+      } else {
+          console.log("No new products to add.");
+      }
 
-        return newProducts;
-    } catch (error) {
-        console.error("Error loading Inventory to Products:", error);
-        throw error;
-    }
+      // Update existing products
+      if (updates.length > 0) {
+          await Product.bulkWrite(updates);
+          console.log(`${updates.length} products updated.`);
+      } else {
+          console.log("No products to update.");
+      }
+
+      return { newProducts, updatedCount: updates.length };
+  } catch (error) {
+      console.error("Error loading Inventory to Products:", error);
+      throw error;
+  }
 };
+
 
 // exports.getLimitProduct = async(req,res)=>{
 //     const page = parseInt(req.query.page) || 1;
@@ -53,8 +79,8 @@ exports.loadInventoryToProduct = async () => {
 //     const skip  = (page-1)*limit;
 //     console.log(skip);
 
-//     const totalProducts = await SaleStock.countDocuments();
-//     const products = await SaleStock.find().skip(skip).limit(limit);
+//     const totalProducts = await Product.countDocuments();
+//     const products = await Product.find().skip(skip).limit(limit);
 //     res.json({totalProducts,products});
 // }
 /*
@@ -72,7 +98,7 @@ exports.getSalesComparision = async(req,res)=>{
 
         const skip = (page-1)*limit;
 
-        const skus = await SaleStock.find({}, { sellerSku: 1 })
+        const skus = await Product.find({}, { sellerSku: 1 })
         .skip(skip)
         .limit(parseInt(limit, 10))
         .lean();
@@ -165,11 +191,12 @@ exports.getLimitProduct = async (req, res) => {
         const skip = (page - 1) * limit;
 
         
-        const totalProducts = await SaleStock.countDocuments();
+        const totalProducts = await Product.countDocuments();
 
         console.log(totalProducts);
         
-        const products = await SaleStock.find()
+        const products = await Product.find()
+            .sort({isFavourite:-1,isHide:1})
             .skip(skip)
             .limit(limit);
 
@@ -520,12 +547,12 @@ exports.getFilteredSchedulesAndStocks = async (req, res) => {
 
 
 
-exports.getFilteredSortedAndPaginatedSaleStock = async (req, res) => {
+exports.getFilteredSortedAndPaginatedProduct = async (req, res) => {
     try {
         const { sortOrder = "asc", page = 1, limit = 20 } = req.query;
 
-        // Call the service to get sorted and paginated SaleStock data
-        const result = await filterSortAndPaginateSaleStock(
+        // Call the service to get sorted and paginated Product data
+        const result = await filterSortAndPaginateProduct(
             sortOrder.toLowerCase(),
             parseInt(page, 10),
             parseInt(limit, 10)
@@ -533,7 +560,7 @@ exports.getFilteredSortedAndPaginatedSaleStock = async (req, res) => {
 
         res.status(200).json({
             status: "Success",
-            message: "Filtered, sorted, and paginated SaleStock data retrieved successfully.",
+            message: "Filtered, sorted, and paginated Product data retrieved successfully.",
             data: result.data,
             data:{
                 totalProducts: result.totalResults,
@@ -545,7 +572,7 @@ exports.getFilteredSortedAndPaginatedSaleStock = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             status: "Failed",
-            message: "An error occurred while retrieving SaleStock data.",
+            message: "An error occurred while retrieving Product data.",
             error: error.message,
         });
     }
@@ -572,7 +599,7 @@ exports.getFilteredProduct = async (req, res) => {
   
       res.status(200).json({
         status: "Success",
-        message: "Filtered and paginated SaleStock data retrieved successfully.",
+        message: "Filtered and paginated Product data retrieved successfully.",
         
         metadata: {
           totalProducts: result.totalResults,
@@ -584,7 +611,7 @@ exports.getFilteredProduct = async (req, res) => {
     } catch (error) {
       res.status(500).json({
         status: "Failed",
-        message: "Error occurred while retrieving filtered SaleStock data.",
+        message: "Error occurred while retrieving filtered Product data.",
         error: error.message,
       });
     }
@@ -631,7 +658,7 @@ exports.getFilteredProduct = async (req, res) => {
   
       res.status(200).json({
         status: "Success",
-        message: "Filtered and paginated SaleStock data retrieved successfully.",
+        message: "Filtered and paginated Product data retrieved successfully.",
         metadata: {
           totalProducts: result.totalResults,
           currentPage: result.currentPage,
@@ -642,17 +669,47 @@ exports.getFilteredProduct = async (req, res) => {
     } catch (error) {
       res.status(500).json({
         status: "Failed",
-        message: "Error occurred while retrieving filtered SaleStock data.",
+        message: "Error occurred while retrieving filtered Product data.",
         error: error.message,
       });
     }
   };
   
+  exports.updateProductToFavoutire = async(req,res,next)=>{
+    const {sku} = req.params;
+    const {isFavourite}= req.body;
+    try {
+      const result = await updateProductToFovouriteService(sku,isFavourite);
 
+      res.status(200).json({result});
+      
+    } catch (error) {
+      next (error)
+    }
+  }
+
+  exports.updateProductToHide = async(req,res,next)=>{
+    const {sku} = req.params;
+    const {isHide} = req.body;
+
+    try {
+      const result = await updateProductToHideService(sku,isHide);
+      res.status(200).json({result});
+    } catch (error) {
+      next(error);
+    }
+  }
   exports.updateTag = async (req, res) => {
     const { sku } = req.params;
+    console.log(sku);
     const { tags} = req.body;
+    console.log(req.body);
     try {
+      const product = await Product.findOne({sellerSku:sku});
+      // console.log(product)
+      if(!product || product===null || product === undefined){
+      return res.status(404).json({message:"Product not found!"})
+      }
       const updatedTag = await updateTagService(sku, tags);
       res.status(200).json({
         status: "Success",
@@ -683,10 +740,32 @@ exports.getFilteredProduct = async (req, res) => {
     }
   };
 
+  exports.updateGroup= async(req,res,next)=>{
+    const {sku} = req.params;
+    const {groupName} = req.body;
+    try {
+      const result = await updateGroupService(sku,groupName);
+      res.status(200).json({result});
+    } catch (error) {
+      next(error);
+    }
+  }
+
+exports.deleteGroup= async(req,res,next)=>{
+  const {sku} = req.params;
+  const {name} = req.body;
+  try {
+    await deleteGroupService(sku,name);
+    res.status(200).json({message:"Successfully delted group"});
+  } catch (error) {
+    next(error);
+  }
+}
+
   exports.getSingleProduct = async(req,res)=>{
     const {sku} = req.params;
     try {
-        const result = await SaleStock.findOne({sellerSku:sku})
+        const result = await Product.findOne({sellerSku:sku})
         res.status(200).json({
             result
         })

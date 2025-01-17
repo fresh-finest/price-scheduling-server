@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 const colors = require("colors");
+require("dotenv").config();
+
 const OWNER_URI = process.env.OWNER_URI;
+
 
 const ownerDb = mongoose.createConnection(OWNER_URI);
 ownerDb.on("connected", () => {

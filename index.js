@@ -32,6 +32,10 @@ app.use(express.json());
 app.use(cookieParser()); // To parse cookies
 
 app.use(cors());
+// app.use(cors({ 
+//   origin: ["http://localhost:5173","https://app.priceobo.com"],
+//   credentials: true, // Allow cookies to be sent
+// }));
 // app.options('*', cors()); // Enable pre-flight for all routes
 // const allowedOrigins = ['http://localhost:5173', 'https://api.priceobo.com'];
 
@@ -47,18 +51,89 @@ app.use(cors());
 //   },
 //   credentials: true,
 // }));
-// bb:fresh-finest@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db
+
 const MONGO_URI = process.env.MONGO_URI;
-// const MONGO_URI = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fbizqwv.mongodb.net/price-calendar?retryWrites=true&w=majority&appName=ppc-db`
+/*
+const MONGO_URI = process.env.MONGO_URI;
+// const MONGO_URI = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fbizqwv.mongodb.net/po_canda?retryWrites=true&w=majority&appName=ppc-db`
 // const MONGO_URI ="mongodb+srv://bb:fresh-finest@cluster0.fbizqwv.mongodb.net/dps?retryWrites=true&w=majority&appName=ppc-db";
+*/
+
+/*
+const DB_URIS = {
+  "ATVPDKIKX0DER": MONGO_URI,
+  "A2EUQ1WTGCTBG2": `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fbizqwv.mongodb.net/po_canda?retryWrites=true&w=majority&appName=ppc-db`,
+};
+
+app.use((req, res, next) => {
+  req.marketplace_id = req.cookies.marketplace_id || "";
+  next();
+});
+
+const connectToDatabase = async (marketplaceId) => {
+  console.log("passed",marketplaceId);
+  let mongoUri = DB_URIS[marketplaceId];
+  if (!mongoUri) {
+    mongoUri = MONGO_URI
+  }
+
+  const currentConnection = mongoose.connection;
+
+  // Check if already connected to the correct database
+  if (currentConnection.readyState === 1 && currentConnection.host === new URL(mongoUri).host) {
+    console.log("Already connected to the correct database.");
+    return; // No need to reconnect
+  }
+
+  // Disconnect only if connected to a different database
+  if (currentConnection.readyState === 1) {
+    console.log("Disconnecting from current database...");
+    await mongoose.disconnect();
+  }
+
+  // Establish a new connection
+  console.log(`Connecting to MongoDB for marketplace: ${marketplaceId}`);
+  await mongoose.connect(mongoUri);
+};
+
+const DEFAULT_MARKETPLACE_ID = "ATVPDKIKX0DER";
+
+app.use(async (req, res, next) => {
+  let marketplaceId = req.cookies.marketplace_id || DEFAULT_MARKETPLACE_ID;
+  console.log("cookie",marketplaceId);
+ 
+  if (!marketplaceId) {
+    // return res.status(400).json({ error: "Invalid or missing marketplace_id" });
+    await connectToDatabase(marketplaceId);
+  }
+
+
+  try {
+    await connectToDatabase(marketplaceId);
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error);
+    res.status(500).json({ error: "Failed to connect to the database" });
+  }
+});
+
+*/
+// Example route to fetch marketplace data
+app.get("/api/market", (req, res) => {
+  console.log("Cookies received:", req.cookies);
+  const marketplaceId = req.marketplace_id;
+
+  res.json({ marketplaceId });
+});
 
 app.use((req, res, next) => {
   req.marketplace_id = req.cookies.marketplace_id || "";
   next();
 });
 app.get("/api/market", (req, res) => {
+ 
   const marketplaceId = req.marketplace_id;
-
+  console.log(marketplaceId)
   res.json({ marketplaceId });
 });
 
@@ -131,8 +206,8 @@ agenda.on("ready", async () => {
 });
 
 //socket io connection
-loadSaleStockToFavourite();
-loadInventoryToProduct();
+// loadSaleStockToFavourite();
+// loadInventoryToProduct();
 
 
 const reinitializeJobs = async () => {
@@ -270,7 +345,7 @@ const messageRoute = require("./src/route/message");
 const favouriteRoute = require("./src/route/favourite");
 const automationRoute = require("./src/route/automation");
 const tagRoute = require("./src/route/tag");
-
+const productGroup = require("./src/route/productGroup");
 
 app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
@@ -287,7 +362,7 @@ app.use("/api/message",messageRoute);
 app.use("/api/automation",automationRoute);
 app.use("/api/favourite",favouriteRoute);
 app.use("/api/tag",tagRoute);
-
+app.use("/api/group",productGroup);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";

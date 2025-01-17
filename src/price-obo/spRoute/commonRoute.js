@@ -46,6 +46,7 @@ const Product = require("../../model/Product");
 const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require("../../merge-service/stockMergingToProduct");
 const { mergeSaleUnitoProduct } = require("../../merge-service/saleUnitMergetoProduct");
 const { fetchAndDownloadDataOnce } = require("../../service/inventoryService");
+const { loadInventoryToProduct } = require("../../controller/productController");
 
 const app = express();
 
@@ -95,6 +96,20 @@ router.get("/stock-merge-to-product", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch, merge, and store data" });
   }
 });
+router.get("/api/sync", async (req, res) => {
+  try {
+    // await fetchAndDownloadDataOnce();
+    await loadInventoryToProduct();
+    const listings = await Product.find();
+    const inventorySummaries = await fetchFbaInventorySummaries();
+    await mergeAndSaveFbaData(listings, inventorySummaries);
+    res.status(200).json({success:true,message:"Successfully synced."});
+  } catch (error) {
+    console.error("Error during data processing:", error);
+    res.status(500).json({ error: "Failed to syncing." });
+  }
+});
+
 
 
 

@@ -1,25 +1,9 @@
-const { ErrorReply } = require("redis");
-const SaleStock = require("../model/SaleStock");
+const moment = require("moment-timezone");
+const PriceSchedule = require("../model/PriceSchedule");
+const Product = require("../model/Product");
 
-exports.getLimitProductService = async (page, limit) => {
-  const skip = (page - 1) * limit;
-  const products = await SaleStock.find().skip(skip).limit(limit);
-  const total = await SaleStock.countDocuments;
-  return products, total;
-};
+const ProductGroup = require("../model/ProductGroup");
 
-// exports.searchBySkuAsinService = async(sku,asin)=>{
-//     console.log("search asin sku");
-//     const query={};
-//     if (sku) {
-//         query.sellerSku = { $regex: sku, $options: "i" };
-//     }
-//     if (asin) {
-//         query.asin1 = { $regex: asin, $options: "i" };
-//     }
-//     const products = await SaleStock.find(query);
-//     return products;
-// }
 
 exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
   console.log("search asin sku");
@@ -34,15 +18,15 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
   const skip = (page - 1) * limit;
 
   // Fetch products with pagination
-  let products = await SaleStock.find(query).skip(skip).limit(limit);
+  let products = await Product.find(query).skip(skip).limit(limit);
 
   // Get the total count of matching products
-  let totalResults = await SaleStock.countDocuments(query);
+  let totalResults = await Product.countDocuments(query);
 
   if (totalResults === 0) {
     searchQuery = { itemName: { $regex: sku, $options: "i" } };
-    products = await SaleStock.find(searchQuery).skip(skip).limit(limit);
-    totalResults = await SaleStock.countDocuments(searchQuery);
+    products = await Product.find(searchQuery).skip(skip).limit(limit);
+    totalResults = await Product.countDocuments(searchQuery);
   }
 
   return {
@@ -52,7 +36,7 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
 };
 
 // exports.getProductByFbaFbmService = async(type)=>{
-//     const products = await SaleStock.find({fulfillmentChannel:type});
+//     const products = await Product.find({fulfillmentChannel:type});
 //     return products;
 // }
 
@@ -60,8 +44,8 @@ exports.getProductByFbaFbmService = async (type, page = 1, limit = 20) => {
   const query = { fulfillmentChannel: type };
   console.log(type);
   const skip = (page - 1) * limit;
-  const products = await SaleStock.find(query).skip(skip).limit(limit);
-  const totalResults = await SaleStock.countDocuments(query);
+  const products = await Product.find(query).skip(skip).limit(limit);
+  const totalResults = await Product.countDocuments(query);
   return {
     products,
     totalResults,
@@ -70,31 +54,7 @@ exports.getProductByFbaFbmService = async (type, page = 1, limit = 20) => {
   };
 };
 
-// exports.filterProductBySaleUnitWithDay = async(dayFilter,unitCondition,userInput)=>{
-//  try {
-//     const products = await SaleStock.find();
 
-//     return products.map(product=>{
-//         const filteredMetrics = product.salesMetrics.filter(metric => dayFilter.includes(metric.time));
-
-//         const compareMetrics = filteredMetrics.filter(metric=>{
-//             switch(unitCondition){
-//                 case ">":
-//                     return metric.totalUnits > userInput;
-//                 case "<":
-//                     return metric.totalUnits < userInput;
-//                 case "==":
-//                     return metric.totalUnits === userInput;
-//                 default:
-//                     throw new Error("Invalid condition");
-//             }
-//         });
-//         return {...product._doc,salesMetrics:compareMetrics};
-//     }).filter(product=>product.salesMetrics.length > 0);
-//  } catch (error) {
-//     throw new Error("error on filtering",error.message)
-//  }
-// }
 exports.filterProductBySaleUnitWithDay = async (
   dayFilter,
   unitCondition,
@@ -104,7 +64,7 @@ exports.filterProductBySaleUnitWithDay = async (
 ) => {
   try {
     // Fetch all products
-    const products = await SaleStock.find();
+    const products = await Product.find();
     console.log(userInput, unitCondition, dayFilter);
     // Filter and process products
     const filteredProducts = products
@@ -148,29 +108,6 @@ exports.filterProductBySaleUnitWithDay = async (
   }
 };
 
-// exports.filterProductByStock = async(stockCondition,userInput)=>{
-//     try {
-//         const products = await SaleStock.find();
-
-//         const filterProducts = products.filter(product =>{
-//             const productStock= (product.fulfillableQuantity || 0) + (product.pendingTransshipmentQuantity || 0) + (product.quantity || 0);
-
-//             switch(stockCondition){
-//                 case ">":
-//                     return productStock > userInput;
-//                 case "<":
-//                     return productStock < userInput;
-//                 case "==":
-//                     return productStock === userInput;
-//                 default:
-//                     throw new error("Invalid conditions")
-//             }
-//         })
-//     return filterProducts;
-//     } catch (error) {
-//         throw new error("Error for filtering products.",error.message)
-//     }
-// }
 
 exports.filterProductByStock = async (
   stockCondition,
@@ -182,7 +119,7 @@ exports.filterProductByStock = async (
     // Fetch all products from the database
 
     console.log(stockCondition, userInput);
-    const products = await SaleStock.find();
+    const products = await Product.find();
 
     // Filter products based on stockCondition
     const filteredProducts = products.filter((product) => {
@@ -221,8 +158,7 @@ exports.filterProductByStock = async (
   }
 };
 
-const moment = require("moment-timezone");
-const PriceSchedule = require("../model/PriceSchedule");
+
 
 exports.filterBySkuAndStatus = async (page = 1, limit = 20) => {
   console.log("filter schedule data");
@@ -244,14 +180,14 @@ exports.filterBySkuAndStatus = async (page = 1, limit = 20) => {
     // Extract SKUs from valid price schedules
     const validSkus = validPriceSchedules.map((schedule) => schedule.sku);
 
-    // Fetch and filter SaleStock data based on valid SKUs
-    const filteredSaleStock = await SaleStock.find({
+    // Fetch and filter Product data based on valid SKUs
+    const filteredProduct = await Product.find({
       sellerSku: { $in: validSkus }, // Match SKUs with validPriceSchedules
     });
 
     // Apply pagination to the filtered results
-    const totalResults = filteredSaleStock.length;
-    const paginatedData = filteredSaleStock.slice(
+    const totalResults = filteredProduct.length;
+    const paginatedData = filteredProduct.slice(
       (page - 1) * limit,
       page * limit
     );
@@ -265,22 +201,23 @@ exports.filterBySkuAndStatus = async (page = 1, limit = 20) => {
     };
   } catch (error) {
     throw new Error(
-      "Error while filtering and paginating SaleStock data: " + error.message
+      "Error while filtering and paginating Product data: " + error.message
     );
   }
 };
 
-exports.filterSortAndPaginateSaleStock = async (
+exports.filterSortAndPaginateProduct = async (
   sortOrder = "asc",
   page = 1,
   limit = 20
 ) => {
   try {
-    // Fetch all SaleStock data
-    const saleStockData = await SaleStock.find();
+    // Fetch all Product data
+    // const saleStockData = await Product.find();
+    const saleStockData = await Product.find();
 
     // Calculate productStock and sort by it
-    const sortedSaleStock = saleStockData
+    const sortedProduct = saleStockData
       .map((product) => {
         const productStock =
           (product.fulfillableQuantity || 0) +
@@ -298,8 +235,8 @@ exports.filterSortAndPaginateSaleStock = async (
       });
 
     // Apply pagination to the sorted results
-    const totalResults = sortedSaleStock.length;
-    const paginatedData = sortedSaleStock.slice(
+    const totalResults = sortedProduct.length;
+    const paginatedData = sortedProduct.slice(
       (page - 1) * limit,
       page * limit
     );
@@ -313,7 +250,7 @@ exports.filterSortAndPaginateSaleStock = async (
     };
   } catch (error) {
     throw new Error(
-      "Error while filtering, sorting, and paginating SaleStock data: " +
+      "Error while filtering, sorting, and paginating Product data: " +
         error.message
     );
   }
@@ -357,7 +294,8 @@ exports.filteProductService = async (
       query["tags.tag"] = { $in: tags };
     }
     // Fetch initial matching products from the database
-    let saleStockData = await SaleStock.find(query);
+    // let saleStockData = await Product.find(query);
+    let saleStockData = await Product.find(query);
 
     // Filter by stock condition
     if (stockCondition) {
@@ -447,10 +385,36 @@ exports.filteProductService = async (
     };
   } catch (error) {
     throw new Error(
-      "Error while filtering and paginating SaleStock: " + error.message
+      "Error while filtering and paginating Product: " + error.message
     );
   }
 };
+
+exports.updateProductToFovouriteService = async(sellerSku,isFavourite)=>{
+  try {
+    const updateFavourite = await Product.findOneAndUpdate(
+      {sellerSku},
+      {isFavourite},
+      {new:true}
+    )
+    return updateFavourite;
+  } catch (error) {
+    throw new Error(error.message);
+  }
+}
+
+exports.updateProductToHideService = async(sellerSku,isHide)=>{
+  try {
+    const updateHide = await Product.findOneAndUpdate(
+      {sellerSku},
+      {isHide},
+      {new:true}
+    )
+    return updateHide;
+  } catch (error) {
+    throw new Error(error.message);
+  }
+}
 
 /*
   exports.filteProductService = async (
@@ -487,7 +451,7 @@ exports.filteProductService = async (
       }
   
       // Fetch initial matching products from the database
-      let saleStockData = await SaleStock.find(query);
+      let saleStockData = await Product.find(query);
   
       // Filter by stock condition
       if (stockCondition) {
@@ -557,14 +521,14 @@ exports.filteProductService = async (
       };
     } catch (error) {
       throw new Error(
-        "Error while filtering and paginating SaleStock: " + error.message
+        "Error while filtering and paginating Product: " + error.message
       );
     }
   };
   */
   exports.updateTagService = async (sellerSku, tags) => {
     try {
-      const updatedTag = await SaleStock.findOneAndUpdate(
+      const updatedTag = await Product.findOneAndUpdate(
         { sellerSku }, 
         { $set: { tags } }, 
         { new: true, upsert: true } 
@@ -577,7 +541,7 @@ exports.filteProductService = async (
   
   exports.deleteTagService = async (sellerSku, tag, colorCode) => {
     try {
-      const updatedStock = await SaleStock.findOneAndUpdate(
+      const updatedStock = await Product.findOneAndUpdate(
         { sellerSku },
         {
           $pull: { tags: { tag, colorCode } }, 
@@ -591,4 +555,53 @@ exports.filteProductService = async (
   };
   
 
+
+  exports.updateGroupService = async (sellerSku, groupName) => {
+    try {
+      // Extract the name from the groupName array
+      const name = groupName[0]?.name;
+      if (!name) {
+        throw new Error("Name is required.");
+      }
   
+      const skusToUpdate = Array.isArray(sellerSku)
+      ? sellerSku.map((sku) => ({ sku })) // Map each SKU string to an object
+      : [{ sku: sellerSku }]; // Wrap single SKU string in an object
+
+    // Update the ProductGroup with the skus and group name
+    await ProductGroup.findOneAndUpdate(
+      { name }, // Match the document by name
+      { $addToSet: { skus: { $each: skusToUpdate } } }, // Add skus as objects dynamically
+      { new: true, upsert: true } // Create if not exists
+    );
+
+      const updateGroup = await Product.findOneAndUpdate(
+        { sellerSku }, // Match by sellerSku
+        { $set: { groupName } }, // Set the groupName field
+        { new: true, upsert: true } // Create if not exists
+      );
+  
+      return updateGroup;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  };
+  
+  
+
+  exports.deleteGroupService = async(sellerSku,group)=>{
+    try {
+      const updateGroup = await Product.findOneAndUpdate(
+        {sellerSku},
+        {
+          $pull : {groupName:{group}}
+        },
+        {new:true}
+      )
+      return updateGroup;
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+

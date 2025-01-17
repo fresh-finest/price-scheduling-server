@@ -4,29 +4,37 @@ const productSchema = new mongoose.Schema(
   {
     itemName: { type: String, trim: true },
     itemDescription: { type: String, trim: true },
-    sellerSku: { type: String, required: true, trim: true }, 
+    sellerSku: { type: String, required: true, trim: true },
     fnSku: { type: String },
-    price: { type: Number, default: 0 },  
+    price: { type: Number, default: 0 },
     quantity: { type: Number, default: 0 },
-    imageUrl: { type: String, trim: true },  
-    asin1: { type: String, required: true, trim: true },  
+    imageUrl: { type: String, trim: true },
+    asin1: { type: String, required: true, trim: true },
     fulfillmentChannel: { type: String, trim: true },
-    status: { type: String, trim: true },  
-    fulfillableQuantity: { type: Number, default: 0 }, 
+    status: { type: String, trim: true },
+    fulfillableQuantity: { type: Number, default: 0 },
     pendingTransshipmentQuantity: { type: Number, default: 0 },
-    tags:[
+    tags: [
       {
-        tag:{ type:String},
-        colorCode:{type:String}
-      }
+        tag: { type: String },
+        colorCode: { type: String },
+      },
+    ],
+    groupName: [
+      {
+        name: { tapye: String },
+      },
     ],
     salesMetrics: [
       {
-        time: { type: String, required: true },  
-        totalUnits: { type: Number, required: true },  
-        totalSalesAmount: { type: String, required: true }, 
-      }
-    ]
+        time: { type: String, required: true },
+        totalUnits: { type: Number, required: true },
+        totalSalesAmount: { type: String, required: true },
+      },
+    ],
+
+    isFavourite: { type: Boolean, default: false },
+    isHide: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

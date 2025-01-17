@@ -15,9 +15,9 @@ const reinitializeAutoJobs = async () => {
        
         autoJobsAgenda.define(name, async (job) => {
           
-          const { sku,minPrice,maxPrice, startDate,endDate,perchantage,amount,category,sale} = job.attrs.data;
+          const { sku,minPrice,maxPrice, startDate,endDate,percentage,amount,category,sale} = job.attrs.data;
           // const randomPrice = (Math.random() * (maxPrice - minPrice) + minPrice).toFixed(2);
-          const randomPrice = await generatePrice(sku,maxPrice,minPrice,perchantage,amount,category);
+          const randomPrice = await generatePrice(sku,maxPrice,minPrice,percentage,amount,category);
         
           try {
             if (name.startsWith(`UpdateAutoPriceChange ${sku}`)) {

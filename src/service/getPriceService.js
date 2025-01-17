@@ -59,7 +59,7 @@ const getListingsItemBySku = async (sku) => {
     // Extract the offers amount
     let offerAmount = 'Offer price not available';
     if (itemData.offers && itemData.offers.length > 0) {
-      const offer = itemData.offers.find((o) => o.price && o.price.currencyCode === 'USD');
+      const offer = itemData.offers.find((o) => o.price);
       if (offer && offer.price) {
         offerAmount = offer.price.amount || 'Offer price not specified';
       }

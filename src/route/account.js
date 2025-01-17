@@ -1,5 +1,6 @@
 const express= require("express");
 const { getAccount, createAccount } = require("../controller/accountController");
+const { createOwnerAccount, getOwnerAccount, getOwnerAccountByUserId } = require("../controller/ownerAccountController");
 
 
 const router = express.Router();
@@ -9,5 +10,6 @@ const router = express.Router();
 router.route("/").get(getAccount);
 router.route("/").post(createAccount);
 
-
+router.route("/owner").post(createOwnerAccount).get(getOwnerAccount);
+router.route("/owner/:userId").get(getOwnerAccountByUserId);
 module.exports = router;

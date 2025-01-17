@@ -145,31 +145,31 @@ const downloadReportData = async (url) => {
   }
 };
 
-/*
-const downloadReportData = async (url, compressionAlgorithm) => {
-  try {
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-    let data;
 
-    if (compressionAlgorithm === 'GZIP') {
-      const buffer = Buffer.from(response.data, 'binary');
-      data = zlib.gunzipSync(buffer).toString('utf-8');
-    } else {
-      data = response.data.toString('utf-8'); // No decompression needed
-    }
+// const downloadReportData = async (url, compressionAlgorithm) => {
+//   try {
+//     const response = await axios.get(url, { responseType: 'arraybuffer' });
+//     let data;
 
-    const parsedData = parseTSV(data);
-    const organizedData = organizeListingData(parsedData);
+//     if (compressionAlgorithm === 'GZIP') {
+//       const buffer = Buffer.from(response.data, 'binary');
+//       data = zlib.gunzipSync(buffer).toString('utf-8');
+//     } else {
+//       data = response.data.toString('utf-8'); // No decompression needed
+//     }
 
-    await saveReportData(organizedData);
+//     const parsedData = parseTSV(data);
+//     const organizedData = organizeListingData(parsedData);
 
-    return organizedData;
-  } catch (error) {
-    console.error('Error downloading report data:', error.message);
-    throw error;
-  }
-};
-*/
+//     await saveReportData(organizedData);
+
+//     return organizedData;
+//   } catch (error) {
+//     console.error('Error downloading report data:', error.message);
+//     throw error;
+//   }
+// };
+
 
 // Parse TSV data
 const parseTSV = (tsvData) => {

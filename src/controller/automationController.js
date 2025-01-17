@@ -213,7 +213,7 @@ exports.getRule = async(req,res)=>{
 exports.updateProductBySku = async(req,res)=>{
 
   const {ruleId,sku} = req.params;
-  const {maxPrice,minPrice} = req.body;
+  const {maxPrice,minPrice,sale} = req.body;
   console.log(req.body);
 
   try {
@@ -223,7 +223,7 @@ exports.updateProductBySku = async(req,res)=>{
       return res.status(404).json({error:"Rule not found"})
     }
     const product = await AddPoduct.find({ruleId:rule._id,sku});
-  console.log("product:", product);
+  // console.log("product:", product);
     if(!product){
       return res.status(404).json({error:"Product is not found."});
     }
@@ -237,12 +237,12 @@ exports.updateProductBySku = async(req,res)=>{
       amount:rule.amount,
       category:rule.category,
       interval:rule.interval,
-      sale:product?.sale
+      sale:sale || product?.sale
     })
 
     const updatedProduct = await AddPoduct.findOneAndUpdate(
       {ruleId:rule._id,sku},
-      {maxPrice,minPrice},
+      {maxPrice,minPrice,sale},
       {new:true}
     )
 

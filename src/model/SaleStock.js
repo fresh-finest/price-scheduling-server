@@ -39,6 +39,11 @@ const saleStockSchema = new mongoose.Schema({
       colorCode:{type:String}
     }
   ],
+  groupName:[
+    {
+      name:{tapye:String}
+    }
+  ],
   salesMetrics: [
     {
       time: { type: String, required: true }, 

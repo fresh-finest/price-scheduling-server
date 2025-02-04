@@ -71,21 +71,27 @@ const generatePrice = async (
       const randomAmount = (Math.random()*2 - 1)*parseFloat(amount);
       newPrice = lastPrice + randomAmount;
       if(newPrice>maxPrice){
-        newPrice = parseFloat(price);
+        // newPrice = parseFloat(price);
+        newPrice = parseFloat(maxPrice);
         //await cancelAutoJobs(sku);
       }else if(newPrice<minPrice){
-        newPrice = parseFloat(price);
+        // newPrice = parseFloat(price);
+        newPrice = parseFloat(minPrice);
         //await cancelAutoJobs(sku);
       }
     }else if(percentage !== undefined && percentage !== null){
       const randomPercentage = (Math.random()*2-1)* parseFloat(percentage);
-      const priceChange = lastPrice*(randomPercentage/100);
+      // const priceChange = lastPrice*(randomPercentage/100);
+      const priceChange = lastPrice*randomPercentage;
+      console.log(randomPercentage,priceChange);
       newPrice = lastPrice + priceChange;
       if(newPrice>maxPrice){
-        newPrice = parseFloat(price);
+        // newPrice = parseFloat(price);
+        newPrice = parseFloat(maxPrice);
         // await cancelAutoJobs(sku);
       }else if(newPrice<minPrice){
-        newPrice = parseFloat(price);
+        // newPrice = parseFloat(price);
+        newPrice = parseFloat(minPrice);
         // await cancelAutoJobs(sku);
       }
     }

@@ -50,9 +50,9 @@ const generatePrice = async (
   console.log(price);
   let skuState = await SkuState.findOne({ sku });
   if (!skuState) {
-    if (type === "increasing") {
+    if (type === "increasing || increasingRepeat") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
-    } else if (type === "decreasing") {
+    } else if (type === "decreasing || decreasingRepeat") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(maxPrice) });
     } else if (type == "random"){
       skuState = new SkuState({ sku, lastPrice: parseFloat(price) });
@@ -133,6 +133,49 @@ const generatePrice = async (
         // newPrice = maxPrice - priceDifference * parseFloat(percentage);
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
+
+      }
+    }
+  } else if (type === "increasingRepeat") {
+    if (priceAmount) {
+      console.log("amount");
+      newPrice = lastPrice + parseFloat(amount);
+      console.log("last and new price: " + lastPrice, newPrice, amount);
+      if (newPrice > maxPrice) {
+        newPrice = parseFloat(minPrice) + parseFloat(amount);
+        // newPrice = parseFloat(maxPrice);
+        // await cancelAutoJobs(sku);
+       
+      }
+    } else {
+      newPrice = lastPrice + priceDifference * parseFloat(percentage);
+      console.log(newPrice);
+      console.log("last and new price: " + lastPrice , newPrice);
+      if (newPrice > maxPrice) {
+        newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
+        // newPrice = parseFloat(maxPrice);
+        // await cancelAutoJobs(sku);
+
+      }
+    }
+  }else if (type === "decreasingRepeat") {
+    console.log("decreasing");
+
+    if (priceAmount) {
+      newPrice = lastPrice - parseFloat(amount);
+      if (newPrice < minPrice) {
+        newPrice = maxPrice - parseFloat(amount);
+        // newPrice = parseFloat(minPrice);
+        // await cancelAutoJobs(sku);
+
+      }
+    } else {
+      newPrice = lastPrice - priceDifference * parseFloat(percentage);
+      if (newPrice < minPrice) {
+        newPrice = maxPrice - priceDifference * parseFloat(percentage);
+        console.log(newPrice);
+        // newPrice = parseFloat(minPrice);
+        // await cancelAutoJobs(sku);
 
       }
     }

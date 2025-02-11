@@ -47,16 +47,16 @@ const generatePrice = async (
 
   const listingData = await getListingsItemBySku(sku);
   const price = listingData.offerAmount;
-  console.log(price);
+  // console.log(price);
   let skuState = await SkuState.findOne({ sku });
   if (!skuState) {
-    if (type === "increasing || increasingRepeat") {
+    if (type === "increasing" || type === "increasingRepeat") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
-    } else if (type === "decreasing || decreasingRepeat") {
+    } else if (type === "decreasing" || type === "decreasingRepeat") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(maxPrice) });
-    } else if (type == "random"){
+    } else if (type === "random") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(price) });
-    }
+    }    
     await skuState.save();
   }
 
@@ -96,6 +96,7 @@ const generatePrice = async (
       }
     }
   } else if (type === "increasing") {
+    console.log("increasing type")
     if (priceAmount) {
       console.log("amount");
       newPrice = lastPrice + parseFloat(amount);

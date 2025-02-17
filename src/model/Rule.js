@@ -16,7 +16,7 @@ const ruleSchema = mongoose.Schema({
     },
     category: {
     type: String,
-    enum: ["increasing", "decreasing", "random","increasingRepeat","decreasingRepeat"],
+    enum: ["increasing", "decreasing", "random","increasingRepeat","decreasingRepeat","increasing-cycling","decreasing-cycling"],
     required:true,
   },
   percentage:{

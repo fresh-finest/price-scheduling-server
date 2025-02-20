@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const axios = require("axios");
 const NodeCache = require("node-cache");
+const { DateTime } = require("luxon");
 
 const moment = require("moment-timezone");
 const {
@@ -41,24 +42,38 @@ const {
 const { createClient } = require("redis");
 const CachedJob = require("../../model/CachedJob");
 const TimeZone = require("../../model/TimeZone");
-const { mergeImageToProduct } = require("../../merge-service/imageMergingToProduct");
+const {
+  mergeImageToProduct,
+} = require("../../merge-service/imageMergingToProduct");
 const Product = require("../../model/Product");
-const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require("../../merge-service/stockMergingToProduct");
-const { mergeSaleUnitoProduct } = require("../../merge-service/saleUnitMergetoProduct");
+const {
+  fetchFbaInventorySummaries,
+  mergeAndSaveFbaData,
+} = require("../../merge-service/stockMergingToProduct");
+const {
+  mergeSaleUnitoProduct,
+} = require("../../merge-service/saleUnitMergetoProduct");
 const { fetchAndDownloadDataOnce } = require("../../service/inventoryService");
-const { loadInventoryToProduct } = require("../../controller/productController");
+const {
+  loadInventoryToProduct,
+} = require("../../controller/productController");
+const {
+  fetchSalesMetrics,
+  updateSaeReport,
+} = require("../../service/saleReportService");
+const { start } = require("agenda/dist/agenda/start");
+const AutoSchedule = require("../../model/AutoSchedule");
 
 const app = express();
 
-
-router.get("/report-data",async(req,res)=>{
+router.get("/report-data", async (req, res) => {
   try {
     const reports = await fetchAndDownloadDataOnce();
-    res.status(200).json({reports});
+    res.status(200).json({ reports });
   } catch (error) {
-    res.status(500).json({message:error.message});
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
 router.get("/fetch-and-merge", async (req, res) => {
   try {
@@ -103,15 +118,12 @@ router.get("/api/sync", async (req, res) => {
     const listings = await Product.find();
     const inventorySummaries = await fetchFbaInventorySummaries();
     await mergeAndSaveFbaData(listings, inventorySummaries);
-    res.status(200).json({success:true,message:"Successfully synced."});
+    res.status(200).json({ success: true, message: "Successfully synced." });
   } catch (error) {
     console.error("Error during data processing:", error);
     res.status(500).json({ error: "Failed to syncing." });
   }
 });
-
-
-
 
 router.get("/fetch-and-merge-images", async (req, res) => {
   try {
@@ -228,6 +240,23 @@ router.get("/api/history/sku/:sku", async (req, res) => {
       message: "Couldn't fetch data.",
       error: error.message,
     });
+  }
+});
+
+router.get("/update-sale-metrics", async (req, res) => {
+  try {
+    const products = await Product.find();
+    const skus = products.map((product) => product.sellerSku);
+
+    const endDate = DateTime.now().toISODate();
+    const startDate = DateTime.now().minus({ years: 2 }).toISODate();
+    for (const sku of skus) {
+      const saleMetrics = await fetchSalesMetrics(sku, startDate, endDate);
+      await updateSaeReport(sku, saleMetrics);
+    }
+    res.status(200).json({ message: "Successfully updated sale metrics." });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -489,11 +518,11 @@ router.get("/api/jobs", async (req, res) => {
     res.json({ success: true, jobs });
   } catch (error) {
     console.error("Error fetching cached jobs:", error);
-    res.status(500).json({ success: false, error: "Failed to fetch cached jobs" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch cached jobs" });
   }
 });
-
-
 
 // router.get("/api/jobs", async (req, res) => {
 //   try {
@@ -512,6 +541,24 @@ router.get("/api/jobs", async (req, res) => {
 //   }
 // });
 
+router.delete("/api/auto-schedule/:sku", async (req, res) => {
+  const { sku } = req.params;
+
+  try {
+    const deleteSchedule = await AutoSchedule.deleteMany({ sku });
+   console.log(deleteSchedule);
+    if (deleteSchedule.deletedCount > 0) {
+      console.log(`Successfully deleted ${deleteSchedule.deletedCount} records for SKU: ${sku}`);
+      return res.json({ success: true, message: `Deleted ${deleteSchedule.deletedCount} records for SKU: ${sku}` });
+    } else {
+      console.log(`No records found for SKU: ${sku}`);
+      return res.status(404).json({ success: false, message: `No records found for SKU: ${sku}` });
+    }
+  } catch (error) {
+    console.error(`Error deleting AutoSchedule records for SKU: ${sku}:`, error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 router.get("/api/sales-report", async (req, res) => {
   try {
@@ -524,12 +571,10 @@ router.get("/api/sales-report", async (req, res) => {
     const report = await processReport(schedules);
     res.json(report);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        error: "Failed to fetch and mergee sales metrics and schedule",
-        message: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to fetch and mergee sales metrics and schedule",
+      message: error.message,
+    });
   }
 });
 
@@ -622,61 +667,58 @@ router.patch("/sale-price", async (req, res) => {
   }
 });
 
-
 router.put("/api/time-zone", async (req, res) => {
   const { timeZone } = req.body;
 
   try {
-      
-      if (!moment.tz.zone(timeZone)) {
-          return res.status(400).json({ error: 'Invalid time zone' });
-      }
+    if (!moment.tz.zone(timeZone)) {
+      return res.status(400).json({ error: "Invalid time zone" });
+    }
 
-      
-      const result = await TimeZone.updateOne(
-          {}, 
-          { $set: { timeZone } }, 
-          { upsert: true, runValidators: true } 
-      );
+    const result = await TimeZone.updateOne(
+      {},
+      { $set: { timeZone } },
+      { upsert: true, runValidators: true }
+    );
 
-      res.status(200).json({ 
-          status: "Success",
-          message: "Successfully updated timezone",
-          result
-      });
+    res.status(200).json({
+      status: "Success",
+      message: "Successfully updated timezone",
+      result,
+    });
   } catch (error) {
-      res.status(500).json({
-          status: "Failed",
-          message: "Failed to update timeZone",
-          error: error.message
-      });
+    res.status(500).json({
+      status: "Failed",
+      message: "Failed to update timeZone",
+      error: error.message,
+    });
   }
 });
 
-router.get("/api/time-zone",async(req,res)=>{
+router.get("/api/time-zone", async (req, res) => {
   try {
     const result = await TimeZone.find({});
     res.status(200).json({
-      status:"Success",
-      message:"Successfully get timezone",
-      result
-    })
+      status: "Success",
+      message: "Successfully get timezone",
+      result,
+    });
   } catch (error) {
     res.status(500).json({
-      status:"Failed",
-      message:"Failed to get timeZone",
-      error:error.message
-    })
+      status: "Failed",
+      message: "Failed to get timeZone",
+      error: error.message,
+    });
   }
-})
+});
 
-router.post("/api/time-zone",async(req,res)=>{
+router.post("/api/time-zone", async (req, res) => {
   try {
     const result = await TimeZone.create(req.body);
-    res.json({result});
+    res.json({ result });
   } catch (error) {
-    res.json({error:error.message})
+    res.json({ error: error.message });
   }
-})
+});
 
 module.exports = router;

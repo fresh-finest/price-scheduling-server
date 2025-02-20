@@ -30,6 +30,9 @@ const autoScheduleSchema =  new mongoose.Schema({
     randomPrice:{
         type:Number,
     },
+    unitSale:{
+        type: Number,
+    },
     startDate:{
         type: Date,
     },

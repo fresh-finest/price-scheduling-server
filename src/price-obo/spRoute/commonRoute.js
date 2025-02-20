@@ -57,10 +57,7 @@ const { fetchAndDownloadDataOnce } = require("../../service/inventoryService");
 const {
   loadInventoryToProduct,
 } = require("../../controller/productController");
-const {
-  fetchSalesMetrics,
-  updateSaeReport,
-} = require("../../service/saleReportService");
+
 const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
 

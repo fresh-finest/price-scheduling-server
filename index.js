@@ -257,7 +257,7 @@ agenda.on("ready", async () => {
 });
 
 //socket io connection
-loadSaleStockToFavourite();
+// loadSaleStockToFavourite();
 // loadInventoryToProduct();
 
 
@@ -307,16 +307,16 @@ autoJobsAgenda.on("ready", async () => {
 
 
 
-agenda.on("ready", async () => {
-  cron.schedule("*/60 * * * *", async () => {
-    try {
-      await agenda.start();
-      await loadAndCacheJobs();
-    } catch (error) {
-      console.error("Error during cron job execution:", error);
-    }
-  });
-});
+// agenda.on("ready", async () => {
+//   cron.schedule("*/60 * * * *", async () => {
+//     try {
+//       await agenda.start();
+//       await loadAndCacheJobs();
+//     } catch (error) {
+//       console.error("Error during cron job execution:", error);
+//     }
+//   });
+// });
 
 // agenda.on("start", async (job) => {
 //   try {

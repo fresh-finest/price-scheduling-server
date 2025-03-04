@@ -290,6 +290,8 @@ exports.filteProductService = async (
     if (asin) {
       query.asin1 = { $regex: asin, $options: "i" };
     }
+
+
     if (tags && tags.length > 0) {
       query["tags.tag"] = { $in: tags };
     }
@@ -372,11 +374,17 @@ exports.filteProductService = async (
     }
 
     // Total results after filtering
-    const totalResults = saleStockData.length;
-
+    let totalResults = saleStockData.length;
+    console.log(totalResults);
+    if (totalResults === 0) {
+      let searchQuery = { itemName: { $regex: sku, $options: "i" } };
+      saleStockData = await Product.find(searchQuery).skip(skip).limit(limit);
+      totalResults = await Product.countDocuments(searchQuery);
+    }
+  
     // Paginate results
     const paginatedData = saleStockData.slice(skip, skip + limit);
-
+    
     return {
       data: paginatedData,
       totalResults,

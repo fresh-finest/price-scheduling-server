@@ -1,6 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const dns  = require("dns");
+const net = require("net");
 const colors = require("colors");
 const dayjs = require("dayjs");
 const mongoose = require("mongoose");
@@ -9,10 +11,10 @@ const moment = require("moment-timezone");
 const cron = require("node-cron");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
-
+const crypto = require('crypto');
 const passport = require('passport');
 const OAuth2Strategy = require('passport-oauth2').Strategy;
-
+const session = require('express-session');
 // const { authenticateUser } = require('./src/middleware/authMiddleware');
 const { agenda, autoJobsAgenda } = require("./src/price-obo/Agenda");
 const routes = require("./src/price-obo/spRoute/priceRoute");
@@ -154,35 +156,84 @@ mongoose
     marketplace_id: process.env.MARKETPLACE_ID,
   };
 
+  const generateRandomState = () => {
+    return crypto.randomBytes(16).toString("hex");
+  };
+  
+  
+  // passport.use(new OAuth2Strategy({
+  //   // authorizationURL: 'https://sellercentral.amazon.com/apps/authorize',
+  //   authorizationURL: `https://sellercentral.amazon.com/apps/authorize/consent?application_id=${credentials.lwa_app_id}&state=${generateRandomState()}&version=beta`,
+  //   tokenURL: 'https://api.amazon.com/auth/o2/token',
+  //   clientID: credentials.lwa_app_id,
+  //   clientSecret:  credentials.lwa_client_secret,
+  //   callbackURL: 'https://api.priceobo.com/auth/callback'
+  // },
+  // async function(accessToken, refreshToken, profile, cb) {
+  //   // Save the tokens and profile information
+  //   console.log("acc token "+accessToken+"ref token: "+refreshToken+" profile: "+profile+" cb: "+cb);
+
+  //   await saveUserTokens({accessToken,refreshToken,profile});
+
+  //   return cb(null, { accessToken, refreshToken, profile });
+  // }
+  // ));
+
   passport.use(new OAuth2Strategy({
-    authorizationURL: 'https://sellercentral.amazon.com/apps/authorize',
+    // authorizationURL: `https://sellercentral.amazon.com/apps/authorize/consent?application_id=${credentials.lwa_app_id}&state=${generateRandomState()}&version=beta`,
+    authorizationURL: `https://sellercentral.amazon.com/apps/authorize/consent?application_id=${credentials.lwa_app_id}&version=beta`,
     tokenURL: 'https://api.amazon.com/auth/o2/token',
     clientID: credentials.lwa_app_id,
-    clientSecret:  credentials.lwa_client_secret,
+    clientSecret: credentials.lwa_client_secret,
     callbackURL: 'https://api.priceobo.com/auth/callback'
   },
   async function(accessToken, refreshToken, profile, cb) {
     // Save the tokens and profile information
-    console.log("acc token "+accessToken+"ref token: "+refreshToken+" profile: "+profile+" cb: "+cb);
-
-    await saveUserTokens({accessToken,refreshToken,profile});
-
+    console.log("acc token " + accessToken + " ref token: " + refreshToken + " profile: " + profile + " cb: " + cb);
+  
+    await saveUserTokens({accessToken, refreshToken, profile});
+  
     return cb(null, { accessToken, refreshToken, profile });
   }
   ));
   
+  
   // test
   // saveUserTokens({accessToken:"xxxxxxx",refreshToken:"yyyyy",profile:"zzzzz"});
-
-  app.get('/auth/amazon', passport.authenticate('oauth2'));
+  app.use(session({
+    secret: 'HERER#$#$ES234234ererer',  // Change this to a secure key
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false }  // Set to true if using HTTPS
+  }));
+  // app.get('/auth/amazon', passport.authenticate('oauth2'));
+  app.get('/auth/amazon', (req, res, next) => {
+    const state = generateRandomState();
+    req.session.oauthState = state; // Store state in session
+    passport.authenticate('oauth2', { state })(req, res, next);
+  });
   
+  // app.get('/auth/callback', 
+  //   passport.authenticate('oauth2', { failureRedirect: '/' }),
+  //   function(req, res) {
+  //     // Successful authentication, redirect home.
+  //     res.redirect('https://app.priceobo.com/account');
+  //   }
+  // );
+
   app.get('/auth/callback', 
+    (req, res, next) => {
+      if (!req.session || req.query.state !== req.session.oauthState) {
+        return res.status(403).json({ success: false, message: "CSRF attack detected!" });
+      }
+      next();
+    },
     passport.authenticate('oauth2', { failureRedirect: '/' }),
-    function(req, res) {
-      // Successful authentication, redirect home.
+    (req, res) => {
       res.redirect('https://app.priceobo.com/account');
     }
   );
+  
   
   const refreshAccessToken = async (refreshToken) => {
     const response = await axios.post('https://api.amazon.com/auth/o2/token', {
@@ -206,7 +257,7 @@ agenda.on("ready", async () => {
 });
 
 //socket io connection
-// loadSaleStockToFavourite();
+loadSaleStockToFavourite();
 // loadInventoryToProduct();
 
 
@@ -256,16 +307,16 @@ autoJobsAgenda.on("ready", async () => {
 
 
 
-agenda.on("ready", async () => {
-  cron.schedule("*/60 * * * *", async () => {
-    try {
-      await agenda.start();
-      await loadAndCacheJobs();
-    } catch (error) {
-      console.error("Error during cron job execution:", error);
-    }
-  });
-});
+// agenda.on("ready", async () => {
+//   cron.schedule("*/60 * * * *", async () => {
+//     try {
+//       await agenda.start();
+//       await loadAndCacheJobs();
+//     } catch (error) {
+//       console.error("Error during cron job execution:", error);
+//     }
+//   });
+// });
 
 // agenda.on("start", async (job) => {
 //   try {
@@ -309,6 +360,89 @@ agenda.on("complete", async (job) => {
 // rotateClientSecret();
 // stockVsSaleCronJobs()
 // checkStockVsSales()
+function isValidEmailSyntax(email) {
+  const regex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+  return regex.test(email);
+}
+
+function checkMXRecords(domain) {
+  return new Promise((resolve, reject) => {
+      dns.resolveMx(domain, (err, addresses) => {
+          if (err || addresses.length === 0) {
+              resolve(false);
+          } else {
+              resolve(addresses[0].exchange); // Return first mail server
+          }
+      });
+  });
+}
+
+// Function to verify email using SMTP
+function verifyEmailSMTP(email, mxServer) {
+  return new Promise((resolve) => {
+      const client = net.createConnection(25, mxServer);
+      let result = { email, exists: false, message: "Unknown" };
+
+      client.on("connect", () => {
+          client.write("HELO example.com\r\n");
+          client.write("MAIL FROM:<test@example.com>\r\n");
+          client.write(`RCPT TO:<${email}>\r\n`);
+      });
+
+      client.on("data", (data) => {
+          const response = data.toString();
+          if (response.includes("250")) {
+              result.exists = true;
+              result.message = "Valid email";
+          } else {
+              result.exists = false;
+              result.message = "Invalid email";
+          }
+          client.end();
+      });
+
+      client.on("error", () => {
+          result.exists = false;
+          result.message = "SMTP connection failed";
+          client.end();
+      });
+
+      client.on("end", () => {
+          resolve(result);
+      });
+  });
+}
+
+app.get("/verify-email", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  // Step 1: Syntax Validation
+  const isValidSyntax = isValidEmailSyntax(email);
+  if (!isValidSyntax) return res.json({ email, valid: false, reason: "Invalid email format" });
+
+  // Step 2: MX Record Lookup
+  const domain = email.split("@")[1];
+  const mxServer = await checkMXRecords(domain);
+  if (!mxServer) return res.json({ email, valid: false, reason: "No valid MX records" });
+
+  // Step 3: SMTP Verification
+  const smtpResult = await verifyEmailSMTP(email, mxServer);
+
+  // Return combined results
+  res.json({
+      email,
+      valid_syntax: isValidSyntax,
+      valid_domain: !!mxServer,
+      smtp_check: smtpResult.exists,
+      message: smtpResult.message
+  });
+});
+
+
+
+
 
 
 app.use(routes);

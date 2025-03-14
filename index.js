@@ -129,6 +129,7 @@ app.get("/api/market", (req, res) => {
 
 app.use((req, res, next) => {
   req.marketplace_id = req.cookies.marketplace_id || "";
+
   next();
 });
 app.get("/api/market", (req, res) => {
@@ -387,11 +388,11 @@ const scheduleRoute = require("./src/route/Schedule");
 const authRoute = require("./src/route/auth");
 const userRoute = require("./src/route/user");
 const historyRoute = require("./src/route/history");
-const accountRoute = require("./src/route/account");
+// const accountRoute = require("./src/route/account");
 const notificationRoute = require("./src/route/notification");
-const ownerNotificationRoute= require("./src/route/ownernotification")
+// const ownerNotificationRoute= require("./src/route/ownernotification")
 const sellerRoute = require("./src/route/seller");
-const subscriptionRoute = require("./src/route/subscription");
+// const subscriptionRoute = require("./src/route/subscription");
 const pricingplanRoute = require("./src/route/pricingplan");
 const messageRoute = require("./src/route/message");
 // const billingRoute = require("./src/route/billing");
@@ -404,11 +405,11 @@ app.use("/api/schedule", scheduleRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
 app.use("/api/histories", historyRoute);
-app.use("/api/account", accountRoute);
+// app.use("/api/account", accountRoute);
 app.use("/api/notification", notificationRoute);
 app.use("/api/product",productRoute);
-app.use("/api/ownernotification",ownerNotificationRoute);
-app.use("/api/seller",sellerRoute);app.use("/api/subscription",subscriptionRoute);
+// app.use("/api/ownernotification",ownerNotificationRoute);
+// app.use("/api/seller",sellerRoute);app.use("/api/subscription",subscriptionRoute);
 app.use("/api/pricing",pricingplanRoute);
 app.use("/api/message",messageRoute);
 // app.use("/api/billing",billingRoute);

@@ -21,7 +21,7 @@ const getDynamicInterval = () => {
     const startOf11thPrevMonth = startOf10thPrevMonth.subtract(1, 'month');
     const startOf12thPrevMonth = startOf11thPrevMonth.subtract(1, 'month');
     
-    const intervalStart = startOf8thPrevMonth.startOf('month').add(1, 'day') .toISOString(); // Jan 1
+    const intervalStart = startOf2ndPrevMonth.startOf('month').add(1, 'day') .toISOString(); // Jan 1
     const intervalEnd = today.endOf('day').toISOString(); // March 11 23:59:59
   
     return `${intervalStart}--${intervalEnd}`;

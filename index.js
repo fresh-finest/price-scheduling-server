@@ -1,10 +1,9 @@
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-const dns  = require("dns");
-const net = require("net");
+
 const colors = require("colors");
-const dayjs = require("dayjs");
+
 const mongoose = require("mongoose");
 const Agenda = require("agenda");
 const moment = require("moment-timezone");
@@ -155,7 +154,7 @@ mongoose
     seller_id: process.env.SELLER_ID,
     marketplace_id: process.env.MARKETPLACE_ID,
   };
-
+/*
   const generateRandomState = () => {
     return crypto.randomBytes(16).toString("hex");
   };
@@ -245,7 +244,7 @@ mongoose
     return response.data.access_token;
   };
 
-
+*/
 
 
 

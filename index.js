@@ -257,7 +257,7 @@ agenda.on("ready", async () => {
 });
 
 //socket io connection
-loadSaleStockToFavourite();
+// loadSaleStockToFavourite();
 // loadReportSale();
 // loadInventoryToProduct();
 

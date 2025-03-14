@@ -31,8 +31,8 @@ const addProductSchema = new mongoose.Schema({
    },
     status: {
         type: String,
-        enum: ["created", "updated", "deleted"],
-        default: "created",
+        enum: ["Active", "Inactive", "deleted"],
+        default: "Active",
     },
     ruleId:{
         type:mongoose.Schema.Types.ObjectId,

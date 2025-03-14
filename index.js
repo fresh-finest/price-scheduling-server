@@ -26,7 +26,7 @@ const { checkStockVsSales } = require("./src/notifications/stockAgainstSale");
 
 const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express();
 
-const { loadSaleStockToFavourite } = require("./src/controller/favouriteController");
+const {loadSaleStockToFavourite } = require("./src/controller/favouriteController");
 const { loadInventoryToProduct } = require("./src/controller/productController");
 const { saveUserTokens } = require("./src/controller/accountController");
 
@@ -257,9 +257,9 @@ agenda.on("ready", async () => {
 });
 
 //socket io connection
-// loadSaleStockToFavourite();
+loadSaleStockToFavourite();
+// loadReportSale();
 // loadInventoryToProduct();
-
 
 const reinitializeJobs = async () => {
   try {
@@ -306,17 +306,17 @@ autoJobsAgenda.on("ready", async () => {
 });
 
 
-
-// agenda.on("ready", async () => {
-//   cron.schedule("*/60 * * * *", async () => {
-//     try {
-//       await agenda.start();
-//       await loadAndCacheJobs();
-//     } catch (error) {
-//       console.error("Error during cron job execution:", error);
-//     }
-//   });
-// });
+//  loadAndCacheJobs();
+agenda.on("ready", async () => {
+  cron.schedule("*/60 * * * *", async () => {
+    try {
+      await agenda.start();
+      await loadAndCacheJobs();
+    } catch (error) {
+      console.error("Error during cron job execution:", error);
+    }
+  });
+});
 
 // agenda.on("start", async (job) => {
 //   try {
@@ -360,86 +360,6 @@ agenda.on("complete", async (job) => {
 // rotateClientSecret();
 // stockVsSaleCronJobs()
 // checkStockVsSales()
-function isValidEmailSyntax(email) {
-  const regex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
-  return regex.test(email);
-}
-
-function checkMXRecords(domain) {
-  return new Promise((resolve, reject) => {
-      dns.resolveMx(domain, (err, addresses) => {
-          if (err || addresses.length === 0) {
-              resolve(false);
-          } else {
-              resolve(addresses[0].exchange); // Return first mail server
-          }
-      });
-  });
-}
-
-// Function to verify email using SMTP
-function verifyEmailSMTP(email, mxServer) {
-  return new Promise((resolve) => {
-      const client = net.createConnection(25, mxServer);
-      let result = { email, exists: false, message: "Unknown" };
-
-      client.on("connect", () => {
-          client.write("HELO example.com\r\n");
-          client.write("MAIL FROM:<test@example.com>\r\n");
-          client.write(`RCPT TO:<${email}>\r\n`);
-      });
-
-      client.on("data", (data) => {
-          const response = data.toString();
-          if (response.includes("250")) {
-              result.exists = true;
-              result.message = "Valid email";
-          } else {
-              result.exists = false;
-              result.message = "Invalid email";
-          }
-          client.end();
-      });
-
-      client.on("error", () => {
-          result.exists = false;
-          result.message = "SMTP connection failed";
-          client.end();
-      });
-
-      client.on("end", () => {
-          resolve(result);
-      });
-  });
-}
-
-app.get("/verify-email", async (req, res) => {
-  const { email } = req.query;
-
-  if (!email) return res.status(400).json({ error: "Email is required" });
-
-  // Step 1: Syntax Validation
-  const isValidSyntax = isValidEmailSyntax(email);
-  if (!isValidSyntax) return res.json({ email, valid: false, reason: "Invalid email format" });
-
-  // Step 2: MX Record Lookup
-  const domain = email.split("@")[1];
-  const mxServer = await checkMXRecords(domain);
-  if (!mxServer) return res.json({ email, valid: false, reason: "No valid MX records" });
-
-  // Step 3: SMTP Verification
-  const smtpResult = await verifyEmailSMTP(email, mxServer);
-
-  // Return combined results
-  res.json({
-      email,
-      valid_syntax: isValidSyntax,
-      valid_domain: !!mxServer,
-      smtp_check: smtpResult.exists,
-      message: smtpResult.message
-  });
-});
-
 
 
 

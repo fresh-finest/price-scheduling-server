@@ -60,6 +60,8 @@ const {
 
 const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
+const { fetchSalesMetrics, updateSaeReport } = require("../../service/saleReportService");
+const { getDynamicInterval, fetchOrderMetrics } = require("../../service/totalSaleService");
 
 const app = express();
 
@@ -717,5 +719,17 @@ router.post("/api/time-zone", async (req, res) => {
     res.json({ error: error.message });
   }
 });
+
+router.get('/total-sales', async (req, res) => {
+  const interval = getDynamicInterval();
+
+  try {
+    const orderMetrics = await fetchOrderMetrics(interval);
+    res.json(orderMetrics);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch order metrics' });
+  }
+});
+
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { autoJobsAgenda } = require("../Agenda");
 const { getListingsItemBySku } = require("../../service/getPriceService");
+const AddPoduct = require("../../model/AddProduct");
 
 const skuStateSchema = new mongoose.Schema({
   sku: { type: String, required: true, unique: true },
@@ -267,7 +268,22 @@ const generatePrice = async (
 };
 
 const cancelAutoJobs = async (sku) => {
+ try {
   await autoJobsAgenda.cancel({ "data.sku": sku });
+
+  const updatedProduct = await  AddPoduct.findOneAndUpdate(
+    {sku},
+    {status:"Inactive"},
+    {new:true}
+  )
+  if(!updatedProduct){
+    console.log(`No product found with SKU : ${sku}`);
+  }else{
+    console.log(`Product SKU: ${sku} status updated to inactive`);
+  }
+ } catch (error) {
+  console.error("Error cancelling auto jobs and updated status:", error);
+ }
 };
 
 const skuStateDelete = async (sku) => {

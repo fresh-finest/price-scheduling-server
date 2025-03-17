@@ -4,7 +4,7 @@ const Product = require("../model/Product");
 
 const ProductGroup = require("../model/ProductGroup");
 
-
+/*
 exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
   console.log("search asin sku");
   const query = {};
@@ -28,6 +28,36 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
     products = await Product.find(searchQuery).skip(skip).limit(limit);
     totalResults = await Product.countDocuments(searchQuery);
   }
+
+  return {
+    products,
+    totalResults,
+  };
+};
+*/
+
+exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
+  console.log("search asin sku");
+
+  const query = {};
+  const skip = (page - 1) * limit;
+
+  if (asin) {
+    // Search by ASIN only
+    query.asin1 = { $regex: asin, $options: "i" };
+  } else if (sku) {
+    // Search by SKU or itemName
+    query.$or = [
+      { sellerSku: { $regex: sku, $options: "i" } },
+      { itemName: { $regex: sku, $options: "i" } }
+    ];
+  }
+
+  // Fetch products with pagination
+  const products = await Product.find(query).skip(skip).limit(limit);
+
+  // Get the total count of matching products
+  const totalResults = await Product.countDocuments(query);
 
   return {
     products,
@@ -255,138 +285,110 @@ exports.filterSortAndPaginateProduct = async (
     );
   }
 };
-/*
+
 exports.filteProductService = async (
   { fulfillmentChannel, stockCondition, salesCondition, uid, tags },
   page = 1,
   limit = 50
 ) => {
-
   console.log(tags);
   try {
     const skip = (page - 1) * limit;
 
-    // Build the query object
     let query = {};
 
-    // Apply fulfillmentChannel filter (FBA/FBM)
+    // Fulfillment Channel filter
     if (fulfillmentChannel) {
       query.fulfillmentChannel =
         fulfillmentChannel === "AMAZON_NA" ? { $ne: "DEFAULT" } : "DEFAULT";
     }
-    let sku = null;
-    let asin = null;
-    if (uid !== undefined) {
-      if (uid.startsWith("B0") && uid.length === 10) {
-        asin = uid;
-      } else {
-        sku = uid;
-      }
-    }
-    // Apply SKU/ASIN filters
-    if (sku) {
-      query.sellerSku = { $regex: sku, $options: "i" };
-    }
-    if (asin) {
-      query.asin1 = { $regex: asin, $options: "i" };
-    }
 
+    let isAsin = false;
+
+    if (uid && uid.startsWith("B0") && uid.length === 10) {
+      isAsin = true;
+      query.asin1 = { $regex: uid, $options: "i" };
+    }
+    
+    if (!isAsin && uid) {
+      query.$or = [
+        { sellerSku: { $regex: uid, $options: "i" } },
+        { itemName: { $regex: uid, $options: "i" } }
+      ];
+    }
+    
 
     if (tags && tags.length > 0) {
       query["tags.tag"] = { $in: tags };
     }
-    // Fetch initial matching products from the database
-    // let saleStockData = await Product.find(query);
+
+    // Initial DB fetch
     let saleStockData = await Product.find(query);
 
-    // Filter by stock condition
-    if (stockCondition) {
-      saleStockData = saleStockData.filter((product) => {
+    const applyFilters = (data) => {
+      return data.filter((product) => {
         const productStock =
           (product.fulfillableQuantity || 0) +
           (product.pendingTransshipmentQuantity || 0) +
           (product.quantity || 0);
 
-        switch (stockCondition.condition) {
-          case ">":
-            return productStock > stockCondition.value;
-          case "<":
-            return productStock < stockCondition.value;
-          case "==":
-            return productStock === stockCondition.value;
-          case ">=":
-            return productStock >= stockCondition.value;
-          case "<=":
-            return productStock <= stockCondition.value;
-          case "!=":
-            return productStock !== stockCondition.value;
-          case "blank":
-            return productStock === 0;
-          case "notblank":
-            return productStock !== 0;
-          case "between":
-            return (
-              productStock >= stockCondition.value[0] &&
-              productStock <= stockCondition.value[1]
-            );
-          default:
-            return true;
-        }
+        const matchesStock = !stockCondition || (() => {
+          switch (stockCondition.condition) {
+            case ">": return productStock > stockCondition.value;
+            case "<": return productStock < stockCondition.value;
+            case "==": return productStock === stockCondition.value;
+            case ">=": return productStock >= stockCondition.value;
+            case "<=": return productStock <= stockCondition.value;
+            case "!=": return productStock !== stockCondition.value;
+            case "blank": return productStock === 0;
+            case "notblank": return productStock !== 0;
+            case "between":
+              return (
+                productStock >= stockCondition.value[0] &&
+                productStock <= stockCondition.value[1]
+              );
+            default: return true;
+          }
+        })();
+
+        const matchesSales = !salesCondition || (() => {
+          const matchingMetric = product.salesMetrics.find(
+            (metric) => metric.time === salesCondition.time
+          );
+          if (!matchingMetric) return false;
+
+          const totalUnits = matchingMetric.totalUnits;
+          switch (salesCondition.condition) {
+            case ">": return totalUnits > salesCondition.value;
+            case "<": return totalUnits < salesCondition.value;
+            case "==": return totalUnits === salesCondition.value;
+            case ">=": return totalUnits >= salesCondition.value;
+            case "<=": return totalUnits <= salesCondition.value;
+            case "!=": return totalUnits !== salesCondition.value;
+            case "blank": return totalUnits === 0;
+            case "notblank": return totalUnits !== 0;
+            case "between":
+              return (
+                totalUnits >= salesCondition.value[0] &&
+                totalUnits <= salesCondition.value[1]
+              );
+            default: return true;
+          }
+        })();
+
+        return matchesStock && matchesSales;
       });
-    }
+    };
 
-    // Filter by sales metrics
-    if (salesCondition) {
-      saleStockData = saleStockData.filter((product) => {
-        const matchingMetric = product.salesMetrics.find(
-          (metric) => metric.time === salesCondition.time
-        );
-
-        if (!matchingMetric) return false;
-
-        const totalUnits = matchingMetric.totalUnits;
-        switch (salesCondition.condition) {
-          case ">":
-            return totalUnits > salesCondition.value;
-          case "<":
-            return totalUnits < salesCondition.value;
-          case "==":
-            return totalUnits === salesCondition.value;
-          case ">=":
-            return totalUnits >= salesCondition.value;
-          case "<=":
-            return totalUnits <= salesCondition.value;
-          case "!=":
-            return totalUnits !== salesCondition.value;
-          case "blank":
-            return totalUnits === 0;
-          case "notblank":
-            return totalUnits !== 0;
-          case "between":
-            return (
-              totalUnits >= salesCondition.value[0] &&
-              totalUnits <= salesCondition.value[1]
-            );
-          default:
-            return true;
-        }
-      });
-    }
-
-    // Total results after filtering
+    saleStockData = applyFilters(saleStockData);
     let totalResults = saleStockData.length;
-    console.log(totalResults);
-    if (totalResults === 0) {
-      let searchQuery = { itemName: { $regex: sku, $options: "i" } };
-      totalResults = await Product.countDocuments(searchQuery);
-      saleStockData = await Product.find(searchQuery).skip(skip).limit(limit);
-    }
-  
-    // Paginate results
-    // const paginatedData = saleStockData.slice(skip, skip + limit);
-    
+    console.log("Total results before fallback:", totalResults);
+
+    // Apply pagination after filtering
+    const paginatedData = saleStockData.slice(skip, skip + limit);
+
     return {
-      data: saleStockData,
+      data: paginatedData,
       totalResults,
       currentPage: page,
       totalPages: Math.ceil(totalResults / limit),
@@ -397,8 +399,9 @@ exports.filteProductService = async (
     );
   }
 };
-*/
 
+
+/*
 exports.filteProductService = async (
   { fulfillmentChannel, stockCondition, salesCondition, uid, tags },
   page = 1,
@@ -560,6 +563,8 @@ exports.filteProductService = async (
   }
 };
 
+
+*/
 exports.updateProductToFovouriteService = async(sellerSku,isFavourite)=>{
   try {
     const updateFavourite = await Product.findOneAndUpdate(

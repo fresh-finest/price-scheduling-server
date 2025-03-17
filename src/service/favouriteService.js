@@ -27,7 +27,7 @@ exports.updateIsHideService = async(sellerSku,isHide)=>{
         throw new Error(error.message); 
     }
 }
-
+/*
 exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
   console.log("search asin sku");
   const query = {};
@@ -51,6 +51,36 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
     products = await SaleReport.find(searchQuery).skip(skip).limit(limit);
     totalResults = await SaleReport.countDocuments(searchQuery);
   }
+
+  return {
+    products,
+    totalResults,
+  };
+};
+*/
+
+exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 50) => {
+  console.log("search asin sku");
+
+  const query = {};
+  const skip = (page - 1) * limit;
+
+  if (asin) {
+    // Search by ASIN only
+    query.asin1 = { $regex: asin, $options: "i" };
+  } else if (sku) {
+    // Search by SKU or itemName
+    query.$or = [
+      { sellerSku: { $regex: sku, $options: "i" } },
+      { itemName: { $regex: sku, $options: "i" } }
+    ];
+  }
+
+  // Fetch products with pagination
+  const products = await SaleReport.find(query).skip(skip).limit(limit);
+
+  // Get the total count of matching products
+  const totalResults = await SaleReport.countDocuments(query);
 
   return {
     products,

@@ -7,7 +7,7 @@ const { marketplace_id } = require('../middleware/credentialMiddleware');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const fetchFbaInventorySummaries = async (nextToken = null, allSummaries = []) => {
+  const fetchFbaInventorySummaries = async (nextToken = null, allSummaries = [], retryCount = 0) => {
     const endpoint = 'https://sellingpartnerapi-na.amazon.com';
     const path = '/fba/inventory/v1/summaries';
     const accessToken = await fetchAccessToken();

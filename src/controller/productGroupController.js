@@ -1,5 +1,6 @@
 const Product = require("../model/Product");
 const ProductGroup = require("../model/ProductGroup");
+const SaleReport = require("../model/SaleReport");
 
 
 exports.createGroup = async (req, res, next) => {
@@ -7,7 +8,7 @@ exports.createGroup = async (req, res, next) => {
     // Validate required fields
     const { name, title, imageUrl, cost } = req.body;
 
-    if (!name || !title || !imageUrl || !cost) {
+    if (!name || !title || !cost) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields: name, title, imageUrl, or cost.",
@@ -52,43 +53,42 @@ exports.createGroup = async (req, res, next) => {
 };
 
 
+// exports.getGroup = async (req, res, next) => {
+//   try {
+//     const result = await ProductGroup.find();
+//     res.json({ result });
+//   } catch (error) {
+//     next();
+//   }
+// };
+
 exports.getGroup = async (req, res, next) => {
   try {
-    const result = await ProductGroup.find();
-    res.json({ result });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const skip = (page - 1) * limit;
+
+    const [result, totalCount] = await Promise.all([
+      ProductGroup.find().skip(skip).limit(limit),
+      ProductGroup.countDocuments(),
+    ]);
+
+    res.json({
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalResults: totalCount,
+      result,
+    });
   } catch (error) {
-    next();
+    console.error("Error fetching groups:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch product groups",
+    });
   }
 };
 
-// exports.getGroup = async (req, res, next) => {
-//   try {
-//     // Extract query parameters for pagination
-//     const page = parseInt(req.query.page, 10) || 1; // Default to page 1
-//     const limit = parseInt(req.query.limit, 10) || 15; // Default to 15 items per page
-//     const skip = (page - 1) * limit; // Calculate the number of items to skip
-
-//     // Fetch data with pagination
-//     const result = await ProductGroup.find().skip(skip).limit(limit);
-
-//     // Get the total count of documents
-//     const totalCount = await ProductGroup.countDocuments();
-
-//     // Return paginated results
-//     res.json({
-//       success: true,
-//       data: result,
-//       meta: {
-//         totalItems: totalCount,
-//         currentPage: page,
-//         totalPages: Math.ceil(totalCount / limit),
-//         pageSize: result.length,
-//       },
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 
 exports.getGroupById = async(req,res,next)=>{
   const {id}= req.params;
@@ -124,6 +124,26 @@ exports.updateGroup = async(req,res,next)=>{
         //     )
         // }
 
+        if(data.skus && Array.isArray(data.skus)){
+
+          const invalidSkus = [];
+        
+          for(let skuObj of data.skus){
+            const skuCode = skuObj.sku;
+            const product = await Product.findOne({sellerSku:skuCode});
+            if(!product){
+              invalidSkus.push(skuCode);
+            }
+          }
+
+          if (invalidSkus.length > 0) {
+            return res.status(400).json({
+              success: false,
+              message: `Invalid SKU(s): ${invalidSkus.join(", ")}`,
+            });
+          }
+        }
+
         const updateGroup = await ProductGroup.findByIdAndUpdate(
           { _id: id }, // Match by ID
           data, // Update with the request body
@@ -147,6 +167,74 @@ exports.updateGroup = async(req,res,next)=>{
     } catch (error) {
         next();
     }
+}
+
+exports.bulkUpdateGroups = async(req,res,next)=>{
+  try {
+    const updates = req.body;
+    
+    if(!Array.isArray(updates) || updates.length === 0){
+      return res.status(400).json({
+        success:false,
+        message:"Request body must be a non empty array.",
+      })
+    }
+
+    const results = await Promise.all(
+      updates.map(async(update)=>{
+        const {name,sku,uom}= update;
+
+        if(!name || !sku || !uom){
+          return {
+            success:false,
+            message:`Invalid update object`,
+          }
+        }
+
+        const product = await Product.findOne({sellerSku:sku});
+
+        if(!product){
+          return {
+            success:false,
+            message:`Product not found for SKU: ${sku}`,
+          }
+        }
+
+        const productGroup = await ProductGroup.findOne({name});
+        console.log(productGroup);
+       if(productGroup){
+          const existingSkuIndex = productGroup.skus.findIndex(
+            (s)=>s.sku === sku
+          );
+          if(existingSkuIndex !== -1){
+            productGroup.skus[existingSkuIndex].uom = uom;
+          }else {
+            productGroup.skus.push({sku,uom});
+          }
+
+          await productGroup.save();
+
+          return {
+            success:true,
+            message:`Sku map to ${name}`,
+          }
+        }
+      })
+    )
+
+    return res.status(200).json({
+      success:true,
+      message:"Bulk updation completed",
+      results
+    })
+  } catch (error) {
+    res.status(500).json({
+      success:false,
+      message:"An error occured during the bulk update",
+      error:error.message
+    });
+    next(error);
+  }
 }
 
 exports.updateSku = async(req,res,next)=>{
@@ -228,6 +316,7 @@ exports.getSkuDetails = async(req,res,next)=>{
 
 
 
+
 exports.deleteGroup = async(req,res,next)=>{
     const {id} = req.params;
     try {
@@ -247,4 +336,110 @@ exports.deleteGroup = async(req,res,next)=>{
 }
 
 
+
+exports.getProductGroupWithSales = async(req,res,next)=>{
+  try {
+    const groupId = req.params.id;
+
+    const productGroup = await ProductGroup.findById(groupId);
+
+    if(!productGroup){
+      return res.status(404).json({
+        status: "Error",
+        message: "Product group not found.",
+      })
+    }
+
+    const skuList = productGroup.skus.map((skuObj)=>skuObj.sku);
+
+    const saleReports = await SaleReport.aggregate([
+      // {$match: {sellerSku:{$in:skuList}}},
+      // {$group:{_id:"$sellerSku",totalUnits:{$sum:"$units"}}}
+       // Match products by SKUs that belong to the product group
+  { $match: { sellerSku: { $in: skuList } } },
+  // Unwind the salesMetrics array so each metric becomes a separate document
+  { $unwind: "$salesMetrics" },
+  // Project a new field `saleDate` by extracting the date part from the interval
+  { $project: {
+      saleDate: { $substr: ["$salesMetrics.interval", 0, 10] }, // Extracts "YYYY-MM-DD"
+      units: "$salesMetrics.units"
+  }},
+  // Group by the extracted date and sum the sales units for that date
+  { $group: {
+      _id: "$saleDate",          // _id is now the sale date
+      totalSales: { $sum: "$units" }
+  }}
+    ])
+
+    let sumOfTotalSales = 0;
+    saleReports.forEach((report) => {
+      sumOfTotalSales += report.totalSales;
+    });
+
+    return res.status(200).json({
+      status:"Success",
+      message:"Product group with sales data",
+      data:{
+        productGroup,
+        sumOfTotalSales,
+        saleReports
+      }
+    })
+  } catch (error) {
+    return res.status(500).json({
+      status:"Error",
+      message:error.message
+    })  
+  }
+}
+
+exports.searchProductGroups = async (req, res) => {
+  try {
+    const { uid } = req.query; // query param like ?q=syrup
+    console.log(uid);
+    if (!uid || !uid.trim()) {
+      return res.status(400).json({
+        status: "error",
+        message: "Search term is required.",
+      });
+    }
+
+  
+    const trimmedQuery = uid.trim();
+
+    const result = await ProductGroup.find({
+      $or: [
+        { name: { $regex: trimmedQuery, $options: "i" } },
+        { title: { $regex: trimmedQuery, $options: "i" } },
+      ],
+    });
+
+    res.status(200).json({
+      status: "success",
+      result,
+    });
+  } catch (error) {
+    console.error("Search error:", error.message);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error.",
+    });
+  }
+};
+
+
+// here stock will be filtered equal, greater than , less than, not equal to
+exports.groupFilterByStock = async(req,res,next)=>{
+  try {
+    const {stock} = req.query;
+    let query = {};
+    if(stock){
+      query = {stock:{$gte:parseInt(stock)}}
+    }
+    const result = await ProductGroup.find(query);
+    res.status(200).json({result}); 
+  } catch (error) {
+    next(error);
+  } 
+}
 

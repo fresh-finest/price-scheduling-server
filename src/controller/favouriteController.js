@@ -277,13 +277,14 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
         const { uid } = req.params;
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 100;
-
-        console.log(uid);
+        let keyword =  uid ? uid.replace(/^\s+/, "") : "";
+         
         let result;
-        if (uid.startsWith("B0") && uid.length === 10) {
-            result = await searchBySkuAsinService(null, uid, page, limit);
+        if (keyword.startsWith("B0") && keyword.length === 10) {
+            result = await searchBySkuAsinService(null, keyword, page, limit);
         } else {
-            result = await searchBySkuAsinService(uid, null, page, limit);
+            console.log("searching by sku",uid);
+            result = await searchBySkuAsinService(keyword, null, page, limit);
         }
 
         const { products, totalResults } = result;

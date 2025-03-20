@@ -263,13 +263,13 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
         const { uid } = req.params;
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 100;
-
-        console.log(uid);
+        let keyword =  uid ? uid.replace(/^\s+/, "") : "";
+        
         let result;
-        if (uid.startsWith("B0") && uid.length === 10) {
-            result = await searchBySkuAsinService(null, uid, page, limit);
+        if (keyword.startsWith("B0") && keyword.length === 10) {
+            result = await searchBySkuAsinService(null, keyword, page, limit);
         } else {
-            result = await searchBySkuAsinService(uid, null, page, limit);
+            result = await searchBySkuAsinService(keyword, null, page, limit);
         }
 
         const { products, totalResults } = result;
@@ -630,7 +630,7 @@ exports.getFilteredProduct = async (req, res) => {
         limit = 50,
       } = req.query;
   
-      console.log(tags);
+      
       // Parse stock and sales conditions if provided
       const parsedStockCondition = stockCondition
         ? JSON.parse(stockCondition)
@@ -641,8 +641,9 @@ exports.getFilteredProduct = async (req, res) => {
         : null; // { time: '7 D', condition: '>', value: 100 }
   
         const parsedTags = tags ? tags.split(",") : [];
-
-        console.log("parsed: ",parsedTags);
+         
+ 
+        // uid =  uid.replace(/^\s+/, "");
       // Combine all filters and fetch results
       const result = await filteProductService(
         {

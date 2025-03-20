@@ -13,7 +13,7 @@ const { mergeSaleUnitoProduct } = require('../../merge-service/saleUnitMergetoPr
 const scheduleCronJobs=()=>{
 
 
-  cron.schedule('0 9 * * *', async () => {
+  cron.schedule('0 8 * * *', async () => {
     const bangladeshTime = moment.tz("Asia/Dhaka").format();
     console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
     await fetchAndDownloadDataOnce();
@@ -25,24 +25,37 @@ const scheduleCronJobs=()=>{
     const inventorySummaries = await fetchFbaInventorySummaries();
     console.log(`Fetched ${inventorySummaries.length} inventory summaries.`);
      await mergeAndSaveFbaData(listings, inventorySummaries);
-     await mergeSaleUnitoProduct(listings);
      await mergeImageToProduct(listings);
-
+     await mergeSaleUnitoProduct(listings);
   }, {
     timezone: "Asia/Dhaka"
   });
+
+  cron.schedule('0 6 * * *', async () => {
+    console.log('Running scheduled task to fetch and merge sales data.');
+    try {
+      const response = await axios.get('http://localhost:3000/update-sale-metrics');
+      console.log('Scheduled task completed:', response.data);
+    } catch (error) { 
+
+      console.error('Error in scheduled task:', error);
+    }
+  }, {
+    timezone: 'Asia/Dhaka'  
+  });
+
   //'0 */12 * * *'
   // '*/5 * * * *'
-  cron.schedule('0 */12 * * *', async () => {
-    console.log('Running auto-pricing-report job...');
+//   cron.schedule('0 */12 * * *', async () => {
+//     console.log('Running auto-pricing-report job...');
 
-    try {
-        const response = await axios.get('http://localhost:3000/auto-pricing-report');
+//     try {
+//         const response = await axios.get('http://localhost:3000/auto-pricing-report');
         
-    } catch (error) {
-        console.error('Error fetching auto-pricing-report:', error.message);
-    }
-});
+//     } catch (error) {
+//         console.error('Error fetching auto-pricing-report:', error.message);
+//     }
+// });
   /*
      // Schedule the task to run every day at 8:00 am Bangladesh time
   cron.schedule('0 8 * * *', async () => {

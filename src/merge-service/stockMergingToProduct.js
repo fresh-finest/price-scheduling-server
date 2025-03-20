@@ -5,6 +5,7 @@ const { fetchAccessToken } = require('../middleware/accessToken');
 const { marketplace_id } = require('../middleware/credentialMiddleware');
 
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const fetchFbaInventorySummaries = async (nextToken = null, allSummaries = []) => {
     const endpoint = 'https://sellingpartnerapi-na.amazon.com';
@@ -52,6 +53,13 @@ const { marketplace_id } = require('../middleware/credentialMiddleware');
       return allSummaries;
   
     } catch (error) {
+      if (error.response && error.response.status === 429 && retryCount < 8) {
+        const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
+        console.warn(`Rate limited. Retrying in ${waitTime / 1000}s...`);
+        await sleep(waitTime);
+        return fetchFbaInventorySummaries(nextToken, allSummaries, retryCount + 1);
+      }
+  
       console.error('Error fetching inventory summaries:', error);
       throw error;
     }

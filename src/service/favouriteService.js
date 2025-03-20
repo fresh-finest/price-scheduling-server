@@ -64,12 +64,13 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 50) => {
 
   const query = {};
   const skip = (page - 1) * limit;
-
+ 
   if (asin) {
-    // Search by ASIN only
+     asin = asin.replace(/^\s+/, "");
     query.asin1 = { $regex: asin, $options: "i" };
   } else if (sku) {
     // Search by SKU or itemName
+    // sku = sku.replace(/^\s+/, "");
     query.$or = [
       { sellerSku: { $regex: sku, $options: "i" } },
       { itemName: { $regex: sku, $options: "i" } }

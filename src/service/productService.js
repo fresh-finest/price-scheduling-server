@@ -42,11 +42,14 @@ exports.searchBySkuAsinService = async (sku, asin, page = 1, limit = 100) => {
   const query = {};
   const skip = (page - 1) * limit;
 
+
   if (asin) {
+    asin = asin.replace(/^\s+/, "");
     // Search by ASIN only
     query.asin1 = { $regex: asin, $options: "i" };
   } else if (sku) {
     // Search by SKU or itemName
+    sku = sku.replace(/^\s+/, "");
     query.$or = [
       { sellerSku: { $regex: sku, $options: "i" } },
       { itemName: { $regex: sku, $options: "i" } }
@@ -291,7 +294,7 @@ exports.filteProductService = async (
   page = 1,
   limit = 50
 ) => {
-  console.log(tags);
+
   try {
     const skip = (page - 1) * limit;
 
@@ -303,17 +306,22 @@ exports.filteProductService = async (
         fulfillmentChannel === "AMAZON_NA" ? { $ne: "DEFAULT" } : "DEFAULT";
     }
 
+    // const trimmedUid = uid ? uid.replace(/^\s+/, "") : "";
+
+
+    const trimmedUid = uid ? uid.trim() : "";
+    console.log(trimmedUid);
     let isAsin = false;
 
-    if (uid && uid.startsWith("B0") && uid.length === 10) {
+    if (trimmedUid && trimmedUid.startsWith("B0")) {
       isAsin = true;
-      query.asin1 = { $regex: uid, $options: "i" };
+      query.asin1 = { $regex: trimmedUid, $options: "i" };
     }
     
-    if (!isAsin && uid) {
+    if (!isAsin && trimmedUid) {
       query.$or = [
-        { sellerSku: { $regex: uid, $options: "i" } },
-        { itemName: { $regex: uid, $options: "i" } }
+        { sellerSku: { $regex: trimmedUid, $options: "i" } },
+        { itemName: { $regex: trimmedUid, $options: "i" } }
       ];
     }
     

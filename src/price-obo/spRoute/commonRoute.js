@@ -13,7 +13,7 @@ const {
 const {
   mergeAndSaveImageData,
 } = require("../../merge-service/imageMergedService");
-const sendEmail = require("../../service/EmailService");
+// const sendEmail = require("../../service/EmailService");
 const MergedProduct = require("../../model/MergedImage");
 const Inventory = require("../../model/Inventory");
 const {
@@ -241,15 +241,16 @@ router.get("/api/history/sku/:sku", async (req, res) => {
     });
   }
 });
-
+/*
 router.get("/update-sale-metrics", async (req, res) => {
   try {
     const products = await Product.find();
-    const skus = products.map((product) => product.sellerSku);
+    // const skus = products.map((product) => product.sellerSku);
+    const asins = products.map((product)=> product.asin1);
 
     const endDate = DateTime.now().toISODate();
     const startDate = DateTime.now().minus({ years: 2 }).toISODate();
-    for (const sku of skus) {
+    for (const sku of asins) {
       const saleMetrics = await fetchSalesMetrics(sku, startDate, endDate);
       await updateSaeReport(sku, saleMetrics);
     }
@@ -258,6 +259,46 @@ router.get("/update-sale-metrics", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+*/
+
+router.get("/update-sale-metrics", async (req, res) => {
+  try {
+    const products = await Product.find();
+
+    // Group SKUs by ASIN
+    const asinToSkus = {};
+    products.forEach((product) => {
+      const asin = product.asin1;
+      const sku = product.sellerSku;
+      if (asin) {
+        if (!asinToSkus[asin]) asinToSkus[asin] = [];
+        asinToSkus[asin].push(sku);
+      }
+    });
+
+    const endDate = DateTime.now().toISODate();
+    const startDate = DateTime.now().minus({ years: 2 }).toISODate();
+
+    for (const [asin, skus] of Object.entries(asinToSkus)) {
+      try {
+        const saleMetrics = await fetchSalesMetrics(asin, startDate, endDate);
+        for (const sku of skus) {
+          await updateSaeReport(sku, saleMetrics);
+        }
+        console.log(`✅ Successfully updated sales for ASIN ${asin}`);
+      } catch (error) {
+        console.error(`Skipping ASIN ${asin} due to error:`, error.message);
+        // Continue with the next ASIN
+      }
+    }
+
+    res.status(200).json({ message: "Sale metrics update completed with error handling." });
+  } catch (error) {
+    console.error("Fatal error during update:", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 
 router.get("/sales-metrics-by-sku/:sku", async (req, res) => {
   // const { sku } = req.params;
@@ -485,28 +526,23 @@ router.get("/fetch-all-listings", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch all listings" });
   }
 });
-/*
+
 router.get("/api/jobs", async (req, res) => {
-  // const { sku } = req.params;
-  // console.log('Requested scheduleId:', sku);
-
   try {
-    // Make sure scheduleId is a string
-    const jobs = await agenda._collection.find().toArray();
-
-    if (jobs.length === 0) {
-      console.log("No jobs found for sku:", sku);
-    }
+    const jobs = await agenda._collection
+      .find()
+      .sort({ lastRunAt: -1 }) // Sort by latest run
+      .limit(100)               // Limit to 100
+      .toArray();
 
     res.json({ success: true, jobs });
   } catch (error) {
-    console.error("Error fetching jobs by scheduleId:", error);
+    console.error("Error fetching recent jobs:", error);
     res.status(500).json({ success: false, error: "Failed to fetch jobs" });
   }
 });
 
-*/
-router.get("/api/jobs", async (req, res) => {
+/* router.get("/api/jobs", async (req, res) => {
   try {
     const jobs = await CachedJob.find(); // Fetch jobs from cached collection
 
@@ -521,7 +557,7 @@ router.get("/api/jobs", async (req, res) => {
       .status(500)
       .json({ success: false, error: "Failed to fetch cached jobs" });
   }
-});
+}); */
 
 // router.get("/api/jobs", async (req, res) => {
 //   try {

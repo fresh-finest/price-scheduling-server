@@ -241,16 +241,16 @@ router.get("/api/history/sku/:sku", async (req, res) => {
     });
   }
 });
-/*
+
 router.get("/update-sale-metrics", async (req, res) => {
   try {
     const products = await Product.find();
-    // const skus = products.map((product) => product.sellerSku);
-    const asins = products.map((product)=> product.asin1);
+    const skus = products.map((product) => product.sellerSku);
+    // const skus = products.map((product)=> product.sellerSku);
 
     const endDate = DateTime.now().toISODate();
     const startDate = DateTime.now().minus({ years: 2 }).toISODate();
-    for (const sku of asins) {
+    for (const sku of skus) {
       const saleMetrics = await fetchSalesMetrics(sku, startDate, endDate);
       await updateSaeReport(sku, saleMetrics);
     }
@@ -259,8 +259,9 @@ router.get("/update-sale-metrics", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-*/
 
+
+/*
 router.get("/update-sale-metrics", async (req, res) => {
   try {
     const products = await Product.find();
@@ -298,7 +299,7 @@ router.get("/update-sale-metrics", async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
+*/
 
 router.get("/sales-metrics-by-sku/:sku", async (req, res) => {
   // const { sku } = req.params;

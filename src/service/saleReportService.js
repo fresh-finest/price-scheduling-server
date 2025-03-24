@@ -3,7 +3,7 @@ const { fetchAccessToken } = require("../middleware/accessToken");
 const { marketplace_id } = require("../middleware/credentialMiddleware");
 const SaleReport = require("../model/SaleReport");
 
-const fetchSalesMetrics = async (asin, startDate, endDate) => {
+const fetchSalesMetrics = async (sku, startDate, endDate) => {
 
     const maxRetries = 7;
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve,ms));
@@ -20,7 +20,7 @@ const fetchSalesMetrics = async (asin, startDate, endDate) => {
         interval: interval,
         granularity: 'Day',
         granularityTimeZone: 'America/Los_Angeles',
-        asin: asin,
+        sku: sku,
       };
   
       const response = await axios.get(url, {
@@ -49,7 +49,7 @@ const fetchSalesMetrics = async (asin, startDate, endDate) => {
             error.response.data.errors &&
             error.response.data.errors[0].code === 'QuotaExceeded'
           ) {
-            console.warn(`Quota exceeded for ${asin}. Attempt ${i}} of ${maxRetries}. Retrying in 2 seconds...`);
+            console.warn(`Quota exceeded for ${sku}. Attempt ${i}} of ${maxRetries}. Retrying in 2 seconds...`);
             await delay(3000); // Delay before retrying
             continue;
           }

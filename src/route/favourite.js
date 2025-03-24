@@ -1,12 +1,14 @@
 
 const express = require("express");
-const { getFavourites, updateIsFavourite, updateIsHide, getReport, getReportBySku, searchProductsByAsinSku } = require("../controller/favouriteController");
+const { getFavourites, updateIsFavourite, updateIsHide, getReport, getReportBySku, searchProductsByAsinSku, getAsinSaleMetrics, searchAsinSaleMetrics } = require("../controller/favouriteController");
 
 const router = express.Router();
 
 router.route("/search/:uid").get(searchProductsByAsinSku);
+router.route("/find/:query").get(searchAsinSaleMetrics);
 router.route("/limit").get(getFavourites);
 router.route("/report").get(getReport)
+router.route("/report/asins").get(getAsinSaleMetrics)
 router.route("/:sku").put(updateIsFavourite).get(getReportBySku);
 router.route("/:sku/hide").put(updateIsHide);
 

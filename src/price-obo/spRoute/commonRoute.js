@@ -66,7 +66,7 @@ const {
 
 const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
-const Warehouse = require("../../model/Warehouse");
+// const Warehouse = require("../../model/Warehouse");
 
 const { fetchSalesMetrics, updateSaeReport } = require("../../service/saleReportService");
 const { getDynamicInterval, fetchOrderMetrics } = require("../../service/totalSaleService");
@@ -781,6 +781,7 @@ router.get('/total-sales', async (req, res) => {
 
 
 // const upload = multer({ dest: 'uploads/' });
+/*
 const upload = multer({ storage: multer.memoryStorage() });
 
 
@@ -859,7 +860,7 @@ router.get("/warehouse", async (req, res) => {
   res.json({ current, previous: previousData });
 });
 
-
+*/
 
 
 // shopify services

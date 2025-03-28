@@ -861,9 +861,7 @@ router.get("/warehouse", async (req, res) => {
 });
 
 */
-
-
-// shopify services
+// shopify admin admin 
 router.post("/request-quote",async(req,res)=>{
 
   const {cart,note,email} = req.body;

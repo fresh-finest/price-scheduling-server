@@ -3,6 +3,12 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const axios = require("axios");
 const NodeCache = require("node-cache");
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
+const path = require('path');
+const { Readable } = require('stream');
+const storage = multer.memoryStorage(); 
 const { DateTime } = require("luxon");
 
 const moment = require("moment-timezone");
@@ -62,6 +68,8 @@ const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
 const { fetchSalesMetrics, updateSaeReport } = require("../../service/saleReportService");
 const { getDynamicInterval, fetchOrderMetrics } = require("../../service/totalSaleService");
+
+const Warehouse = require("../../model/Warehouse");
 
 const app = express();
 
@@ -527,7 +535,7 @@ router.get("/fetch-all-listings", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch all listings" });
   }
 });
-
+/*
 router.get("/api/jobs", async (req, res) => {
   try {
     const jobs = await agenda._collection
@@ -541,9 +549,9 @@ router.get("/api/jobs", async (req, res) => {
     console.error("Error fetching recent jobs:", error);
     res.status(500).json({ success: false, error: "Failed to fetch jobs" });
   }
-});
+});*/
 
-/* router.get("/api/jobs", async (req, res) => {
+ router.get("/api/jobs", async (req, res) => {
   try {
     const jobs = await CachedJob.find(); // Fetch jobs from cached collection
 
@@ -558,7 +566,7 @@ router.get("/api/jobs", async (req, res) => {
       .status(500)
       .json({ success: false, error: "Failed to fetch cached jobs" });
   }
-}); */
+}); 
 
 // router.get("/api/jobs", async (req, res) => {
 //   try {
@@ -767,6 +775,132 @@ router.get('/total-sales', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch order metrics' });
   }
 });
+
+
+
+
+// const upload = multer({ dest: 'uploads/' });
+const upload = multer({ storage: multer.memoryStorage() });
+
+
+router.post("/warehouse/upload", upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const bufferStream = Readable.from(req.file.buffer);
+    
+
+    const currentData = [];
+    const batchId = new Date().toISOString();
+
+    // Mark old data as not latest
+    await Warehouse.updateMany({ isLatest: true }, { isLatest: false });
+
+    bufferStream
+      .pipe(csv())
+      .on('data', (row) => {
+        if (["Brecx FBM", "Brecx-Shelves"].includes(row.WarehouseName)) {
+          const itemCount = parseInt(row.ItemCount) || 0;
+          const qty = parseInt(row.Qty) || 0;
+
+          currentData.push({
+            WarehouseId: parseInt(row.WarehouseId),
+            locationId: parseInt(row.locationid),
+            WarehouseName: row.WarehouseName,
+            LocationCode: row.LocationCode,
+            ItemCount: itemCount,
+            Qty: qty,
+            LastUpdate: row.LastUpdate,
+            FBMEnabled: row.FBMEnabled,
+            TotalValue: parseFloat(row.TotalValue) || 0,
+            WId: row.WId,
+            Note: row.Note,
+            Items: row.Items,
+            isOutOfStock: itemCount === 0 || qty === 0,
+            uploadedAt: new Date(),
+            batchId,
+            isLatest: true,
+          });
+        }
+      })
+      .on('end', async () => {
+        await Warehouse.insertMany(currentData);
+        res.json({ message: "Upload successful", batchId });
+      })
+      .on('error', (err) => {
+        console.error("CSV Parse Error:", err);
+        res.status(500).json({ error: "Failed to parse CSV" });
+      });
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Server error during upload" });
+  }
+});
+
+
+router.get("/warehouse", async (req, res) => {
+  const current = await Warehouse.find({ isLatest: true,isOutOfStock:true});
+  const previous = await Warehouse.find({ isLatest: false, isOutOfStock: true }); 
+
+  const previousBatch = {};
+
+  for (let item of previous) {
+    if (!previousBatch[item.batchId]) {
+      previousBatch[item.batchId] = [];
+    }
+    previousBatch[item.batchId].push(item);
+  }
+
+  const recentBatch = Object.keys(previousBatch).sort().reverse()[0];
+  const previousData = previousBatch[recentBatch] || [];
+
+  res.json({ current, previous: previousData });
+});
+
+
+
+
+// shopify services
+router.post("/request-quote",async(req,res)=>{
+
+  const {cart,note,email} = req.body;
+ console.log(req.body);
+  const draftOrder = {
+    draft_order:{
+      line_items: cart.items.map(item=>({
+        title: item.title,
+        quantity: item.quantity,
+        price:item.price/100
+      })),
+      note,
+      email,
+      tags:'Quote Request',
+    }
+  };
+
+  try {
+    const result = await axios.post(
+       `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2023-10/draft_orders.json`,
+       draftOrder,
+       {
+          headers:{
+          'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
+          'Content-Type': 'application/json'
+          }
+       }
+    );
+
+    return res.status(200).json({
+      success:true,
+      draftOrder: result.data.draft_order,
+    })
+  } catch (error) {
+    console.error('Error creating draft order:', err.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to create draft order' });
+  }
+
+})
 
 
 module.exports = router;

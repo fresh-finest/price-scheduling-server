@@ -66,10 +66,11 @@ const {
 
 const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
+const Warehouse = require("../../model/Warehouse");
+
 const { fetchSalesMetrics, updateSaeReport } = require("../../service/saleReportService");
 const { getDynamicInterval, fetchOrderMetrics } = require("../../service/totalSaleService");
 
-const Warehouse = require("../../model/Warehouse");
 
 const app = express();
 

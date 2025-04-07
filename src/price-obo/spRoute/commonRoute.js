@@ -861,23 +861,24 @@ router.get("/warehouse", async (req, res) => {
 });
 
 */
-// shopify admin admin 
+
+// shopify admin api sections 
 router.post("/request-quote",async(req,res)=>{
 
   const {cart,note,email} = req.body;
- console.log(req.body);
-  const draftOrder = {
-    draft_order:{
-      line_items: cart.items.map(item=>({
-        title: item.title,
-        quantity: item.quantity,
-        price:item.price/100
-      })),
-      note,
-      email,
-      tags:'Quote Request',
-    }
-  };
+
+ const draftOrder = {
+  draft_order: {
+    line_items: cart.items.map(item => ({
+      variant_id: item.variant_id, 
+      quantity: item.quantity,
+      price: item.price / 100
+    })),
+    note,
+    email,
+    tags: 'Quote Request'
+  }
+};
 
   try {
     const result = await axios.post(

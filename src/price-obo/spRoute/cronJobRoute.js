@@ -13,6 +13,7 @@ const { mergeSaleUnitoProduct } = require('../../merge-service/saleUnitMergetoPr
 const scheduleCronJobs=()=>{
 
 
+
   cron.schedule('0 8 * * *', async () => {
     const bangladeshTime = moment.tz("Asia/Dhaka").format();
     console.log(`Cron job started at Bangladesh Time: ${bangladeshTime}`);
@@ -44,6 +45,19 @@ const scheduleCronJobs=()=>{
     timezone: 'Asia/Dhaka'  
   });
 
+  cron.schedule('0 3 * * *', async () => {
+    console.log('Running scheduled task to fetch and merge sales data.');
+    try {
+      const response = await axios.get('http://localhost:3000/api/sales-report');
+      console.log('Scheduled task completed:', response.data);
+    } catch (error) { 
+
+      console.error('Error in scheduled task:', error);
+    }
+  }, {
+    timezone: 'Asia/Dhaka'  
+  });
+  
   //'0 */12 * * *'
   // '*/5 * * * *'
 //   cron.schedule('0 */12 * * *', async () => {

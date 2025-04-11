@@ -25,10 +25,13 @@ const { checkStockVsSales } = require("./src/notifications/stockAgainstSale");
 
 const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express();
 
-const {loadSaleStockToFavourite } = require("./src/controller/favouriteController");
+const {loadSaleStockToFavourite, loadReportSale } = require("./src/controller/favouriteController");
 const { loadInventoryToProduct } = require("./src/controller/productController");
 const { saveUserTokens } = require("./src/controller/accountController");
+const PushService = require('./src/service/pushService');
 
+const server = require('http').createServer(app);
+const io = require('socket.io')(server, { cors: { origin: "*" } });
 app.use(express.json());
 app.use(cookieParser()); // To parse cookies
 
@@ -248,6 +251,13 @@ mongoose
 */
 
 
+PushService.init(io);
+
+io.on('connection', socket => {
+  const userId = socket.handshake.query.userId;
+  socket.join(userId);
+});
+
 
 agenda.on("ready", async () => {
   console.log("Agenda is connected and ready.");
@@ -263,12 +273,12 @@ agenda.on("ready", async () => {
 
 const reinitializeJobs = async () => {
   try {
-    // const jobs = await agenda.jobs({});
-    const jobs = await agenda.jobs(
-      { nextRunAt: { $ne: null } }, 
-      {},                           
-      100                          
-    );
+    const jobs = await agenda.jobs({});
+    // const jobs = await agenda.jobs(
+    //   { nextRunAt: { $ne: null } }, 
+    //   {},    
+    //   100                                       
+    // );
     
 
 
@@ -438,5 +448,8 @@ app.listen(process.env.PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${process.env.PORT}`);
 });
 
+// server.listen(3000, () => {
+//   console.log("🚀 Server running on port 3000");
+// });
 // const PORT = process.env.PORT || 3000;
 // server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -98,6 +98,8 @@ const processReport = async (reports) => {
   const today = moment().utc().startOf("day"); // Today's date in UTC
 
   for (const report of reports) {
+      if (report.status === "deleted") continue;
+      if (!report.weekly && !report.monthly && moment(report.endDate).isBefore(moment())) continue;
     const {
       sku,
       title: itemName,

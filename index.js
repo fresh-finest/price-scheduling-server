@@ -28,7 +28,7 @@ const { stockVsSaleCronJobs } = require("./src/config/cron");const app = express
 const {loadSaleStockToFavourite, loadReportSale } = require("./src/controller/favouriteController");
 const { loadInventoryToProduct } = require("./src/controller/productController");
 const { saveUserTokens } = require("./src/controller/accountController");
-const PushService = require('./src/service/pushService');
+// const PushService = require('./src/service/pushService');
 
 const server = require('http').createServer(app);
 const io = require('socket.io')(server, { cors: { origin: "*" } });
@@ -248,7 +248,7 @@ mongoose
     return response.data.access_token;
   };
 
-*/
+
 
 
 PushService.init(io);
@@ -257,6 +257,7 @@ io.on('connection', socket => {
   const userId = socket.handshake.query.userId;
   socket.join(userId);
 });
+*/
 
 
 agenda.on("ready", async () => {

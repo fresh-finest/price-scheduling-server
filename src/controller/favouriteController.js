@@ -340,8 +340,8 @@ exports.getSaleBySku = async (req, res) => {
       });
     }
     
-    await SkuModeReport.deleteMany(); 
-    await SkuModeReport.insertMany(results.map(({ _id,salesMetrics, ...rest }) => rest));
+    // await SkuModeReport.deleteMany(); 
+    // await SkuModeReport.insertMany(results.map(({ _id,salesMetrics, ...rest }) => rest));
 
     const paginated = results.slice(skip, skip + limit);
 
@@ -596,8 +596,8 @@ exports.getSaleByAsin = async (req, res) => {
     const listings = await SaleReport.aggregate(pipeline);
     const totalAsins = await SaleReport.distinct("asin1", { asin1: { $ne: null } });
 
-    await AsinModeReport.deleteMany(); 
-    await AsinModeReport.insertMany(listings.map(({ _id,salesMetrics, ...rest }) => rest));
+    // await AsinModeReport.deleteMany(); 
+    // await AsinModeReport.insertMany(listings.map(({ _id,salesMetrics, ...rest }) => rest));
 
     res.status(200).json({
       status: "Success",
@@ -1335,3 +1335,405 @@ exports.getReportSkuMode = async (req, res) => {
     })
   }
 }
+
+exports.loadSaleBySku = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 2300;
+    const skip = (page - 1) * limit;
+
+    const {
+      startDate,
+      endDate,
+      prevStartDate,
+      prevEndDate,
+      sortByChange,
+      sortOrder = "desc"
+    } = req.query;
+
+    console.log("Get Sale by SKU called", req.query);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const prevStart = new Date(prevStartDate);
+    const prevEnd = new Date(prevEndDate);
+
+    const pipeline = [
+      { $match: { salesMetrics: { $exists: true, $ne: [] } } },
+
+      // Filter only relevant salesMetrics
+      {
+        $addFields: {
+          filteredSalesMetrics: {
+            $filter: {
+              input: "$salesMetrics",
+              as: "metric",
+          
+              cond: {
+                $or: [
+                  {
+                    $and: [
+                      { $gte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 0] } }, start] },
+                      { $lte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 1] } }, end] }
+                    ]
+                  },
+                  {
+                    $and: [
+                      { $gte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 0] } }, prevStart] },
+                      { $lte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 1] } }, prevEnd] }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+
+      // Final projection
+      {
+        $project: {
+          sellerSku: 1,
+          itemName: 1,
+          price: 1,
+          imageUrl: 1,
+          status: 1,
+          quantity: 1,
+          isFavourite: 1,
+          isHide: 1,
+          asin1: 1,
+          salesMetrics: "$filteredSalesMetrics"
+        }
+      }
+    ];
+
+    const rawResults = await SaleReport.aggregate(pipeline);
+
+    // Calculate currentUnits, previousUnits, and percentageChange in JS per SKU
+    const results = rawResults.map(item => {
+      let currentUnits = 0;
+      let previousUnits = 0;
+
+      for (const metric of item.salesMetrics) {
+        const [startStr, endStr] = metric.interval.split("--");
+        const metricStart = new Date(startStr);
+        const metricEnd = new Date(endStr);
+
+        if (metricStart >= start && metricEnd <= end) {
+          currentUnits += metric.units;
+        } else if (metricStart >= prevStart && metricEnd <= prevEnd) {
+          previousUnits += metric.units;
+        }
+      }
+
+      let percentageChange = 0;
+
+      if (previousUnits === 0 && currentUnits > 0) {
+        percentageChange = 100;
+      } else if (previousUnits === 0 && currentUnits === 0) {
+        percentageChange = 0;
+      } else if (currentUnits > previousUnits) {
+        percentageChange = ((currentUnits - previousUnits) / currentUnits) * 100;
+      } else {
+        percentageChange = ((currentUnits - previousUnits) / previousUnits) * 100;
+      }
+
+      return {
+        ...item,
+        currentUnits,
+        previousUnits,
+        percentageChange: Math.round(percentageChange * 100) / 100
+      };
+    });
+
+    // Sort in JS if needed
+    if (sortByChange) {
+      results.sort((a, b) => {
+        return sortOrder === "asc"
+          ? a.percentageChange - b.percentageChange
+          : b.percentageChange - a.percentageChange;
+      });
+    }else {
+      results.sort((a, b) => {
+  
+        if (a.isFavourite !== b.isFavourite) {
+          return b.isFavourite - a.isFavourite;
+        }
+        
+        return a.isHide - b.isHide;
+      });
+    }
+    
+    await SkuModeReport.deleteMany(); 
+    await SkuModeReport.insertMany(results.map(({ _id,salesMetrics, ...rest }) => rest));
+
+    const paginated = results.slice(skip, skip + limit);
+
+    res.status(200).json({
+      status: "Success",
+      message: "SKU-based sales data retrieved",
+      data: {
+        totalProducts: results.length,
+        currentPage: page,
+        totalPages: Math.ceil(results.length / limit),
+        listings: paginated
+      }
+    });
+
+  } catch (error) {
+    console.error("🔥 getSaleBySku failed:", error);
+    res.status(500).json({
+      status: "Error",
+      message: "Server error while retrieving SKU sales",
+      error: error.message
+    });
+  }
+};
+
+exports.loadSaleByAsin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
+    const {
+      startDate,
+      endDate,
+      prevStartDate,
+      prevEndDate,
+      sortByChange,
+      sortOrder,
+      unitsOperator,
+      unitsValue,
+      unitsValue2 // used for between
+    } = req.query;
+
+    console.log("Get Sale by ASIN called", req.query);
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const prevStart = new Date(prevStartDate);
+    const prevEnd = new Date(prevEndDate);
+
+    const matchUnits = {};
+    if (unitsOperator && unitsValue !== undefined) {
+      const val = parseInt(unitsValue);
+      const val2 = unitsValue2 ? parseInt(unitsValue2) : null;
+
+      switch (unitsOperator) {
+        case "=": matchUnits.$eq = val; break;
+        case "!=": matchUnits.$ne = val; break;
+        case ">": matchUnits.$gt = val; break;
+        case "<": matchUnits.$lt = val; break;
+        case ">=": matchUnits.$gte = val; break;
+        case "<=": matchUnits.$lte = val; break;
+        case "between":
+          if (val2 !== null) {
+            matchUnits.$gte = val;
+            matchUnits.$lte = val2;
+          }
+          break;
+        default: break;
+      }
+    }
+
+    const pipeline = [
+      { $match: { asin1: { $ne: null } } },
+      {
+        $addFields: {
+          filteredSalesMetrics: {
+            $filter: {
+              input: "$salesMetrics",
+              as: "metric",
+              cond: {
+                $or: [
+                  {
+                    $and: [
+                      { $gte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 0] } }, new Date(startDate)] },
+                      { $lte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 1] } }, new Date(endDate)] }
+                    ]
+                  },
+                  {
+                    $and: [
+                      { $gte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 0] } }, new Date(prevStartDate)] },
+                      { $lte: [{ $toDate: { $arrayElemAt: [{ $split: ["$$metric.interval", "--"] }, 1] } }, new Date(prevEndDate)] }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      { $unwind: "$filteredSalesMetrics" },
+      {
+        $addFields: {
+          metricStart: {
+            $toDate: { $arrayElemAt: [{ $split: ["$filteredSalesMetrics.interval", "--"] }, 0] },
+          },
+          metricEnd: {
+            $toDate: { $arrayElemAt: [{ $split: ["$filteredSalesMetrics.interval", "--"] }, 1] },
+          },
+        },
+      },
+      {
+        $project: {
+          asin1: 1,
+          isFavourite: 1,
+          isHide: 1,
+          itemName: 1,
+          sellerSku: 1,
+          price: 1,
+          imageUrl: 1,
+          quantity: 1,
+          status: 1,
+          fulfillableQuantity: 1,
+          pendingTransshipmentQuantity: 1,
+          metricStart: 1,
+          metricEnd: 1,
+          salesMetric: "$filteredSalesMetrics",
+          currentFlag: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ["$metricStart", start] },
+                  { $lte: ["$metricEnd", end] }
+                ]
+              },
+              true,
+              false
+            ]
+          },
+          previousFlag: {
+            $cond: [
+              {
+                $and: [
+                  { $gte: ["$metricStart", prevStart] },
+                  { $lte: ["$metricEnd", prevEnd] }
+                ]
+              },
+              true,
+              false
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$asin1",
+          doc: { $first: "$$ROOT" },
+          currentUnits: {
+            $sum: {
+              $cond: ["$currentFlag", "$salesMetric.units", 0]
+            }
+          },
+          previousUnits: {
+            $sum: {
+              $cond: ["$previousFlag", "$salesMetric.units", 0]
+            }
+          },
+          salesMetrics: {
+            $push: {
+              $cond: [
+                { $or: ["$currentFlag", "$previousFlag"] },
+                "$salesMetric",
+                "$$REMOVE"
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          percentageChange: {
+            $cond: [
+              { $eq: ["$previousUnits", "$currentUnits"] },
+              0,
+              {
+                $cond: [
+                  { $gt: ["$currentUnits", "$previousUnits"] },
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          { $subtract: ["$currentUnits", "$previousUnits"] },
+                          { $cond: [{ $eq: ["$currentUnits", 0] }, 1, "$currentUnits"] }
+                        ]
+                      },
+                      100
+                    ]
+                  },
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          { $subtract: ["$currentUnits", "$previousUnits"] },
+                          { $cond: [{ $eq: ["$previousUnits", 0] }, 1, "$previousUnits"] }
+                        ]
+                      },
+                      100
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      ...(Object.keys(matchUnits).length > 0 ? [
+        { $match: { currentUnits: matchUnits } }
+      ] : []),
+      {
+        $sort: sortByChange ? {
+          percentageChange: sortOrder === "asc" ? 1 : -1
+        } : {
+          "doc.isFavourite": -1,
+          "doc.isHide": 1
+        }
+      },
+      // { $skip: skip },
+      // { $limit: limit },
+      {
+        $project: {
+          asin1: "$_id",
+          sellerSku: "$doc.sellerSku",
+          itemName: "$doc.itemName",
+          price: "$doc.price",
+          imageUrl: "$doc.imageUrl",
+          quantity: "$doc.quantity",
+          status: "$doc.status",
+          fulfillableQuantity: "$doc.fulfillableQuantity",
+          pendingTransshipmentQuantity: "$doc.pendingTransshipmentQuantity",
+          isFavourite: "$doc.isFavourite",
+          isHide: "$doc.isHide",
+          currentUnits: 1,
+          previousUnits: 1,
+          percentageChange: 1,
+          salesMetrics: 1
+        }
+      }
+    ];
+
+    const listings = await SaleReport.aggregate(pipeline);
+    const totalAsins = await SaleReport.distinct("asin1", { asin1: { $ne: null } });
+
+    await AsinModeReport.deleteMany(); 
+    await AsinModeReport.insertMany(listings.map(({ _id,salesMetrics, ...rest }) => rest));
+
+    res.status(200).json({
+      status: "Success",
+      message: "ASIN metrics retrieved successfully",
+      data: {
+        totalProducts: listings.length,
+        currentPage: page,
+        totalPages: Math.ceil(totalAsins.length / limit),
+        listings,
+      },
+    });
+  } catch (error) {
+    console.error("🔥 ASIN aggregation failed:", error);
+    res.status(500).json({
+      status: "Error",
+      message: "Failed to retrieve ASIN metrics",
+    });
+  }
+};

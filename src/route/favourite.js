@@ -1,10 +1,14 @@
 
 const express = require("express");
-const { getFavourites, updateIsFavourite, updateIsHide, getReport, getReportBySku, searchProductsByAsinSku, getAsinSaleMetrics, searchAsinSaleMetrics,getSalesReportByAsinSku,getSaleBySku, getSaleByAsin} = require("../controller/favouriteController");
+const { getFavourites, updateIsFavourite, updateIsHide, getReport, getReportBySku, searchProductsByAsinSku, getAsinSaleMetrics, searchAsinSaleMetrics,getSalesReportByAsinSku,getSaleBySku, getSaleByAsin, getReportAsinMode, getReportSkuMode} = require("../controller/favouriteController");
 
 const router = express.Router();
 
 
+router.route("/report/sku-mode").get(getReportSkuMode)
+router.route("/report/asin-mode").get(getReportAsinMode)
+router.route("/report/load-sku").get(getSaleBySku)
+router.route("/report/load-asin").get(getSaleByAsin)
 router.route("/report/skus").get(getSaleBySku)
 router.route("/report/byasins").get(getSaleByAsin)
 router.route("/sale-units").get(getSalesReportByAsinSku)

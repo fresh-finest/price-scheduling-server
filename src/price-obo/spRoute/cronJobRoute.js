@@ -2,7 +2,8 @@ const cron = require('node-cron');
 const moment = require('moment-timezone');
 const axios = require('axios');
 const { mergeAndSaveImageData } = require('../../merge-service/imageMergedService');
-const Inventory = require('../../model/Inventory');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
 const { fetchAndDownloadDataOnce } = require('../../service/inventoryService');
 const { loadInventoryToProduct } = require('../../controller/productController');
 const Product = require('../../model/Product');
@@ -57,7 +58,34 @@ const scheduleCronJobs=()=>{
   }, {
     timezone: 'Asia/Dhaka'  
   });
+
+  cron.schedule('0 18 * * *', async () => {
+
+    console.log('Running scheduled task to fetch and merge sales data.');
+    // Get today's date in Bangladesh time
+   const today = dayjs.utc().subtract(1, 'day');
   
+    const startDate = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
+    const prevEndDate = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
+    const prevStartDate = dayjs().subtract(60, 'day').format('YYYY-MM-DD');
+  
+    const url1 = `http://localhost:3000/api/favourite/report/load-asin?startDate=${startDate}&endDate=${today}&prevStartDate=${prevStartDate}&prevEndDate=${prevEndDate}`;
+    const url2 = `http://localhost:3000/api/favourite/report/load-sku?startDate=${startDate}&endDate=${today}&prevStartDate=${prevStartDate}&prevEndDate=${prevEndDate}`;
+    
+    try {
+      await axios.get(url1);
+      await axios.get(url2);
+      console.log('Cron job executed successfully for sales report.');
+
+    } catch (error) {
+      console.error('Error executing cron job:', error.message);
+    }
+  }, {
+    timezone: 'Asia/Dhaka'  
+  });
+
+
+
   //'0 */12 * * *'
   // '*/5 * * * *'
 //   cron.schedule('0 */12 * * *', async () => {

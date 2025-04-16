@@ -1,9 +1,11 @@
-const { currentLineHeight } = require("pdfkit");
+const { currentLineHeight, list } = require("pdfkit");
 const Favourite = require("../model/Favourite");
 
 const { updateIsFavouriteService, updateIsHideService, searchBySkuAsinService } = require("../service/favouriteService");
 const SaleReport = require("../model/SaleReport");
 const Product = require("../model/Product");
+const AsinModeReport = require("../model/AsinModeReport");
+const SkuModeReport = require("../model/SkuModeReport");
 
 const mapSaleStockToFavourite = async (saleStock) => {
     // const existingFavourites = await Favourite.find();
@@ -167,6 +169,7 @@ exports.getReport =async(req,res)=>{
     try {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 20;
+            // const limit= 2000;
             // const limit = 2000;
             console.log(page,limit);
             if(page <1 || limit <1){
@@ -336,7 +339,10 @@ exports.getSaleBySku = async (req, res) => {
         return a.isHide - b.isHide;
       });
     }
-    // Paginate
+    
+    await SkuModeReport.deleteMany(); 
+    await SkuModeReport.insertMany(results.map(({ _id,salesMetrics, ...rest }) => rest));
+
     const paginated = results.slice(skip, skip + limit);
 
     res.status(200).json({
@@ -590,11 +596,14 @@ exports.getSaleByAsin = async (req, res) => {
     const listings = await SaleReport.aggregate(pipeline);
     const totalAsins = await SaleReport.distinct("asin1", { asin1: { $ne: null } });
 
+    await AsinModeReport.deleteMany(); 
+    await AsinModeReport.insertMany(listings.map(({ _id,salesMetrics, ...rest }) => rest));
+
     res.status(200).json({
       status: "Success",
       message: "ASIN metrics retrieved successfully",
       data: {
-        totalProducts: totalAsins.length,
+        totalProducts: listings.length,
         currentPage: page,
         totalPages: Math.ceil(totalAsins.length / limit),
         listings,
@@ -679,43 +688,7 @@ exports.getReportBySku = async(req,res)=>{
     }
 }
 
-/*
-exports.searchProductsByAsinSku = async (req, res, next) => {
-    try {
-        const { uid } = req.params;
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 100;
-        let keyword =  uid ? uid.replace(/^\s+/, "") : "";
-         
-        let result;
-        if (keyword.startsWith("B0") && keyword.length === 10) {
-            result = await searchBySkuAsinService(null, keyword, page, limit);
-        } else {
-            console.log("searching by sku",uid);
-            result = await searchBySkuAsinService(keyword, null, page, limit);
-        }
 
-        const { products, totalResults } = result;
-
-        res.status(200).json({
-            status: "Success",
-            message: "Successfully searched products",
-            data: {
-                totalProducts:totalResults,
-                currentPage: page,
-                totalPages: Math.ceil(totalResults / limit),
-                listings:products,
-            },
-        });
-    } catch (error) {
-        res.status(400).json({
-            status: "Failed",
-            message: "Failed to search products.",
-            error: error.message,
-        });
-    }
-};
-*/
 exports.searchProductsByAsinSku = async (req, res, next) => {
   try {
     const { uid } = req.params;
@@ -916,134 +889,10 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
 
 
 
-/*
 exports.getAsinSaleMetrics = async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1;
-      const limit = 20;
-      const skip = (page - 1) * limit;
-  
-      // Step 1: Paginate ASINs
-      const asinList = await SaleReport.aggregate([
-        { $match: { asin1: { $ne: null } } },
-        { $group: { _id: "$asin1" } },
-        // { $sort: { _id: 1 } },
-        { $sort: { isFavourite: -1, asin1: 1 } },
-        { $skip: skip },
-        { $limit: limit },
-      ]);
-
-      
-      const asinValues = asinList.map((item) => item._id);
-  
-      // Step 2: Merge sales metrics by ASIN and get one product per ASIN
-      const aggregated = await SaleReport.aggregate([
-        { $match: { asin1: { $in: asinValues } } },
-        {
-          $lookup: {
-            from: "salereports",
-            localField: "sellerSku",
-            foreignField: "sellerSku",
-            as: "report",
-          },
-        },
-        { $unwind: "$report" },
-        { $unwind: "$report.salesMetrics" },
-        {
-          $group: {
-            _id: {
-              asin: "$asin1",
-              interval: "$report.salesMetrics.interval",
-            },
-            totalUnits: { $sum: "$report.salesMetrics.units" },
-            totalRevenue: {
-              $sum: {
-                $multiply: ["$report.salesMetrics.units", "$report.salesMetrics.price"],
-              },
-            },
-          },
-        },
-        {
-          $group: {
-            _id: "$_id.asin",
-            salesMetrics: {
-              $push: {
-                interval: "$_id.interval",
-                units: "$totalUnits",
-                price: {
-                  $cond: {
-                    if: { $eq: ["$totalUnits", 0] },
-                    then: 0,
-                    else: {
-                      $round: [{ $divide: ["$totalRevenue", "$totalUnits"] }, 2],
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        {
-          $lookup: {
-            from: "products",
-            localField: "_id",
-            foreignField: "asin1",
-            as: "productInfo",
-          },
-        },
-        {
-          $addFields: {
-            product: { $first: "$productInfo" },
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            asin1: "$_id",
-            salesMetrics: 1,
-            sellerSku: "$product.sellerSku",
-            itemName: "$product.itemName",
-            price: "$product.price",
-            imageUrl: "$product.imageUrl",
-            status: "$product.status",
-            quantity: "$product.quantity",
-            fulfillableQuantity: "$product.fulfillableQuantity",
-            pendingTransshipmentQuantity: "$product.pendingTransshipmentQuantity",
-            isFavourite: "$product.isFavourite",
-            isHide: "$product.isHide",
-          },
-        },
-      ]);
-  
-      // Total unique ASINs
-      const totalAsins = await Product.distinct("asin1", { asin1: { $ne: null } });
-      const totalPages = Math.ceil(totalAsins.length / limit);
-  
-      res.status(200).json({
-        status: "Success",
-        message: "ASIN metrics retrieved successfully",
-        data: {
-          totalProducts: totalAsins.length,
-          currentPage: page,
-          totalPages,
-          listings: aggregated,
-        },
-      });
-    } catch (error) {
-      console.error("🔥 ASIN aggregation failed:", error);
-      res.status(500).json({
-        status: "Error",
-        message: "Failed to retrieve ASIN metrics",
-      });
-    }
-  };
-  
-*/
-
-exports.getAsinSaleMetrics = async (req, res) => {
-    try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = 20;
+      const limit = 2000;
       const skip = (page - 1) * limit;
   
       // Step 1: Find top-selling SKU per ASIN and sort favourites first
@@ -1168,138 +1017,7 @@ exports.getAsinSaleMetrics = async (req, res) => {
     }
   };
   
-  /*
-
-  exports.searchAsinSaleMetrics = async (req, res) => {
-    try {
-      const { query } = req.params;
-      const page = parseInt(req.query.page) || 1;
-      const limit = 20;
-      const skip = (page - 1) * limit;
   
-      if (!query) {
-        return res.status(400).json({
-          status: "Error",
-          message: "Missing search query.",
-        });
-      }
-  
-      // Step 1: Build regex filters from keyword query (e.g., "Caramel Vanilla")
-      const words = query.trim().split(/\s+/);
-    //   const regexConditions = words.map((word) => ({
-    //     itemName: { $regex: word, $options: "i" },
-    //     asin1: { $regex: word, $options: "i" },
-    //     sellerSku: { $regex: word, $options: "i" },
-    //   }));
-    const regexConditions = words.flatMap((word) => [
-        { itemName: { $regex: word, $options: "i" } },
-        { asin1:word  },
-        { sellerSku: { $regex: word, $options: "i" } },
-      ]);
-    //   const matchedReports = await SaleReport.find({
-    //     $or: regexConditions,
-    //   });
-      // Step 2: Find matching ASINs from SaleReport
-      const asinGroup = await SaleReport.aggregate([
-        { $match: { $or: regexConditions } },
-        { $group: { _id: "$asin1" } },
-        { $skip: skip },
-        { $limit: limit },
-      ]);
-  
-      const asinList = asinGroup.map((a) => a._id);
-  
-      // Step 3: Get all reports for those ASINs
-      const allReports = await SaleReport.find({ asin1: { $in: asinList } });
-  
-      // Step 4: Group reports by ASIN
-      const asinMap = {};
-      for (const report of allReports) {
-        if (!asinMap[report.asin1]) {
-          asinMap[report.asin1] = {
-            _id: report._id,
-            asin1: report.asin1,
-            sellerSku: report.sellerSku,
-            itemName: report.itemName,
-            price: report.price,
-            imageUrl: report.imageUrl,
-            status: report.status,
-            quantity: report.quantity,
-            fulfillableQuantity: report.fulfillableQuantity,
-            pendingTransshipmentQuantity: report.pendingTransshipmentQuantity,
-            isFavourite: report.isFavourite,
-            isHide: report.isHide,
-            salesMetrics: [],
-          };
-        }
-  
-        asinMap[report.asin1].salesMetrics.push(...report.salesMetrics);
-      }
-  
-      // Step 5: Merge metrics per ASIN
-      const listings = Object.values(asinMap).map((asinEntry) => {
-        const intervalMap = {};
-  
-        asinEntry.salesMetrics.forEach((metric) => {
-          const key = metric.interval;
-          if (!intervalMap[key]) {
-            intervalMap[key] = {
-              interval: metric.interval,
-              units: 0,
-              price: 0,
-              _id: metric._id,
-            };
-          }
-          intervalMap[key].units += metric.units;
-          intervalMap[key].price += metric.price * metric.units;
-        });
-  
-        const mergedMetrics = Object.values(intervalMap).map((m) => ({
-          interval: m.interval,
-          units: m.units,
-          price: m.units > 0 ? +(m.price / m.units).toFixed(2) : 0,
-          _id: m._id,
-        }));
-  
-        return {
-          _id: asinEntry._id,
-          sellerSku: asinEntry.sellerSku,
-          itemName: asinEntry.itemName,
-          price: asinEntry.price,
-          imageUrl: asinEntry.imageUrl,
-          asin1: asinEntry.asin1,
-          status: asinEntry.status,
-          quantity: asinEntry.quantity,
-          fulfillableQuantity: asinEntry.fulfillableQuantity,
-          pendingTransshipmentQuantity: asinEntry.pendingTransshipmentQuantity,
-          isFavourite: asinEntry.isFavourite,
-          isHide: asinEntry.isHide,
-          salesMetrics: mergedMetrics,
-        };
-      });
-  
-      const totalProducts = await SaleReport.countDocuments({ $or: regexConditions });
-      const totalPages = Math.ceil(totalProducts / limit);
-  
-      res.status(200).json({
-        status: "Success",
-        message: "Search results loaded successfully.",
-        data: {
-          totalProducts,
-          currentPage: page,
-          totalPages,
-          listings,
-        },
-      });
-    } catch (error) {
-      console.error("Search error:", error);
-      res.status(500).json({
-        status: "Error",
-        message: "Internal server error while searching.",
-      });
-    }
-  };
-  */
 
 
   exports.searchAsinSaleMetrics = async (req, res) => {
@@ -1575,99 +1293,45 @@ exports.getAsinSaleMetrics = async (req, res) => {
   };
   
   
-/*
-exports.getSalesReportByAsinSku = async (req, res) => {
+exports.getReportAsinMode = async (req, res) => {
+
   try {
-    const { type, value, startDate, endDate } = req.query;
-
-    if (!type || !['sku', 'asin'].includes(type)) {
-      return res.status(400).json({ status: 'Error', message: 'Invalid type. Must be either "sku" or "asin".' });
-    }
-
-    if (!value) {
-      return res.status(400).json({ status: 'Error', message: 'Missing value for sku or asin.' });
-    }
-
-    const matchQuery = {};
-    if (type === 'sku') {
-      matchQuery.sellerSku = value;
-    } else if (type === 'asin') {
-      matchQuery.asin1 = value;
-    }
-
-    const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) dateFilter.$lte = new Date(endDate);
-
-    const pipeline = [
-      { $match: matchQuery },
-      { $unwind: '$salesMetrics' },
-
-      // Extract interval start date
-      {
-        $addFields: {
-          intervalStart: {
-            $toDate: {
-              $arrayElemAt: [
-                { $split: ['$salesMetrics.interval', '--'] },
-                0
-              ]
-            }
-          }
-        }
-      },
-
-      // Optional date range filtering
-      ...(startDate || endDate ? [{
-        $match: {
-          intervalStart: dateFilter
-        }
-      }] : []),
-      {
-        $match: {
-          'salesMetrics.units': { $gt: 0 }
-        }
-      },
-      // Group by interval to eliminate duplicates when same asin has multiple skus
-      {
-        $group: {
-          _id: {
-            interval: '$salesMetrics.interval'
-          },
-          totalUnits: { $sum: '$salesMetrics.units' },
-          totalRevenue: { $sum: '$salesMetrics.price' },
-           minPrice: { $min: '$salesMetrics.price' }
-        }
-      },
-
-      // Final sort by interval
-      {
-        $sort: { '_id.interval': 1 }
-      }
-    ];
-
-    const intervalResults = await SaleReport.aggregate(pipeline);
-
-    // Final aggregation for total sum
-    const totalUnits = intervalResults.reduce((acc, item) => acc + item.totalUnits, 0);
-    const totalRevenue = intervalResults.reduce((acc, item) => acc + item.totalRevenue, 0);
-
-    res.json({
-      status: 'Success',
-      message: 'Sales report fetched successfully',
+    const listings = await AsinModeReport.find({}).sort({ isFavourite:-1 });
+    res.status(200).json({
+      status: "Success",
+      message: "Report retrieved successfully",
       data: {
-        totalUnits,
-        totalRevenue,
-        entries: intervalResults.map(item => ({
-          interval: item._id.interval,
-          units: item.totalUnits,
-          price: item.minPrice
-        }))
-      }
-    });
+        total:listings.length,
+        listings,
+      },
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 'Error', message: 'Server error' });
+    res.status(500).json({
+      status: "Error",
+      message: "Server error while retrieving report",
+      error: error.message
+    })
   }
-};
-*/
+}
+
+  
+exports.getReportSkuMode = async (req, res) => {
+
+  try {
+    const listings = await SkuModeReport.find({}).sort({ isFavourite:-1 });
+    res.status(200).json({
+      status: "Success",
+      message: "Report retrieved successfully",
+      data: {
+        total:listings.length,
+        listings,
+      },
+    })
+  } catch (error) {
+    res.status(500).json({
+      status: "Error",
+      message: "Server error while retrieving report",
+      error: error.message
+    })
+  }
+}

@@ -59,11 +59,11 @@ const scheduleCronJobs=()=>{
     timezone: 'Asia/Dhaka'  
   });
 
-  cron.schedule('0 18 * * *', async () => {
+  cron.schedule('0 14 * * *', async () => {
 
     console.log('Running scheduled task to fetch and merge sales data.');
     // Get today's date in Bangladesh time
-   const today = dayjs.utc().subtract(1, 'day');
+   const today = dayjs.utc().add(1, 'day');
   
     const startDate = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
     const prevEndDate = dayjs().subtract(30, 'day').format('YYYY-MM-DD');

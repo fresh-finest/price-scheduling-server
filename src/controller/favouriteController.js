@@ -694,7 +694,7 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
     const { uid } = req.params;
     const {
       page = 1,
-      limit = 100,
+      limit = 500,
       startDate,
       endDate,
       prevStartDate,
@@ -707,24 +707,41 @@ exports.searchProductsByAsinSku = async (req, res, next) => {
     const keyword = uid ? uid.trim() : "";
 
     const start = new Date(startDate);
+    // start.setDate(start.getDate() + 1);
     const end = new Date(endDate);
+     end.setDate(end.getDate() + 2);
     const prevStart = new Date(prevStartDate);
     const prevEnd = new Date(prevEndDate);
+    prevEnd.setDate(prevEnd.getDate() + 1);
 
     let matchQuery;
 
+    // if (keyword.startsWith("B0") && keyword.length === 10) {
+    //   matchQuery = { asin1: keyword };
+    // } else {
+    //   matchQuery = {
+    //     // $or: keyword.split(/\s+/).flatMap((word) => [
+    //     //   { sellerSku: { $regex: word, $options: "i" } },
+    //     //   { itemName: { $regex: word, $options: "i" } },
+    //     //   { asin1: { $regex: word, $options: "i" } }
+    //     // ])
+    //     $or = [
+    //       { sellerSku: { $regex: keyword, $options: "i" } },
+    //       { itemName: { $regex: keyword, $options: "i" } }
+    //     ]
+    //   };
+    // }
     if (keyword.startsWith("B0") && keyword.length === 10) {
       matchQuery = { asin1: keyword };
     } else {
       matchQuery = {
-        $or: keyword.split(/\s+/).flatMap((word) => [
-          { sellerSku: { $regex: word, $options: "i" } },
-          { itemName: { $regex: word, $options: "i" } },
-          { asin1: { $regex: word, $options: "i" } }
-        ])
+        $or: [
+          { sellerSku: { $regex: keyword, $options: "i" } },
+          { itemName: { $regex: keyword, $options: "i" } }
+        ]
       };
     }
-
+    
     const pipeline = [
       { $match: matchQuery },
       { $unwind: "$salesMetrics" },
@@ -1025,7 +1042,7 @@ exports.getAsinSaleMetrics = async (req, res) => {
       const { query } = req.params;
       const {
         page = 1,
-        limit = 20,
+        limit = 500,
         startDate,
         endDate,
         prevStartDate,
@@ -1042,17 +1059,30 @@ exports.getAsinSaleMetrics = async (req, res) => {
         });
       }
   
-      const words = query.trim().split(/\s+/);
+      let matchCondition;
+      // const keyword = query.trim().split(/\s+/);
+      const keyword = query ? query.trim() : "";
+
+      if (keyword.startsWith("B0") && keyword.length === 10) {
+        matchCondition = { asin1: keyword };
+      } else {
+        matchCondition = {
+          $or: [
+            { sellerSku: { $regex: keyword, $options: "i" } },
+            { itemName: { $regex: keyword, $options: "i" } }
+          ]
+        };
+      }
       const isAsin = /^B0[A-Z0-9]{8}$/.test(query.trim());
-      const matchCondition = isAsin
-        ? { asin1: query.trim() }
-        : {
-            $or: words.flatMap((word) => [
-              { itemName: { $regex: word, $options: "i" } },
-              { asin1: { $regex: word, $options: "i" } },
-              { sellerSku: { $regex: word, $options: "i" } },
-            ]),
-          };
+      // const matchCondition = isAsin
+      //   ? { asin1: query.trim() }
+      //   : {
+      //       $or: words.flatMap((word) => [
+      //         { itemName: { $regex: word, $options: "i" } },
+      //         { asin1: { $regex: word, $options: "i" } },
+      //         { sellerSku: { $regex: word, $options: "i" } },
+      //       ]),
+      //     };
   
       const asinGroup = await SaleReport.aggregate([
         { $match: matchCondition },
@@ -1086,6 +1116,7 @@ exports.getAsinSaleMetrics = async (req, res) => {
       // Parse and normalize date ranges
       const start = new Date(startDate);
       const end = new Date(endDate);
+      end.setDate(end.getDate() + 1); 
       const prevStart = new Date(prevStartDate);
       const prevEnd = new Date(prevEndDate);
   

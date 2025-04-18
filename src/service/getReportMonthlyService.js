@@ -200,7 +200,7 @@ const fetchMontlySalesMetrics = async (identifier, type = "sku") => {
       const url = `https://sellingpartnerapi-na.amazon.com/sales/v1/orderMetrics`;
 
       const endDate = moment().utc().format("YYYY-MM-DD");
-      const startDate = moment().utc().subtract(365, "days").format("YYYY-MM-DD");
+      const startDate = moment().utc().subtract(549, "days").format("YYYY-MM-DD");
       const interval = `${startDate}T00:00:00Z--${endDate}T23:59:59Z`;
 
       const params = {
@@ -224,7 +224,7 @@ const fetchMontlySalesMetrics = async (identifier, type = "sku") => {
       });
 
       // Prepare an array to store data for each of the last 12 months
-      const monthlyData = Array.from({ length: 12 }, (_, i) => {
+      const monthlyData = Array.from({ length: 18 }, (_, i) => {
         const monthStart = moment().utc().subtract(i, "months").startOf("month");
         const monthEnd =
           i === 0 ? moment().utc().endOf("day") : monthStart.clone().endOf("month"); // Current month up to today, others full month

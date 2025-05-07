@@ -25,6 +25,9 @@ const addProductSchema = new mongoose.Schema({
     type:Number,
     required:true
    },
+   targetQuantity:{
+    type:Number,
+   },
    sale:{
     type:Boolean,
     default:false

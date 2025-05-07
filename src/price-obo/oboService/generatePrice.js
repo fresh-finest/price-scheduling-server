@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { autoJobsAgenda } = require("../Agenda");
 const { getListingsItemBySku } = require("../../service/getPriceService");
 const AddPoduct = require("../../model/AddProduct");
+const fetchSalesMetricsByDay = require("../../service/getReportService");
 
 const skuStateSchema = new mongoose.Schema({
   sku: { type: String, required: true, unique: true },
@@ -37,9 +38,14 @@ const generatePrice = async (
   percentage,
   amount,
   type,
+  targetQuantity,
   ruleId
 ) => {
   console.log(percentage, amount, type);
+  console.log(targetQuantity);
+  const metrics = await fetchSalesMetricsByDay("F-BC-8736-UPC","sku")
+  const quantity = metrics[metrics.length - 1].unitCount;
+  console.log("quantity: " + quantity);
   let priceAmount = false;
   let priceDifference;
   if (amount === undefined || amount === null) {
@@ -52,7 +58,7 @@ const generatePrice = async (
 
   const listingData = await getListingsItemBySku(sku);
   const price = listingData.offerAmount;
-  // console.log(price);
+  console.log(price);
   let skuState = await SkuState.findOne({ sku });
   if (!skuState) {
     if (type === "increasing" || type === "increasingRepeat" || type === "increasing-cycling") {
@@ -69,65 +75,36 @@ const generatePrice = async (
   let isIncreasing = skuState.isIncreasing;
   let newPrice;
 
+  // Rule
   if (type === "random") {
     console.log("random");
-
-    // for random type changing the similar amount of price for each sku under one rule
-
-    const randomSeed = getRandomSeedForRule(ruleId);
-    /*
-    if(amount !== undefined && amount !== null){
-      const randomAmount = (randomSeed)*parseFloat(amount);
-      newPrice = lastPrice + randomAmount;
-      if(newPrice > maxPrice){
-
-      }
-      if(newPrice < minPrice){
-
-      }
-    }
-    else if(percentage !== undefined && percentage !== null){
-      const randomPercentage = (randomSeed)*parseFloat(percentage);
-      const priceChange = lastPrice*randomPercentage;
-      newPrice = lastPrice + priceChange;
-      if(newPrice > maxPrice){
-
-      }
-      if(newPrice < minPrice){
-
-      }
-    }
-
-
-*/
-
-    // newPrice = (Math.random() * (maxPrice - minPrice) + minPrice).toFixed(2);
+   
     if (amount !== undefined && amount !== null) {
       const randomAmount = (Math.random() * 2 - 1) * parseFloat(amount);
       newPrice = lastPrice + randomAmount;
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(price);
+       
         newPrice = parseFloat(maxPrice);
-        //await cancelAutoJobs(sku);
+       
       } else if (newPrice < minPrice) {
-        // newPrice = parseFloat(price);
+       
         newPrice = parseFloat(minPrice);
-        //await cancelAutoJobs(sku);
+       
       }
     } else if (percentage !== undefined && percentage !== null) {
       const randomPercentage = (Math.random() * 2 - 1) * parseFloat(percentage);
-      // const priceChange = lastPrice*(randomPercentage/100);
+    
       const priceChange = lastPrice * randomPercentage;
       console.log(randomPercentage, priceChange);
       newPrice = lastPrice + priceChange;
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(price);
+        
         newPrice = parseFloat(maxPrice);
-        // await cancelAutoJobs(sku);
+       
       } else if (newPrice < minPrice) {
-        // newPrice = parseFloat(price);
+        
         newPrice = parseFloat(minPrice);
-        // await cancelAutoJobs(sku);
+        
       }
     }
   } else if (type === "increasing") {
@@ -137,7 +114,7 @@ const generatePrice = async (
       newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(minPrice) + parseFloat(amount);
+      
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
       }
@@ -145,7 +122,7 @@ const generatePrice = async (
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log("last and new price: " + lastPrice, newPrice);
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
+       
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
       }
@@ -156,14 +133,14 @@ const generatePrice = async (
     if (priceAmount) {
       newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-        // newPrice = maxPrice - parseFloat(amount);
+       
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
-        // newPrice = maxPrice - priceDifference * parseFloat(percentage);
+       
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
       }
@@ -174,20 +151,18 @@ const generatePrice = async (
       newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(minPrice) + parseFloat(amount);
+     
         newPrice = parseFloat(minPrice);
-        // newPrice = parseFloat(maxPrice);
-        // await cancelAutoJobs(sku);
+     
       }
     } else {
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log(newPrice);
       console.log("last and new price: " + lastPrice, newPrice);
       if (newPrice > maxPrice) {
-        // newPrice = parseFloat(minPrice) + priceDifference * parseFloat(percentage);
+        
         newPrice = parseFloat(minPrice);
-        // newPrice = parseFloat(maxPrice);
-        // await cancelAutoJobs(sku);
+      
       }
     }
   } else if (type === "decreasingRepeat") {
@@ -196,19 +171,17 @@ const generatePrice = async (
     if (priceAmount) {
       newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-        // newPrice = maxPrice - parseFloat(amount);
+       
         newPrice = parseFloat(maxPrice);
-        // newPrice = parseFloat(minPrice);
-        // await cancelAutoJobs(sku);
+        
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
-        // newPrice = maxPrice - priceDifference * parseFloat(percentage);
+    
         newPrice = parseFloat(maxPrice);
         console.log(newPrice);
-        // newPrice = parseFloat(minPrice);
-        // await cancelAutoJobs(sku);
+      
       }
     }
   } else if (type === "increasing-cycling") {
@@ -250,15 +223,15 @@ const generatePrice = async (
         isIncreasing = true;
       }
     }
+  }else if(type === "quantity-cycling"){
+    if(quantity >= targetQuantity){
+      newPrice = parseFloat(maxPrice);
+     console.log("quantity is greater than",targetQuantity);
+    }else{
+      console.log("quantity is less than",targetQuantity);
+      newPrice = parseFloat(minPrice);
+    }
   }
-
-  // else if(type === "buy-box"){
-  //   checking "IsBuyBoxWinner": true,
-  //   checking "IsFeaturedMerchant": false,
-  //   dicreasing 
-  // if checking isBuboxWinner is true then increase price
-  // if isBuyBoxWinner is false and price is minimum then increase 50% of price difference
-  // continue this process until isBuyBoxWinner is true
 
   skuState.lastPrice = parseFloat(newPrice);
   skuState.isIncreasing = isIncreasing;

@@ -60,7 +60,8 @@ exports.addProductsToRule = async (req, res) => {
           amount: rule.amount,
           category: rule.category,
           interval: rule.interval,
-          sale:product?.sale
+          sale:product?.sale,
+          targetQuantity: product.targetQuantity,
         })
       );
 
@@ -105,7 +106,8 @@ exports.createRuleWithProduct= async(req,res)=>{
                     amount: rule.amount,
                     category:rule.category,
                     interval:rule.interval,
-                    sale:product?.sale
+                    sale:product?.sale,
+                    targetQuantity:product.targetQuantity
 
                 })
             )
@@ -213,7 +215,7 @@ exports.getRule = async(req,res)=>{
 exports.updateProductBySku = async(req,res)=>{
 
   const {ruleId,sku} = req.params;
-  const {maxPrice,minPrice,sale} = req.body;
+  const {maxPrice,minPrice,sale,targetQuantity} = req.body;
   console.log(req.body);
 
   try {
@@ -237,7 +239,8 @@ exports.updateProductBySku = async(req,res)=>{
       amount:rule.amount,
       category:rule.category,
       interval:rule.interval,
-      sale:sale || product?.sale
+      sale:sale || product?.sale,
+      targetQuantity:targetQuantity|| product.targetQuantity
     })
 
     const updatedProduct = await AddPoduct.findOneAndUpdate(
@@ -338,7 +341,8 @@ exports.updateProductBySku = async(req,res)=>{
       amount: rule.amount,
       category:rule.category,
       interval:rule.interval,
-      sale:product?.sale
+      sale:product?.sale,
+      targetQuantity:product.targetQuantity
     })
 
     res.status(200).json({
@@ -383,7 +387,8 @@ exports.updateRule=async(req,res)=>{
         amount,
         category,
         interval,
-        sale:product?.sale
+        sale:product?.sale,
+        targetQuantity:product.targetQuantity
       })
     );
     await Promise.all(autoPricingPromises);
@@ -499,7 +504,8 @@ exports.resumeRule = async(req,res)=>{
         amount,
         category,
         interval,
-        product?.sale
+        product?.sale,
+        product.targetQuantity
       )
        
     )
@@ -540,4 +546,3 @@ exports.getAutoJobBySku = async(req,res,next)=>{
 const cancelAutoJobs = async(sku)=>{
     await autoJobsAgenda.cancel({'data.sku':sku});
 }
-

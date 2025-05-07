@@ -16,7 +16,7 @@ const ruleSchema = mongoose.Schema({
     },
     category: {
     type: String,
-    enum: ["increasing", "decreasing", "random","increasingRepeat","decreasingRepeat","increasing-cycling","decreasing-cycling"],
+    enum: ["increasing", "decreasing", "random","increasingRepeat","decreasingRepeat","increasing-cycling","decreasing-cycling","quantity-cycling"],
     required:true,
   },
   percentage:{
@@ -27,7 +27,7 @@ const ruleSchema = mongoose.Schema({
   },
   interval: {
     type: String,
-    required:true
+    default: "30 minutes",
   },
   userName:{
     type:String,

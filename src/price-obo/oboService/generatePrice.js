@@ -43,7 +43,7 @@ const generatePrice = async (
 ) => {
   console.log(percentage, amount, type);
   console.log(targetQuantity);
-  const metrics = await fetchSalesMetricsByDay("F-BC-8736-UPC","sku")
+  const metrics = await fetchSalesMetricsByDay(sku,"sku")
   const quantity = metrics[metrics.length - 1].unitCount;
   console.log("quantity: " + quantity);
   let priceAmount = false;

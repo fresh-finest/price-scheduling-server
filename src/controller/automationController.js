@@ -142,6 +142,23 @@ exports.getRuleByRuleId=async(req,res)=>{
   }
 }
 
+exports.getRuleById = async(req,res)=>{
+  const {id} = req.params;
+  try {
+    const rule = await Rule.findById({_id:id});
+
+    res.status(200).json({
+      success:true,
+      rule
+    })
+
+  } catch (error) {
+    res.status(400).json({
+      error:error.message
+    })
+  }
+}
+
 exports.getActiveProductBySku = async(req,res)=>{
   const {sku} = req.params;
   try {
@@ -245,7 +262,7 @@ exports.updateProductBySku = async(req,res)=>{
 
     const updatedProduct = await AddPoduct.findOneAndUpdate(
       {ruleId:rule._id,sku},
-      {maxPrice,minPrice,sale},
+      {maxPrice,minPrice,sale,targetQuantity},
       {new:true}
     )
 

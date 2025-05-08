@@ -88,16 +88,16 @@ const scheduleCronJobs=()=>{
 
   //'0 */12 * * *'
   // '*/5 * * * *'
-//   cron.schedule('0 */12 * * *', async () => {
-//     console.log('Running auto-pricing-report job...');
+  cron.schedule('0 */12 * * *', async () => {
+    console.log('Running auto-pricing-report job...');
 
-//     try {
-//         const response = await axios.get('http://localhost:3000/auto-pricing-report');
+    try {
+        const response = await axios.get('http://localhost:3000/auto-pricing-report');
         
-//     } catch (error) {
-//         console.error('Error fetching auto-pricing-report:', error.message);
-//     }
-// });
+    } catch (error) {
+        console.error('Error fetching auto-pricing-report:', error.message);
+    }
+});
   /*
      // Schedule the task to run every day at 8:00 am Bangladesh time
   cron.schedule('0 8 * * *', async () => {

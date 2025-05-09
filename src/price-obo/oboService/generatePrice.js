@@ -67,6 +67,8 @@ const generatePrice = async (
       skuState = new SkuState({ sku, lastPrice: parseFloat(maxPrice) });
     } else if (type === "random") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(price) });
+    }else if (type === "quantity-cycling") {
+      skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
     }
     await skuState.save();
   }
@@ -224,6 +226,7 @@ const generatePrice = async (
       }
     }
   }else if(type === "quantity-cycling"){
+    console.log("Entered quantity-cycling block", quantity, targetQuantity);
     if(quantity >= targetQuantity){
       newPrice = parseFloat(maxPrice);
      console.log("quantity is greater than",targetQuantity);

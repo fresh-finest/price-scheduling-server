@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const { autoJobsAgenda } = require("../Agenda");
 const { getListingsItemBySku } = require("../../service/getPriceService");
 const AddPoduct = require("../../model/AddProduct");
-const fetchSalesMetricsByDay = require("../../service/getReportService");
+const fetchSalesQuantity = require("../../service/getQuantiryService");
 
 const skuStateSchema = new mongoose.Schema({
   sku: { type: String, required: true, unique: true },
@@ -43,7 +43,7 @@ const generatePrice = async (
 ) => {
   console.log(percentage, amount, type);
   console.log(targetQuantity);
-  const metrics = await fetchSalesMetricsByDay(sku,"sku")
+  const metrics = await fetchSalesQuantity(sku,"sku")
   const quantity = metrics[metrics.length - 1].unitCount;
   console.log("quantity: " + quantity);
   let priceAmount = false;

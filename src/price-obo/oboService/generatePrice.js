@@ -3,11 +3,12 @@ const { autoJobsAgenda } = require("../Agenda");
 const { getListingsItemBySku } = require("../../service/getPriceService");
 const AddPoduct = require("../../model/AddProduct");
 const fetchSalesQuantity = require("../../service/getQuantiryService");
+const fetchDynamicQuantity = require("../../service/getDynamictQuantityService");
 
 const skuStateSchema = new mongoose.Schema({
   sku: { type: String, required: true, unique: true },
   lastPrice: { type: Number, required: true },
-  isIncreasing:{type:Boolean, default:false}
+  isIncreasing: { type: Boolean, default: false },
 });
 
 const SkuState = mongoose.model("Skustate", skuStateSchema);
@@ -41,11 +42,15 @@ const generatePrice = async (
   targetQuantity,
   ruleId
 ) => {
+  console.log()
   console.log(percentage, amount, type);
   console.log(targetQuantity);
-  const metrics = await fetchSalesQuantity(sku,"sku")
+  const metrics = await fetchSalesQuantity(sku, "sku");
   const quantity = metrics[metrics.length - 1].unitCount;
-  console.log("quantity: " + quantity);
+  const dyanamicQuantity = await fetchDynamicQuantity(sku, "sku");
+  
+  console.log("dyanamicQuantity: " + dyanamicQuantity);
+
   let priceAmount = false;
   let priceDifference;
   if (amount === undefined || amount === null) {
@@ -61,13 +66,23 @@ const generatePrice = async (
   console.log(price);
   let skuState = await SkuState.findOne({ sku });
   if (!skuState) {
-    if (type === "increasing" || type === "increasingRepeat" || type === "increasing-cycling") {
+    if (
+      type === "increasing" ||
+      type === "increasingRepeat" ||
+      type === "increasing-cycling"
+    ) {
       skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
-    } else if (type === "decreasing" || type === "decreasingRepeat" || type === "decreasing-cycling") {
+    } else if (
+      type === "decreasing" ||
+      type === "decreasingRepeat" ||
+      type === "decreasing-cycling"
+    ) {
       skuState = new SkuState({ sku, lastPrice: parseFloat(maxPrice) });
     } else if (type === "random") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(price) });
-    }else if (type === "quantity-cycling") {
+    } else if (type === "quantity-cycling") {
+      skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
+    } else if (type === "age-by-day") {
       skuState = new SkuState({ sku, lastPrice: parseFloat(minPrice) });
     }
     await skuState.save();
@@ -80,33 +95,25 @@ const generatePrice = async (
   // Rule
   if (type === "random") {
     console.log("random");
-   
+
     if (amount !== undefined && amount !== null) {
       const randomAmount = (Math.random() * 2 - 1) * parseFloat(amount);
       newPrice = lastPrice + randomAmount;
       if (newPrice > maxPrice) {
-       
         newPrice = parseFloat(maxPrice);
-       
       } else if (newPrice < minPrice) {
-       
         newPrice = parseFloat(minPrice);
-       
       }
     } else if (percentage !== undefined && percentage !== null) {
       const randomPercentage = (Math.random() * 2 - 1) * parseFloat(percentage);
-    
+
       const priceChange = lastPrice * randomPercentage;
       console.log(randomPercentage, priceChange);
       newPrice = lastPrice + priceChange;
       if (newPrice > maxPrice) {
-        
         newPrice = parseFloat(maxPrice);
-       
       } else if (newPrice < minPrice) {
-        
         newPrice = parseFloat(minPrice);
-        
       }
     }
   } else if (type === "increasing") {
@@ -116,7 +123,6 @@ const generatePrice = async (
       newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-      
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
       }
@@ -124,7 +130,6 @@ const generatePrice = async (
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log("last and new price: " + lastPrice, newPrice);
       if (newPrice > maxPrice) {
-       
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
       }
@@ -135,14 +140,12 @@ const generatePrice = async (
     if (priceAmount) {
       newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-       
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
-       
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
       }
@@ -153,18 +156,14 @@ const generatePrice = async (
       newPrice = lastPrice + parseFloat(amount);
       console.log("last and new price: " + lastPrice, newPrice, amount);
       if (newPrice > maxPrice) {
-     
         newPrice = parseFloat(minPrice);
-     
       }
     } else {
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
       console.log(newPrice);
       console.log("last and new price: " + lastPrice, newPrice);
       if (newPrice > maxPrice) {
-        
         newPrice = parseFloat(minPrice);
-      
       }
     }
   } else if (type === "decreasingRepeat") {
@@ -173,31 +172,26 @@ const generatePrice = async (
     if (priceAmount) {
       newPrice = lastPrice - parseFloat(amount);
       if (newPrice < minPrice) {
-       
         newPrice = parseFloat(maxPrice);
-        
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
-    
         newPrice = parseFloat(maxPrice);
         console.log(newPrice);
-      
       }
     }
   } else if (type === "increasing-cycling") {
-    
     if (isIncreasing) {
       newPrice =
         lastPrice +
         (priceDifference * parseFloat(percentage) || parseFloat(amount));
-        console.log("new price: "+newPrice);
+      console.log("new price: " + newPrice);
       if (newPrice > maxPrice) {
         newPrice = maxPrice;
         isIncreasing = false;
       }
-    } else{
+    } else {
       newPrice =
         lastPrice -
         (priceDifference * parseFloat(percentage) || parseFloat(amount));
@@ -206,8 +200,7 @@ const generatePrice = async (
         isIncreasing = true;
       }
     }
-  }else if(type=== "decreasing-cycling"){
-   
+  } else if (type === "decreasing-cycling") {
     if (isIncreasing) {
       newPrice =
         lastPrice -
@@ -216,7 +209,7 @@ const generatePrice = async (
         newPrice = minPrice;
         isIncreasing = false;
       }
-    } else{
+    } else {
       newPrice =
         lastPrice +
         (priceDifference * parseFloat(percentage) || parseFloat(amount));
@@ -225,14 +218,24 @@ const generatePrice = async (
         isIncreasing = true;
       }
     }
-  }else if(type === "quantity-cycling"){
+  } else if (type === "quantity-cycling") {
     console.log("Entered quantity-cycling block", quantity, targetQuantity);
-    if(quantity >= targetQuantity){
+    if (quantity >= targetQuantity) {
       newPrice = parseFloat(maxPrice);
-     console.log("quantity is greater than",targetQuantity);
-    }else{
-      console.log("quantity is less than",targetQuantity);
+      console.log("quantity is greater than", targetQuantity);
+    } else {
+      console.log("quantity is less than", targetQuantity);
       newPrice = parseFloat(minPrice);
+    }
+  } else if (type === "age-by-day") {
+    console.log("Entered age by day block", dyanamicQuantity, targetQuantity);
+    if (dyanamicQuantity >= targetQuantity) {
+      newPrice = parseFloat(maxPrice);
+      console.log("dyanamicQuantity is greater than", targetQuantity);
+    } else {
+      console.log("quantity is less than", targetQuantity);
+      newPrice = parseFloat(minPrice);
+      // await cancelAutoJobs(sku);
     }
   }
 
@@ -244,22 +247,22 @@ const generatePrice = async (
 };
 
 const cancelAutoJobs = async (sku) => {
- try {
-  await autoJobsAgenda.cancel({ "data.sku": sku });
+  try {
+    await autoJobsAgenda.cancel({ "data.sku": sku });
 
-  const updatedProduct = await  AddPoduct.findOneAndUpdate(
-    {sku},
-    {status:"Inactive"},
-    {new:true}
-  )
-  if(!updatedProduct){
-    console.log(`No product found with SKU : ${sku}`);
-  }else{
-    console.log(`Product SKU: ${sku} status updated to inactive`);
+    const updatedProduct = await AddPoduct.findOneAndUpdate(
+      { sku },
+      { status: "Inactive" },
+      { new: true }
+    );
+    if (!updatedProduct) {
+      console.log(`No product found with SKU : ${sku}`);
+    } else {
+      console.log(`Product SKU: ${sku} status updated to inactive`);
+    }
+  } catch (error) {
+    console.error("Error cancelling auto jobs and updated status:", error);
   }
- } catch (error) {
-  console.error("Error cancelling auto jobs and updated status:", error);
- }
 };
 
 const skuStateDelete = async (sku) => {

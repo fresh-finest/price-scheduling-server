@@ -232,10 +232,11 @@ const generatePrice = async (
     if (dyanamicQuantity >= targetQuantity) {
       newPrice = parseFloat(maxPrice);
       console.log("dyanamicQuantity is greater than", targetQuantity);
+       await cancelAutoJobs(sku);
     } else {
       console.log("quantity is less than", targetQuantity);
       newPrice = parseFloat(minPrice);
-      // await cancelAutoJobs(sku);
+     
     }
   }
 

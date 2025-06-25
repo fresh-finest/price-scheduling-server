@@ -144,7 +144,7 @@ app.use(session({
 }));
 
 // Set view engine for basic UI
-app.set('view engine', 'ejs');
+// app.set('view engine', 'ejs');
 
 // ==============================================
 // HELPER FUNCTIONS

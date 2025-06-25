@@ -3,7 +3,6 @@ const axios = require("axios");
 const cors = require("cors");
 
 const colors = require("colors");
-
 const mongoose = require("mongoose");
 const Agenda = require("agenda");
 const moment = require("moment-timezone");
@@ -122,6 +121,390 @@ app.use(async (req, res, next) => {
 });
 
 */
+
+const config = {
+  clientKey: '6gi3nino9sia3',
+  clientSecret: '18da778e456044d348a5ae6639dd519893d2db59',
+  redirectUri: 'http://localhost:3000/auth/callback',
+  authUrl: 'https://auth.tiktok-shops.com/oauth/authorize',
+  tokenUrl: 'https://auth.tiktok-shops.com/api/v2/token/get',
+  apiVersion: '202309',
+  sessionSecret: process.env.SESSION_SECRET || 'your-secret-key-heresdfhsdsdsdsd'
+};
+
+// In-memory storage (use a database in production)
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(session({
+  secret: config.sessionSecret,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Set view engine for basic UI
+app.set('view engine', 'ejs');
+
+// ==============================================
+// HELPER FUNCTIONS
+// ==============================================
+
+// Token storage (in-memory for development - use database in production)
+const tokenStore = {};
+
+/**
+ * Generates a random state string for OAuth security
+ */
+function generateStateString() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+/**
+ * Generates API signature required by TikTok
+ * @param {Object} params - Request parameters
+ * @param {String} secret - Client secret
+ */
+function generateSignature(params, secret) {
+  const sortedKeys = Object.keys(params).sort();
+  const stringToSign = sortedKeys.map(key => `${key}${params[key]}`).join('');
+  return crypto.createHmac('sha256', secret).update(stringToSign).digest('hex');
+}
+
+/**
+ * Refreshes access token if expired
+ * @param {Object} req - Express request object
+ */
+async function refreshTokenIfNeeded(req) {
+  const userToken = tokenStore[req.session.userId];
+  if (!userToken) throw new Error('No active session');
+
+  if (Date.now() >= userToken.expiresAt) {
+    const response = await axios.post(config.tokenUrl, null, {
+      params: {
+        app_key: config.clientKey,
+        app_secret: config.clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: userToken.refreshToken,
+        version: config.apiVersion
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const { access_token, refresh_token, expires_in } = response.data.data;
+    
+    userToken.accessToken = access_token;
+    userToken.refreshToken = refresh_token || userToken.refreshToken;
+    userToken.expiresAt = Date.now() + (expires_in * 1000);
+  }
+}
+
+// ==============================================
+// AUTHENTICATION ROUTES
+// ==============================================
+
+/**
+ * Initiates OAuth flow
+ */
+app.get('/auth', (req, res) => {
+  // Safely regenerate session to avoid using a destroyed one
+  req.session.regenerate((err) => {
+    if (err) {
+      console.error("Session regeneration error:", err);
+      return res.status(500).send("Failed to start session");
+    }
+
+    const state = generateStateString();
+    req.session.state = state;
+
+    const authParams = {
+      app_key: config.clientKey,
+      state: state,
+      redirect_uri: config.redirectUri,
+      response_type: 'code',
+      version: config.apiVersion
+    };
+
+    const authUrl = `${config.authUrl}?${require('querystring').stringify(authParams)}`;
+    res.redirect(authUrl);
+  });
+});
+
+
+/**
+ * Handles OAuth callback
+ */
+app.get('/auth/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+
+    // Validate state parameter
+    if (!state || state !== req.session.state) {
+      return res.status(400).render('error', { 
+        message: 'Invalid state parameter' 
+      });
+    }
+
+    // Exchange authorization code for tokens
+    const tokenResponse = await axios.post(config.tokenUrl, null, {
+      params: {
+        app_key: config.clientKey,
+        app_secret: config.clientSecret,
+        auth_code: code,
+        grant_type: 'authorized_code',
+        version: config.apiVersion
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('Token Response:', tokenResponse.data);
+    const { access_token, refresh_token, expires_in, shop_id } = tokenResponse.data.data;
+     console.log('Access Token:', access_token);
+    // Store tokens
+    req.session.userId = `user_${Date.now()}`;
+    tokenStore[req.session.userId] = {
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresAt: Date.now() + (expires_in * 1000),
+      shopId: shop_id,
+      shopInfo: null
+    };
+
+    // Redirect to home page
+    res.redirect('/');
+  } catch (error) {
+    console.error('Authorization error:', error.response?.data || error.message);
+    res.status(500).render('error', {
+      message: 'Authorization failed',
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// ==============================================
+// API ROUTES
+// ==============================================
+
+/**
+ * Gets authorized shops for the authenticated seller
+ */
+app.get('/api/shops', async (req, res) => {
+  try {
+    // Check authentication
+    if (!req.session.userId || !tokenStore[req.session.userId]) {
+      return res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: 'Please authenticate first'
+      });
+    }
+
+    const userToken = tokenStore[req.session.userId];
+
+    // Refresh token if needed
+    await refreshTokenIfNeeded(req);
+
+    // Prepare request parameters
+    const timestamp = Math.floor(Date.now() / 1000);
+    const params = {
+      app_key: config.clientKey,
+      timestamp: timestamp,
+      version: config.apiVersion
+    };
+
+    // Generate signature
+    params.sign = generateSignature(params, config.clientSecret);
+
+    // Make API request
+    const response = await axios.get(`${config.apiBaseUrl}/api/shop/get_authorized_shop`, {
+      params: params,
+      headers: {
+        'x-tts-access-token': userToken.accessToken
+      }
+    });
+
+    // Update shop info
+    userToken.shopInfo = response.data.data.shop_list[0];
+
+    // Return response
+    res.json({
+      code: 0,
+      data: response.data.data,
+      message: 'Success',
+      request_id: response.headers['x-tts-trace-id']
+    });
+
+  } catch (error) {
+    console.error('Get Authorized Shop Error:', error.response?.data || error.message);
+    res.status(500).json({
+      code: 'API_ERROR',
+      message: 'Failed to fetch authorized shops',
+      details: error.response?.data || error.message
+    });
+  }
+});
+
+/**
+ * Gets order list for the authenticated shop
+ */
+app.get('/orders', async (req, res) => {
+  try {
+    // Check authentication
+    if (!req.session.userId || !tokenStore[req.session.userId]) {
+      return res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: 'Please authenticate first'
+      });
+    }
+
+    const userToken = tokenStore[req.session.userId];
+
+    // Refresh token if needed
+    await refreshTokenIfNeeded(req);
+
+    // Prepare request parameters
+    const timestamp = Math.floor(Date.now() / 1000);
+    const params = {
+      app_key: config.clientKey,
+      timestamp: timestamp,
+      shop_id: userToken.shopId,
+      version: config.apiVersion
+    };
+
+    // Generate signature
+    params.sign = generateSignature(params, config.clientSecret);
+
+    // Prepare request body
+    const requestBody = {
+      page_size: 10,
+      order_status: 4 // READY_TO_SHIP
+    };
+
+    // Make API request
+    const response = await axios.post(`${config.apiBaseUrl}/api/orders/search`, requestBody, {
+      params: params,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tts-access-token': userToken.accessToken
+      }
+    });
+
+    // Return response
+    res.json({
+      code: 0,
+      data: response.data.data,
+      message: 'Success',
+      request_id: response.headers['x-tts-trace-id']
+    });
+
+  } catch (error) {
+    console.error('Get Orders Error:', error.response?.data || error.message);
+    res.status(500).json({
+      code: 'API_ERROR',
+      message: 'Failed to fetch orders',
+      details: error.response?.data || error.message
+    });
+  }
+});
+
+async function refreshAccessToken(refreshToken) {
+  try {
+    const response = await axios.post(config.tokenUrl, null, {
+      params: {
+        app_key: config.clientKey,
+        app_secret: config.clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        version: config.apiVersion
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const { access_token, refresh_token, expires_in } = response.data.data;
+    
+    // Update token store
+    tokenStore = {
+      ...tokenStore,
+      accessToken: access_token,
+      refreshToken: refresh_token || tokenStore.refreshToken, // Keep old if not provided
+      expiresAt: Date.now() + (expires_in * 1000)
+    };
+
+    return access_token;
+  } catch (error) {
+    console.error('Error refreshing token:', error.response?.data || error.message);
+    throw error;
+  }
+}
+app.get('/', async (req, res) => {
+  try {
+    const userToken = req.session.userId ? tokenStore[req.session.userId] : null;
+    
+    // If authenticated but no shop info, fetch it
+    if (userToken && !userToken.shopInfo) {
+      await refreshTokenIfNeeded(req);
+      const timestamp = Math.floor(Date.now() / 1000);
+      const params = {
+        app_key: config.clientKey,
+        timestamp: timestamp,
+        version: config.apiVersion
+      };
+      params.sign = generateSignature(params, config.clientSecret);
+
+      const shopResponse = await axios.get(`${config.apiBaseUrl}/api/shop/get_authorized_shop`, {
+        params,
+        headers: {
+          'x-tts-access-token': userToken.accessToken
+        }
+      });
+      userToken.shopInfo = shopResponse.data.data.shop_list[0];
+    }
+
+    res.render('index', {
+      authenticated: !!userToken?.accessToken,
+      shopInfo: userToken?.shopInfo
+    });
+  } catch (error) {
+    console.error('Home page error:', error);
+    res.status(500).render('error', {
+      message: 'Failed to load page',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Logout
+ */
+app.get('/logout', (req, res) => {
+  if (req.session.userId) {
+    delete tokenStore[req.session.userId];
+  }
+  req.session.destroy();
+  res.redirect('/');
+});
+
+// ==============================================
+// ERROR HANDLING
+// ==============================================
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({
+    code: 'SERVER_ERROR',
+    message: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+
+
+
+
 // Example route to fetch marketplace data
 app.get("/api/market", (req, res) => {
   console.log("Cookies received:", req.cookies);

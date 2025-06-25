@@ -125,7 +125,7 @@ app.use(async (req, res, next) => {
 const config = {
   clientKey: '6gi3nino9sia3',
   clientSecret: '18da778e456044d348a5ae6639dd519893d2db59',
-  redirectUri: 'http://localhost:3000/auth/callback',
+  redirectUri: 'https://api.priceobo.com/auth/callback',
   authUrl: 'https://auth.tiktok-shops.com/oauth/authorize',
   tokenUrl: 'https://auth.tiktok-shops.com/api/v2/token/get',
   apiVersion: '202309',

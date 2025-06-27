@@ -66,10 +66,12 @@ const {
 
 const { start } = require("agenda/dist/agenda/start");
 const AutoSchedule = require("../../model/AutoSchedule");
-// const Warehouse = require("../../model/Warehouse");
+const Warehouse = require("../../model/Warehouse");
 
 const { fetchSalesMetrics, updateSaeReport } = require("../../service/saleReportService");
 const { getDynamicInterval, fetchOrderMetrics } = require("../../service/totalSaleService");
+const fetchDynamicQuantity = require("../../service/getDynamictQuantityService");
+const ScanOrder = require("../../model/scanOrder");
 
 
 const app = express();
@@ -781,7 +783,7 @@ router.get('/total-sales', async (req, res) => {
 
 
 // const upload = multer({ dest: 'uploads/' });
-/*
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 
@@ -860,7 +862,7 @@ router.get("/warehouse", async (req, res) => {
   res.json({ current, previous: previousData });
 });
 
-*/
+
 
 // shopify admin api sections 
 router.post("/request-quote",async(req,res)=>{
@@ -902,6 +904,199 @@ router.post("/request-quote",async(req,res)=>{
   }
 
 })
+
+
+router.get("/quantity",async(req,res)=>{
+  //  const sku=
+  try {
+    const quantity = await fetchDynamicQuantity('B-BB-2864',"sku");
+    res.status(200).json({
+      quantity
+    })
+  } catch (error) {
+    console.log(error);
+  }
+})
+
+
+// veeqo
+const VEEQO_API_URL = "https://api.veeqo.com/orders";
+
+const VEEQO_API_KEY = process.env.VEEQO_API_KEY;
+
+router.get("/api/orders", async (req, res) => {
+  try {
+    const {
+      page = 1,
+      page_size = 100,
+      status = "shipped",
+      created_at_min,
+      updated_at_min,
+      tags,
+      allocated_at,
+      query,
+      since_id
+    } = req.query;
+
+    const params = {
+      status,
+      page,
+      page_size,
+      created_at_min,
+      updated_at_min,
+      tags,
+      allocated_at,
+      query,
+      since_id
+    };
+
+    // Clean empty params
+    Object.keys(params).forEach((key) => {
+      if (!params[key]) delete params[key];
+    });
+
+    // 1. Fetch Veeqo orders
+    const response = await axios.get(VEEQO_API_URL, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": VEEQO_API_KEY,
+      },
+      params,
+    });
+
+    const veeqoOrders = response.data.orders || response.data; // depends on API format
+
+    // 2. Extract order IDs to match
+    const veeqoOrderIds = veeqoOrders.map(order => order.id.toString());
+
+    // 3. Fetch matching ScannerOrders
+    const scannerOrders = await ScanOrder.find({
+      orderId: { $in: veeqoOrderIds }
+    });
+
+    // 4. Create a map for fast lookup
+    const scannerMap = {};
+    scannerOrders.forEach(scan => {
+      scannerMap[scan.orderId] = scan;
+    });
+
+    // 5. Merge Scanner data into Veeqo orders
+    const mergedOrders = veeqoOrders.map(order => {
+      const scanData = scannerMap[order.id.toString()];
+      return {
+        ...order,
+        scanStatus: scanData?.scanStatus || null,
+        picked: scanData?.picked || false,
+        packed: scanData?.packed || false,
+        trackingNumber: scanData?.trackingNumber || null,
+        scanUpdatedAt: scanData?.updatedAt || null,
+      };
+    });
+
+    res.status(200).json({ result:mergedOrders });
+  } catch (error) {
+    console.error("Error fetching or merging orders:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to fetch merged orders" });
+  }
+});
+
+
+router.get('/api/orders/scan', async (req, res) => {
+  const { query, role } = req.query; 
+
+  if (!query || !role) {
+    return res.status(400).json({ error: "query and user role are required" });
+  }
+
+  let trackingNumber = query.trim();
+  if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+    trackingNumber = trackingNumber.slice(-22); 
+  }
+  console.log(query," ..convert to.. ",trackingNumber)
+  try {
+    const response = await axios.get(VEEQO_API_URL, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": VEEQO_API_KEY,
+      },
+      params: {
+        query: trackingNumber
+      }
+    });
+
+    const order = response.data[0]; // Assume first match
+    if (!order) {
+      return res.status(404).json({ error: "Order not found in Veeqo" });
+    }
+
+    const { id: orderId } = order;
+
+  
+    let existingScan = await ScanOrder.findOne({ orderId });
+
+    if (role === "picker") {
+
+      if (!existingScan) {
+        existingScan = await ScanOrder.create({
+          orderId,
+          trackingNumber,
+          picked: true,
+          packed: false,
+          scanStatus: "picked",
+        });
+      } else {
+        existingScan.picked = true;
+        existingScan.scanStatus = "picked";
+        await existingScan.save();
+      }
+      return res.json({ message: "Picked scan recorded", order, scanStatus: existingScan });
+    }
+
+    if (role === "packer") {
+      // Packer can only scan after picker
+      if (!existingScan || !existingScan.picked) {
+        return res.status(400).json({ error: "Cannot pack before pick" });
+      }
+      if (existingScan.packed) {
+        return res.status(400).json({ error: "Already packed" });
+      }
+
+      existingScan.packed = true;
+      existingScan.scanStatus = "packed";
+      await existingScan.save();
+
+      return res.json({ message: "Packed scan recorded", order, scanStatus: existingScan });
+    }
+
+    return res.status(400).json({ error: "Invalid user Role" });
+
+  } catch (error) {
+    console.error("Scan error:", error.response?.data || error.message);
+    return res.status(500).json({ error: "Failed to process scan" });
+  }
+});
+
+router.get("/api/order/:order_id", async (req, res) => {
+  const { order_id } = req.params;
+ 
+  if (!order_id) {
+    return res.status(400).json({ error: "Missing order ID" });
+  }
+
+  try {
+    const response = await axios.get(`https://api.veeqo.com/orders/#${order_id}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": VEEQO_API_KEY,
+      },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error fetching order details:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to fetch order details" });
+  }
+});
 
 
 module.exports = router;

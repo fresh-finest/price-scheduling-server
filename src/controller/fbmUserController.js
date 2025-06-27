@@ -198,7 +198,7 @@ exports.inviteFBMUser = async (req, res, next) => {
             newFBMUser.email.trim(), // Ensure no leading/trailing spaces
             'Invitation to join FBM Warehouse',
             `You are invited to join FBM Warehouse. Please set up your password using the following link: ${resetUrl}`,
-            `<p>You are invited to join <strong>Fresh Finest</strong>.</p>
+            `<p>You are invited to join <strong>FBM Warehouse</strong>.</p>
             <p>Please set up your password using the link below:</p>
             <p><a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; font-size: 16px; color: white; background-color: #28a745; text-decoration: none; border-radius: 5px;">Accept Invitation</a></p>`
         );

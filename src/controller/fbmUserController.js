@@ -189,7 +189,7 @@ exports.inviteFBMUser = async (req, res, next) => {
         // const resetUrl = `http://localhost:5173/reset-password?token=${token}`;
         // const resetUrl = `https://price-changing.netlify.app/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
         // const resetUrl = `https://app.priceobo.com/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
-        const resetUrl = `http://https://fbm.priceobo.com/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
+        const resetUrl = `https://fbm.priceobo.com/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`;
 
 
 

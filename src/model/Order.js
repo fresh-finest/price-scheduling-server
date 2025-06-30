@@ -1,0 +1,33 @@
+const mongoose = require("mongoose");
+
+const orderSchema = mongoose.Schema(
+  {
+    OrderId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    created_at:{ type:String},
+    carrier_name: { type: String },
+    customerName: { type: String },
+    address: { type: String },
+    trackingNumber: { type: String },
+    trackingUrl:{type:String},
+    items:[
+        {
+            sku: { type: String },
+            quantity: { type: Number },
+            title: { type: String },
+            image: { type: String },
+        },
+    ],
+    status: {
+      type: String,
+    },
+
+  },
+  { timestamps: true }
+);
+
+const Order = mongoose.model("Order", orderSchema);
+module.exports = Order;

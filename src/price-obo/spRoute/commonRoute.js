@@ -78,6 +78,7 @@ const {
 } = require("../../service/totalSaleService");
 const fetchDynamicQuantity = require("../../service/getDynamictQuantityService");
 const ScanOrder = require("../../model/scanOrder");
+const Order = require("../../model/Order");
 
 const app = express();
 
@@ -1047,7 +1048,7 @@ router.get("/api/orders/scan", async (req, res) => {
       return res.status(404).json({ error: "Order not found in Veeqo" });
     }
 
-    const { id: orderId } = order;
+    const { number: orderId } = order;
 
     let existingScan = await ScanOrder.findOne({ orderId });
 
@@ -1096,6 +1097,161 @@ router.get("/api/orders/scan", async (req, res) => {
   } catch (error) {
     console.error("Scan error:", error.response?.data || error.message);
     return res.status(500).json({ error: "Failed to process scan" });
+  }
+});
+
+router.get("/api/orders/store", async (req, res) => {
+  try {
+    const pageSize = 50;
+    const totalOrders = 100;
+    const totalPages = Math.ceil(totalOrders / pageSize);
+    const allOrders = [];
+
+    for (let page = 1; page <= totalPages; page++) {
+      const response = await axios.get(VEEQO_API_URL, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": VEEQO_API_KEY,
+        },
+        params: {
+          page,
+          page_size: pageSize,
+          status: "shipped",
+        },
+      });
+
+      const rawOrders = response.data;
+
+      for (const order of rawOrders) {
+        const structuredOrder = {
+          OrderId: String(order.number),
+          created_at: order.created_at || "",
+          carrier_name:
+            order.allocations?.[0]?.shipment?.service_carrier_name || "",
+          customerName: order.customer?.full_name || "",
+          address: order.customer?.billing_address?.address1 || "",
+          trackingNumber:
+            order.allocations?.[0]?.shipment?.tracking_number
+              ?.tracking_number || "",
+          trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
+          status:
+            order.allocations?.[0]?.shipment?.tracking_number?.status || "",
+          items: (order.allocations?.[0]?.line_items || []).map((item) => {
+            const sellable = item.sellable || {};
+            return {
+              sku: sellable.sku_code || "",
+              quantity: item.quantity || 0,
+              title: sellable.product_title || sellable.title || "",
+              imageUrl: sellable.image_url || sellable.main_thumbnail_url || "",
+            };
+          }),
+        };
+
+        allOrders.push(structuredOrder);
+      }
+    }
+
+  
+    const bulkOps = allOrders.map((order) => ({
+      updateOne: {
+        filter: { OrderId: order.OrderId },
+        update: {
+          $set: {
+            trackingNumber: order.trackingNumber,
+            trackingUrl: order.trackingUrl,
+            status: order.status,
+            updatedAt: new Date(),
+          },
+          $setOnInsert: {
+            created_at: order.created_at,
+            carrier_name: order.carrier_name,
+            customerName: order.customerName,
+            address: order.address,
+            items: order.items,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    await Order.bulkWrite(bulkOps);
+
+    console.log(`Upserted ${allOrders.length} orders.`);
+    res
+      .status(200)
+      .json({ message: "Orders stored/updated", count: allOrders.length });
+  } catch (error) {
+    console.error(
+      "Error fetching/storing orders:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({ error: "Failed to store/update orders" });
+  }
+});
+
+router.get("/api/orders-list", async (req, res) => {
+  try {
+    const { status, scanStatus } = req.query;
+
+    const orders = await Order.find({ ...(status && { status }) }).sort({created_at:-1}).lean();
+    const scanOrders = await ScanOrder.find({}).lean();
+    const scanMap = new Map(scanOrders.map(scan => [scan.orderId, scan]));
+
+    const validStatuses = [
+      "awaiting_collection",
+      "created",
+      "in_transit",
+      "out_for_delivery",
+      "delivered"
+    ];
+
+    let mergedOrders = orders.map(order => {
+      const scan = scanMap.get(order.OrderId);
+      return {
+        ...order,
+        picked: scan?.picked || false,
+        packed: scan?.packed || false,
+        scanStatus: scan?.scanStatus || "pending"
+      };
+    });
+
+    if (scanStatus) {
+      mergedOrders = mergedOrders.filter(order => order.scanStatus === scanStatus);
+    }
+
+    const totalByScanStatus = {};
+    const totalByGranularStatus = {
+      awaiting_collection: 0,
+      in_transit: 0,
+      delivered: 0,
+      created:0,
+      out_for_delivery: 0,
+      tracking_issue: 0
+    };
+
+    mergedOrders.forEach(order => {
+      // Count scanStatus
+      totalByScanStatus[order.scanStatus] = (totalByScanStatus[order.scanStatus] || 0) + 1;
+
+      // Normalize and count tracking status
+      const s = order.status?.toLowerCase().trim();
+      if (s === "awaiting_collection") totalByGranularStatus.awaiting_collection += 1;
+      else if (s === "in_transit") totalByGranularStatus.in_transit += 1;
+      else if (s === "delivered") totalByGranularStatus.delivered += 1;
+      else if (s === "created") totalByGranularStatus.created += 1;
+      else if (s === "out_for_delivery") totalByGranularStatus.out_for_delivery += 1;
+      else if (s=== "delayed" || s === "cancelled" || s==="contact_support" || s==="recipient_refused" || s==="returned_to_sender") totalByGranularStatus.tracking_issue += 1;
+    });
+
+    res.status(200).json({
+      total: mergedOrders.length,
+      totalByScanStatus,
+      totalByStatus: totalByGranularStatus,
+      result: mergedOrders
+    });
+  } catch (error) {
+    console.error("❌ Error fetching orders list:", error.message);
+    res.status(500).json({ error: "Failed to fetch orders list" });
   }
 });
 

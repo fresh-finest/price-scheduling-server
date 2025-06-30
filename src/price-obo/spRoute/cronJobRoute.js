@@ -170,7 +170,17 @@ const scheduleCronJobs=()=>{
 };
 
 
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    console.log("⏳ Running cron job to fetch/store orders...");
 
+    const response = await axios.get("http://localhost:3000/api/orders/store");
+
+    console.log(`Orders stored: ${response.data.count}`);
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
 
 // Export the function
 module.exports = { scheduleCronJobs };

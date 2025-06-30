@@ -1147,7 +1147,9 @@ router.get("/api/orders/store", async (req, res) => {
           }),
         };
 
-        allOrders.push(structuredOrder);
+        if (structuredOrder.trackingNumber) {
+          allOrders.push(structuredOrder);
+        }
       }
     }
 

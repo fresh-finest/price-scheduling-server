@@ -1021,7 +1021,9 @@ router.get("/api/orders", async (req, res) => {
 });
 
 router.get("/api/orders/scan", async (req, res) => {
-  const { query, role } = req.query;
+  const { query, role,userName} = req.query;
+
+  console.log("Scan request received with query:", query, "and role:", role);
 
   if (!query || !role) {
     return res.status(400).json({ error: "query and user role are required" });
@@ -1048,6 +1050,7 @@ router.get("/api/orders/scan", async (req, res) => {
       return res.status(404).json({ error: "Order not found in Veeqo" });
     }
 
+  
     const { number: orderId } = order;
 
     let existingScan = await ScanOrder.findOne({ orderId });
@@ -1055,6 +1058,8 @@ router.get("/api/orders/scan", async (req, res) => {
     if (role === "picker") {
       if (!existingScan) {
         existingScan = await ScanOrder.create({
+          pickerName:userName,
+          pickerRole:role,
           orderId,
           trackingNumber,
           picked: true,
@@ -1081,7 +1086,8 @@ router.get("/api/orders/scan", async (req, res) => {
       if (existingScan.packed) {
         return res.status(400).json({ error: "Already packed" });
       }
-
+      existingScan.packerName=userName;
+      existingScan.packerRole = role;
       existingScan.packed = true;
       existingScan.scanStatus = "packed";
       await existingScan.save();
@@ -1195,30 +1201,38 @@ router.get("/api/orders-list", async (req, res) => {
   try {
     const { status, scanStatus } = req.query;
 
-    const orders = await Order.find({ ...(status && { status }) }).sort({created_at:-1}).lean();
+    const orders = await Order.find({ ...(status && { status }) })
+      .sort({ created_at: -1 })
+      .lean();
     const scanOrders = await ScanOrder.find({}).lean();
-    const scanMap = new Map(scanOrders.map(scan => [scan.orderId, scan]));
+    const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
     const validStatuses = [
       "awaiting_collection",
       "created",
       "in_transit",
       "out_for_delivery",
-      "delivered"
+      "delivered",
     ];
 
-    let mergedOrders = orders.map(order => {
+    let mergedOrders = orders.map((order) => {
       const scan = scanMap.get(order.OrderId);
       return {
         ...order,
         picked: scan?.picked || false,
         packed: scan?.packed || false,
-        scanStatus: scan?.scanStatus || "pending"
+        scanStatus: scan?.scanStatus || "pending",
+        pickerName: scan?.pickerName || null,
+        pickerRole: scan?.pickerRole || null,
+        packerName: scan?.packerName || null,
+        packerRole: scan?.packerRole || null,
       };
     });
 
     if (scanStatus) {
-      mergedOrders = mergedOrders.filter(order => order.scanStatus === scanStatus);
+      mergedOrders = mergedOrders.filter(
+        (order) => order.scanStatus === scanStatus
+      );
     }
 
     const totalByScanStatus = {};
@@ -1226,30 +1240,40 @@ router.get("/api/orders-list", async (req, res) => {
       awaiting_collection: 0,
       in_transit: 0,
       delivered: 0,
-      created:0,
+      created: 0,
       out_for_delivery: 0,
-      tracking_issue: 0
+      tracking_issue: 0,
     };
 
-    mergedOrders.forEach(order => {
+    mergedOrders.forEach((order) => {
       // Count scanStatus
-      totalByScanStatus[order.scanStatus] = (totalByScanStatus[order.scanStatus] || 0) + 1;
+      totalByScanStatus[order.scanStatus] =
+        (totalByScanStatus[order.scanStatus] || 0) + 1;
 
       // Normalize and count tracking status
       const s = order.status?.toLowerCase().trim();
-      if (s === "awaiting_collection") totalByGranularStatus.awaiting_collection += 1;
+      if (s === "awaiting_collection")
+        totalByGranularStatus.awaiting_collection += 1;
       else if (s === "in_transit") totalByGranularStatus.in_transit += 1;
       else if (s === "delivered") totalByGranularStatus.delivered += 1;
       else if (s === "created") totalByGranularStatus.created += 1;
-      else if (s === "out_for_delivery") totalByGranularStatus.out_for_delivery += 1;
-      else if (s=== "delayed" || s === "cancelled" || s==="contact_support" || s==="recipient_refused" || s==="returned_to_sender") totalByGranularStatus.tracking_issue += 1;
+      else if (s === "out_for_delivery")
+        totalByGranularStatus.out_for_delivery += 1;
+      else if (
+        s === "delayed" ||
+        s === "cancelled" ||
+        s === "contact_support" ||
+        s === "recipient_refused" ||
+        s === "returned_to_sender"
+      )
+        totalByGranularStatus.tracking_issue += 1;
     });
 
     res.status(200).json({
       total: mergedOrders.length,
       totalByScanStatus,
       totalByStatus: totalByGranularStatus,
-      result: mergedOrders
+      result: mergedOrders,
     });
   } catch (error) {
     console.error("❌ Error fetching orders list:", error.message);

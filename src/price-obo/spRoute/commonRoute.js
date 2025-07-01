@@ -1105,6 +1105,75 @@ router.get("/api/orders/scan", async (req, res) => {
   }
 });
 
+router.post("/api/orders/bulk/scan", async (req, res) => {
+  try {
+    const { trackingNumbers = [], role, userName } = req.body;
+
+    if (!Array.isArray(trackingNumbers) || trackingNumbers.length === 0 || !role || !userName) {
+      return res.status(400).json({ error: "userName, role, and trackingNumbers[] are required." });
+    }
+
+    const results = [];
+
+    for (let rawTracking of trackingNumbers) {
+      let trackingNumber = rawTracking.trim();
+
+      if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+        trackingNumber = trackingNumber.slice(-22);
+      }
+
+      const order = await Order.findOne({ trackingNumber });
+
+      if (!order) {
+        results.push({ trackingNumber, status: "not_found", message: "Order not found" });
+        continue;
+      }
+
+      const { OrderId: orderId } = order;
+      let existingScan = await ScanOrder.findOne({ orderId });
+
+      if (role === "picker") {
+        if (!existingScan) {
+          existingScan = await ScanOrder.create({
+            pickerName: userName,
+            pickerRole: role,
+            orderId,
+            trackingNumber,
+            picked: true,
+            packed: false,
+            scanStatus: "picked",
+          });
+
+          results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
+        } else {
+          results.push({ trackingNumber, status: "already_picked", message: "Already Picked" });
+        }
+      } else if (role === "packer") {
+        if (!existingScan || !existingScan.picked) {
+          results.push({ trackingNumber, status: "not_ready", message: "Cannot pack before pick" });
+        } else if (existingScan.packed) {
+          results.push({ trackingNumber, status: "already_packed", message: "Already Packed" });
+        } else {
+          existingScan.packerName = userName;
+          existingScan.packerRole = role;
+          existingScan.packed = true;
+          existingScan.scanStatus = "packed";
+          await existingScan.save();
+
+          results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
+        }
+      } else {
+        results.push({ trackingNumber, status: "invalid_role", message: "Invalid role" });
+      }
+    }
+
+    res.status(200).json({ success: true, summary: results });
+  } catch (error) {
+    console.error("Bulk Scan Error:", error);
+    res.status(500).json({ error: "Failed to process bulk scan" });
+  }
+});
+
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;

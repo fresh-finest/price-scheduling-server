@@ -7,6 +7,8 @@ const orderSchema = mongoose.Schema(
       required: true,
       unique: true,
     },
+    id: { type: String},
+    shipped_at:{type:String},
     created_at:{ type:String},
     carrier_name: { type: String },
     customerName: { type: String },

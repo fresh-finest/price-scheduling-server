@@ -1033,7 +1033,7 @@ router.get("/api/orders/scan", async (req, res) => {
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
     trackingNumber = trackingNumber.slice(-22);
   }
-  console.log(query, " ..convert to.. ", trackingNumber);
+ 
   try {
     const response = await axios.get(VEEQO_API_URL, {
       headers: {
@@ -1044,14 +1044,15 @@ router.get("/api/orders/scan", async (req, res) => {
         query: trackingNumber,
       },
     });
-
+    const order1 = await Order.findOne({ trackingNumber });
     const order = response.data[0]; // Assume first match
-    if (!order) {
-      return res.status(404).json({ error: "Order not found in Veeqo" });
+
+    if (!order1) {
+      return res.status(404).json({ error: "Order not found!" });
     }
 
   
-    const { number: orderId } = order;
+    const { OrderId: orderId } = order1;
 
     let existingScan = await ScanOrder.findOne({ orderId });
 
@@ -1067,12 +1068,10 @@ router.get("/api/orders/scan", async (req, res) => {
           scanStatus: "picked",
         });
       } else {
-        existingScan.picked = true;
-        existingScan.scanStatus = "picked";
-        await existingScan.save();
+        return res.status(400).json({ error: "Already picked" });
       }
       return res.json({
-        message: "Picked scan recorded",
+        message: "Successfully Picked!",
         order,
         scanStatus: existingScan,
       });
@@ -1093,7 +1092,7 @@ router.get("/api/orders/scan", async (req, res) => {
       await existingScan.save();
 
       return res.json({
-        message: "Packed scan recorded",
+        message: "Successfully Packed!",
         order,
         scanStatus: existingScan,
       });
@@ -1108,7 +1107,7 @@ router.get("/api/orders/scan", async (req, res) => {
 
 router.get("/api/orders/store", async (req, res) => {
   try {
-    const pageSize = 50;
+    const pageSize = 100;
     const totalOrders = 100;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
@@ -1130,8 +1129,10 @@ router.get("/api/orders/store", async (req, res) => {
 
       for (const order of rawOrders) {
         const structuredOrder = {
+          id: String(order.id),
           OrderId: String(order.number),
-          created_at: order.created_at || "",
+          created_at: order.shipped_at || "",
+          shipped_at: order.shipped_at || "",
           carrier_name:
             order.allocations?.[0]?.shipment?.service_carrier_name || "",
           customerName: order.customer?.full_name || "",
@@ -1171,6 +1172,8 @@ router.get("/api/orders/store", async (req, res) => {
             updatedAt: new Date(),
           },
           $setOnInsert: {
+            id: order.id,
+            shipped_at: order.shipped_at,
             created_at: order.created_at,
             carrier_name: order.carrier_name,
             customerName: order.customerName,
@@ -1199,11 +1202,21 @@ router.get("/api/orders/store", async (req, res) => {
 
 router.get("/api/orders-list", async (req, res) => {
   try {
-    const { status, scanStatus } = req.query;
+    const { status, scanStatus, query } = req.query;
 
-    const orders = await Order.find({ ...(status && { status }) })
-      .sort({ created_at: -1 })
-      .lean();
+    // Base query with optional status filter
+    const orderQuery = { ...(status && { status }) };
+
+    // Search by orderId or trackingNumber (case-insensitive)
+    if (query) {
+      orderQuery.$or = [
+        { OrderId: { $regex: query, $options: "i" } },
+        { trackingNumber: { $regex: query, $options: "i" } },
+      ];
+    }
+
+    // Fetch orders and scanOrders
+    const orders = await Order.find(orderQuery).sort({ created_at: -1 }).lean();
     const scanOrders = await ScanOrder.find({}).lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
@@ -1229,12 +1242,14 @@ router.get("/api/orders-list", async (req, res) => {
       };
     });
 
+    // Optional scanStatus filter
     if (scanStatus) {
       mergedOrders = mergedOrders.filter(
         (order) => order.scanStatus === scanStatus
       );
     }
 
+    // Totals
     const totalByScanStatus = {};
     const totalByGranularStatus = {
       awaiting_collection: 0,
@@ -1246,11 +1261,11 @@ router.get("/api/orders-list", async (req, res) => {
     };
 
     mergedOrders.forEach((order) => {
-      // Count scanStatus
+      // Scan status counts
       totalByScanStatus[order.scanStatus] =
         (totalByScanStatus[order.scanStatus] || 0) + 1;
 
-      // Normalize and count tracking status
+      // Tracking status categorization
       const s = order.status?.toLowerCase().trim();
       if (s === "awaiting_collection")
         totalByGranularStatus.awaiting_collection += 1;
@@ -1269,6 +1284,7 @@ router.get("/api/orders-list", async (req, res) => {
         totalByGranularStatus.tracking_issue += 1;
     });
 
+    // Final response
     res.status(200).json({
       total: mergedOrders.length,
       totalByScanStatus,
@@ -1276,7 +1292,7 @@ router.get("/api/orders-list", async (req, res) => {
       result: mergedOrders,
     });
   } catch (error) {
-    console.error("❌ Error fetching orders list:", error.message);
+    console.error("Error fetching orders list:", error.message);
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
 });

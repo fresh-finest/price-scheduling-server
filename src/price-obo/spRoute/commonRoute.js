@@ -5,6 +5,8 @@ const axios = require("axios");
 const NodeCache = require("node-cache");
 const multer = require("multer");
 const csv = require("csv-parser");
+const bcrypt = require('bcryptjs');
+
 const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
@@ -79,6 +81,7 @@ const {
 const fetchDynamicQuantity = require("../../service/getDynamictQuantityService");
 const ScanOrder = require("../../model/scanOrder");
 const Order = require("../../model/Order");
+const FBMUser = require("../../model/fbmUser");
 
 const app = express();
 
@@ -1107,12 +1110,20 @@ router.get("/api/orders/scan", async (req, res) => {
 
 router.post("/api/orders/bulk/scan", async (req, res) => {
   try {
-    const { trackingNumbers = [], role, userName } = req.body;
+    const { email, password, userName, role, trackingNumbers = [] } = req.body;
 
-    if (!Array.isArray(trackingNumbers) || trackingNumbers.length === 0 || !role || !userName) {
-      return res.status(400).json({ error: "userName, role, and trackingNumbers[] are required." });
+    if (!email || !password || !role || !userName || !Array.isArray(trackingNumbers)) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // ✅ Step 2: Authenticate user password
+    const user = await FBMUser.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(401).json({ error: "Invalid password" });
+
+    // ✅ Step 3: Continue with bulk scanning
     const results = [];
 
     for (let rawTracking of trackingNumbers) {
@@ -1123,7 +1134,6 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
       }
 
       const order = await Order.findOne({ trackingNumber });
-
       if (!order) {
         results.push({ trackingNumber, status: "not_found", message: "Order not found" });
         continue;
@@ -1134,7 +1144,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 
       if (role === "picker") {
         if (!existingScan) {
-          existingScan = await ScanOrder.create({
+          await ScanOrder.create({
             pickerName: userName,
             pickerRole: role,
             orderId,
@@ -1143,7 +1153,6 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
             packed: false,
             scanStatus: "picked",
           });
-
           results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
         } else {
           results.push({ trackingNumber, status: "already_picked", message: "Already Picked" });
@@ -1159,7 +1168,6 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
           existingScan.packed = true;
           existingScan.scanStatus = "packed";
           await existingScan.save();
-
           results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
         }
       } else {
@@ -1168,9 +1176,10 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
     }
 
     res.status(200).json({ success: true, summary: results });
+
   } catch (error) {
-    console.error("Bulk Scan Error:", error);
-    res.status(500).json({ error: "Failed to process bulk scan" });
+    console.error("Bulk Scan Error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

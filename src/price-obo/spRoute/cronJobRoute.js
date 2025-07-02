@@ -170,7 +170,7 @@ const scheduleCronJobs=()=>{
 };
 
 
-cron.schedule("*/20 * * * *", async () => {
+cron.schedule("*/15 * * * *", async () => {
   try {
     console.log("⏳ Running cron job to fetch/store orders...");
 

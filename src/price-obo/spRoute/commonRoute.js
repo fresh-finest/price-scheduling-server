@@ -1186,7 +1186,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 400;
+    const totalOrders = 200;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -1216,9 +1216,9 @@ router.get("/api/orders/store", async (req, res) => {
           customerName: order.customer?.full_name || "",
           address: order.customer?.billing_address?.address1 || "",
           trackingNumber:
-            order.allocations?.[0]?.shipment?.tracking_number
-              ?.tracking_number || "",
-          shipmentId:order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||"",
+            order.allocations?.[0]?.shipment?.tracking_number?.tracking_number || "",
+          shipmentId:
+            order.allocations?.[0]?.shipment?.tracking_number?.shipment_id || "",
           trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
           status:
             order.allocations?.[0]?.shipment?.tracking_number?.status || "",
@@ -1228,7 +1228,7 @@ router.get("/api/orders/store", async (req, res) => {
               sku: sellable.sku_code || "",
               quantity: item.quantity || 0,
               title: sellable.product_title || sellable.title || "",
-              imageUrl: sellable.image_url || sellable.main_thumbnail_url || "",
+              image: sellable.image_url || sellable.main_thumbnail_url || "",
             };
           }),
         };
@@ -1239,44 +1239,33 @@ router.get("/api/orders/store", async (req, res) => {
       }
     }
 
-  
-    const bulkOps = allOrders.map((order) => ({
-      updateOne: {
-        filter: { OrderId: order.OrderId },
-        update: {
-          $set: {
-            trackingNumber: order.trackingNumber,
-            trackingUrl: order.trackingUrl,
-            updatedAt: new Date(),
-          },
-          $setOnInsert: {
-            id: order.id,
-            shipmentId: order.shipmentId,
-            shipped_at: order.shipped_at,
-            created_at: order.created_at,
-            carrier_name: order.carrier_name,
-            customerName: order.customerName,
-            status: order.status,
-            address: order.address,
-            items: order.items,
-          },
-        },
-        upsert: true,
-      },
-    }));
+    // Filter only NEW orders
+    const existingOrders = await Order.find({
+      OrderId: { $in: allOrders.map((o) => o.OrderId) },
+    }).select("OrderId");
 
-    await Order.bulkWrite(bulkOps);
+    const existingOrderIds = new Set(existingOrders.map((o) => o.OrderId));
 
-    console.log(`Upserted ${allOrders.length} orders.`);
-    res
-      .status(200)
-      .json({ message: "Orders stored/updated", count: allOrders.length });
+    const newOrders = allOrders.filter(
+      (order) => !existingOrderIds.has(order.OrderId)
+    );
+
+    // Insert all new orders
+    if (newOrders.length > 0) {
+      await Order.insertMany(newOrders);
+    }
+
+    console.log(`Inserted ${newOrders.length} new orders.`);
+    res.status(200).json({
+      message: "New orders inserted",
+      insertedCount: newOrders.length,
+    });
   } catch (error) {
     console.error(
-      "Error fetching/storing orders:",
+      "Error fetching/inserting orders:",
       error.response?.data || error.message
     );
-    res.status(500).json({ error: "Failed to store/update orders" });
+    res.status(500).json({ error: "Failed to insert orders" });
   }
 });
 

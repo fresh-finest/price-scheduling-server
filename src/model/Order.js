@@ -15,6 +15,7 @@ const orderSchema = mongoose.Schema(
     address: { type: String },
     trackingNumber: { type: String },
     trackingUrl:{type:String},
+    shipmentId:{type:String},
     items:[
         {
             sku: { type: String },

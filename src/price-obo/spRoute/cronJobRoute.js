@@ -170,7 +170,7 @@ const scheduleCronJobs=()=>{
 };
 
 
-cron.schedule("*/5 * * * *", async () => {
+cron.schedule("*/10 * * * *", async () => {
   try {
     console.log("⏳ Running cron job to fetch/store orders...");
 
@@ -182,5 +182,18 @@ cron.schedule("*/5 * * * *", async () => {
   }
 });
 
+cron.schedule("0 18 * * *", async () => {
+  try {
+    console.log("⏳ Running daily 6:00 PM BST cron job to fetch/store orders...");
+
+    const response = await axios.get("http://localhost:3000/api/update-status");
+
+    console.log(`Orders stored: ${response.data.count}`);
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
 // Export the function
 module.exports = { scheduleCronJobs };

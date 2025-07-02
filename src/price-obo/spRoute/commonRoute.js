@@ -932,7 +932,7 @@ router.get("/quantity", async (req, res) => {
 
 // veeqo
 const VEEQO_API_URL = "https://api.veeqo.com/orders";
-
+const SHIPPING_EVENTS_URL = "https://api.veeqo.com/shipping/tracking_events";
 const VEEQO_API_KEY = process.env.VEEQO_API_KEY;
 
 router.get("/api/orders", async (req, res) => {
@@ -1186,7 +1186,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 100;
+    const totalOrders = 200;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -1218,6 +1218,7 @@ router.get("/api/orders/store", async (req, res) => {
           trackingNumber:
             order.allocations?.[0]?.shipment?.tracking_number
               ?.tracking_number || "",
+          shipmentId:order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||"",
           trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
           status:
             order.allocations?.[0]?.shipment?.tracking_number?.status || "",
@@ -1246,15 +1247,16 @@ router.get("/api/orders/store", async (req, res) => {
           $set: {
             trackingNumber: order.trackingNumber,
             trackingUrl: order.trackingUrl,
-            status: order.status,
             updatedAt: new Date(),
           },
           $setOnInsert: {
             id: order.id,
+            shipmentId: order.shipmentId,
             shipped_at: order.shipped_at,
             created_at: order.created_at,
             carrier_name: order.carrier_name,
             customerName: order.customerName,
+            status: order.status,
             address: order.address,
             items: order.items,
           },
@@ -1275,6 +1277,60 @@ router.get("/api/orders/store", async (req, res) => {
       error.response?.data || error.message
     );
     res.status(500).json({ error: "Failed to store/update orders" });
+  }
+});
+
+router.get("/api/update-status", async (req, res) => {
+  try {
+    const orders = await Order.find({ shipmentId: { $exists: true, $ne: "" } }).lean();
+
+    const bulkOps = [];
+
+    for (const order of orders) {
+     
+      try {
+        const response = await axios.get(`${SHIPPING_EVENTS_URL}/${order.shipmentId}`, {
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": VEEQO_API_KEY,
+          },
+        });
+
+        const events = response.data;
+
+        if (Array.isArray(events) && events.length > 0) {
+          const lastEvent = events[events.length - 1];
+          const latestStatus = lastEvent.status || "";
+
+          if (latestStatus) {
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: order._id },
+                update: {
+                  $set: {
+                    status: latestStatus,
+                    updatedAt: new Date(),
+                  },
+                },
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`⚠️ Could not update shipment ${order.shipmentId}: ${err.message}`);
+      }
+    }
+
+    if (bulkOps.length > 0) {
+      await Order.bulkWrite(bulkOps);
+    }
+
+    res.json({
+      message: `Updated ${bulkOps.length} order statuses from Veeqo shipping events.`,
+    });
+  } catch (error) {
+    console.error("Error in /api/update-status:", error.message);
+    res.status(500).json({ error: "Failed to update statuses." });
   }
 });
 

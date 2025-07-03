@@ -1294,7 +1294,6 @@ router.get("/api/update-status", async (req, res) => {
     const bulkOps = [];
 
     for (const order of orders) {
-    console.log("Processing order:", order.id);
       try {
         const response = await fetchWithRetry(
           `${SHIPPING_EVENTS_URL}/${order.shipmentId}`,
@@ -1305,9 +1304,7 @@ router.get("/api/update-status", async (req, res) => {
             },
           }
         );
-
         const events = response.data;
-
         if (Array.isArray(events) && events.length > 0) {
           const lastEvent = events[events.length - 1];
           const latestStatus = lastEvent.status || "";
@@ -1333,7 +1330,7 @@ router.get("/api/update-status", async (req, res) => {
         );
       }
 
-      await delay(500); // 300ms delay per request to reduce rate-limiting risk
+      await delay(500); 
     }
 
     if (bulkOps.length > 0) {

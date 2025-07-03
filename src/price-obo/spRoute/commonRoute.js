@@ -1034,7 +1034,7 @@ router.get("/api/orders/scan", async (req, res) => {
 
   let trackingNumber = query.trim();
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-    trackingNumber = trackingNumber.slice(-22);
+     trackingNumber = trackingNumber.replace(/\D/g, '').slice(-22);
   }
  
   try {

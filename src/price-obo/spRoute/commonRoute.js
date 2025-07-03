@@ -1269,21 +1269,41 @@ router.get("/api/orders/store", async (req, res) => {
   }
 });
 
-router.get("/api/update-status", async (req, res) => {
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchWithRetry = async (url, config, retries = 7, delayMs = 3000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.get(url, config);
+      return response;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      console.warn(`Retry ${attempt} failed. Retrying after ${delayMs}ms...`);
+      await delay(delayMs * attempt); 
+    }
+  }
+};
+
+app.get("/api/update-status", async (req, res) => {
   try {
-    const orders = await Order.find({ shipmentId: { $exists: true, $ne: "" } }).lean();
+    const orders = await BackUp.find({
+      shipmentId: { $exists: true, $ne: "" },
+    }).lean();
 
     const bulkOps = [];
 
     for (const order of orders) {
-     
+
       try {
-        const response = await axios.get(`${SHIPPING_EVENTS_URL}/${order.shipmentId}`, {
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": VEEQO_API_KEY,
-          },
-        });
+        const response = await fetchWithRetry(
+          `${SHIPPING_EVENTS_URL}/${order.shipmentId}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": VEEQO_API_KEY,
+            },
+          }
+        );
 
         const events = response.data;
 
@@ -1306,8 +1326,12 @@ router.get("/api/update-status", async (req, res) => {
           }
         }
       } catch (err) {
-        console.warn(`⚠️ Could not update shipment ${order.shipmentId}: ${err.message}`);
+        console.warn(
+          `⚠️ Failed to update shipment ${order.shipmentId}: ${err.message}`
+        );
       }
+
+      await delay(500); // 300ms delay per request to reduce rate-limiting risk
     }
 
     if (bulkOps.length > 0) {
@@ -1322,6 +1346,7 @@ router.get("/api/update-status", async (req, res) => {
     res.status(500).json({ error: "Failed to update statuses." });
   }
 });
+
 
 router.get("/api/orders-list", async (req, res) => {
   try {

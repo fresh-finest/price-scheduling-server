@@ -1287,7 +1287,7 @@ const fetchWithRetry = async (url, config, retries = 7, delayMs = 3000) => {
 router.get("/api/update-status", async (req, res) => {
   console.log("Starting status update from Veeqo shipping events...");
   try {
-    const orders = await BackUp.find({
+    const orders = await Order.find({
       shipmentId: { $exists: true, $ne: "" },
     }).lean();
 

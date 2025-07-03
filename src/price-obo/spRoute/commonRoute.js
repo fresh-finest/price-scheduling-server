@@ -1390,6 +1390,8 @@ router.get("/api/orders-list", async (req, res) => {
         pickerRole: scan?.pickerRole || null,
         packerName: scan?.packerName || null,
         packerRole: scan?.packerRole || null,
+        pickedAt: scan?.pickedAt || null,
+        packedAt: scan?.packedAt || null,
       };
     });
 

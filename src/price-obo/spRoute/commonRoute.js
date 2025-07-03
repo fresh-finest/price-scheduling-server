@@ -1294,7 +1294,7 @@ router.get("/api/update-status", async (req, res) => {
     const bulkOps = [];
 
     for (const order of orders) {
-
+    console.log("Processing order:", order.id);
       try {
         const response = await fetchWithRetry(
           `${SHIPPING_EVENTS_URL}/${order.shipmentId}`,
@@ -1327,6 +1327,7 @@ router.get("/api/update-status", async (req, res) => {
           }
         }
       } catch (err) {
+        console.log(err)
         console.warn(
           `⚠️ Failed to update shipment ${order.shipmentId}: ${err.message}`
         );

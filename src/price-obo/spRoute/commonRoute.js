@@ -1069,6 +1069,7 @@ router.get("/api/orders/scan", async (req, res) => {
           picked: true,
           packed: false,
           scanStatus: "picked",
+          pickedAt: new Date(),
         });
       } else {
         return res.status(400).json({ error: "Already picked" });
@@ -1092,6 +1093,7 @@ router.get("/api/orders/scan", async (req, res) => {
       existingScan.packerRole = role;
       existingScan.packed = true;
       existingScan.scanStatus = "packed";
+      existingScan.packedAt = new Date();
       await existingScan.save();
 
       return res.json({
@@ -1152,6 +1154,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
             picked: true,
             packed: false,
             scanStatus: "picked",
+            pickedAt: new Date(),
           });
           results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
         } else {
@@ -1167,6 +1170,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
           existingScan.packerRole = role;
           existingScan.packed = true;
           existingScan.scanStatus = "packed";
+          existingScan.packedAt = new Date();
           await existingScan.save();
           results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
         }

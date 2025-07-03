@@ -9,6 +9,8 @@ const scanOrderSchema = mongoose.Schema({
   trackingNumber: { type: String, required: true, unique: true },
   picked: { type: Boolean, default: false },
   packed: { type: Boolean, default: false },
+  pickedAt: { type: Date},
+  packedAt: { type: Date},
   scanStatus: { type: String, default: "pending" },
 }, { timestamps: true });
 

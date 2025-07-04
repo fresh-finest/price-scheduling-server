@@ -1330,8 +1330,6 @@ router.post("/api/tiktok/tracking", async (req, res) => {
     }
 
     const updateMap = new Map();
-
-    // Group tracking numbers by TikTokOrderId
     for (const entry of updates) {
       const { tiktokOrderId, trackingNumber } = entry;
       if (!tiktokOrderId || !trackingNumber) continue;
@@ -1345,8 +1343,7 @@ router.post("/api/tiktok/tracking", async (req, res) => {
     const bulkOps = [];
 
     for (const [tiktokId, newTrackingNumbers] of updateMap.entries()) {
-      // Find all matching documents with that TikTok tag
-      const matchingOrders = await BackUp.find({
+      const matchingOrders = await Order.find({
         "tags.name": { $regex: `TikTokOrderID:${tiktokId}` }
       });
 
@@ -1565,32 +1562,5 @@ router.get("/api/orders-list", async (req, res) => {
   }
 });
 
-router.get("/api/order/:order_id", async (req, res) => {
-  const { order_id } = req.params;
-
-  if (!order_id) {
-    return res.status(400).json({ error: "Missing order ID" });
-  }
-
-  try {
-    const response = await axios.get(
-      `https://api.veeqo.com/orders/#${order_id}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": VEEQO_API_KEY,
-        },
-      }
-    );
-
-    res.status(200).json(response.data);
-  } catch (error) {
-    console.error(
-      "Error fetching order details:",
-      error.response?.data || error.message
-    );
-    res.status(500).json({ error: "Failed to fetch order details" });
-  }
-});
 
 module.exports = router;

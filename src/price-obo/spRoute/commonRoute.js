@@ -1074,7 +1074,7 @@ router.get("/api/orders/scan", async (req, res) => {
           pickedAt: new Date(),
         });
       } else {
-        if (existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
+       if (existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
           return res.status(400).json({ error: "Already picked" });
         }
         existingScan.pickedTrackingNumbers.push(trackingNumber);
@@ -1093,7 +1093,7 @@ router.get("/api/orders/scan", async (req, res) => {
       if (!existingScan || !existingScan.picked) {
         return res.status(400).json({ error: "Cannot pack before pick" });
       }
-      if (existingScan.packedTrackingNumbers?.includes(trackingNumber)) {
+       if (existingScan.packedTrackingNumbers?.includes(trackingNumber)) {
         return res.status(400).json({ error: "Already packed" });
       }
       existingScan.packedTrackingNumbers.push(trackingNumber);
@@ -1123,13 +1123,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
     const { email, password, userName, role, trackingNumbers = [] } = req.body;
     console.log("Bulk scan request received with data:", req.body);
 
-    if (
-      !email ||
-      !password ||
-      !role ||
-      !userName ||
-      !Array.isArray(trackingNumbers)
-    ) {
+    if (!email || !password || !role || !userName || !Array.isArray(trackingNumbers)) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -1138,30 +1132,20 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword)
-      return res.status(401).json({ error: "Invalid password" });
+    if (!validPassword) return res.status(401).json({ error: "Invalid password" });
 
     const results = [];
 
     for (let rawTracking of trackingNumbers) {
       let trackingNumber = rawTracking.trim();
 
-      if (
-        !trackingNumber.startsWith("1Z") &&
-        !trackingNumber.startsWith("TBA")
-      ) {
+      if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
         trackingNumber = trackingNumber.slice(-22);
       }
 
-      const order = await Order.findOne({
-        trackingNumber: { $in: [trackingNumber] },
-      });
+      const order = await Order.findOne({ trackingNumber: { $in: [trackingNumber] } });
       if (!order) {
-        results.push({
-          trackingNumber,
-          status: "not_found",
-          message: "Order not found",
-        });
+        results.push({ trackingNumber, status: "not_found", message: "Order not found" });
         continue;
       }
 
@@ -1181,59 +1165,34 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
             scanStatus: "picked",
             pickedAt: new Date(),
           });
-          results.push({
-            trackingNumber,
-            status: "picked",
-            message: "Successfully Picked",
-          });
+          results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
         } else {
           if (existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
-            results.push({
-              trackingNumber,
-              status: "already_picked",
-              message: "Already Picked",
-            });
+            results.push({ trackingNumber, status: "already_picked", message: "Already Picked" });
           } else {
             existingScan.pickedTrackingNumbers.push(trackingNumber);
             existingScan.pickedAt = new Date();
             await existingScan.save();
-            results.push({
-              trackingNumber,
-              status: "picked",
-              message: "Successfully Picked",
-            });
+            results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
           }
         }
       } else if (role === "packer") {
         if (!existingScan || !existingScan.picked) {
-          results.push({
-            trackingNumber,
-            status: "not_ready",
-            message: "Cannot pack before pick",
-          });
+          results.push({ trackingNumber, status: "not_ready", message: "Cannot pack before pick" });
         } else {
           if (!existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
-            results.push({
-              trackingNumber,
-              status: "not_picked",
-              message: "This tracking number wasn't picked",
-            });
+            results.push({ trackingNumber, status: "not_picked", message: "This tracking number wasn't picked" });
             continue;
           }
 
-          if (!existingScan.packedTrackingNumbers)
-            existingScan.packedTrackingNumbers = [];
+          if (!existingScan.packedTrackingNumbers) existingScan.packedTrackingNumbers = [];
 
           if (existingScan.packedTrackingNumbers.includes(trackingNumber)) {
-            results.push({
-              trackingNumber,
-              status: "already_packed",
-              message: "Already Packed",
-            });
+            results.push({ trackingNumber, status: "already_packed", message: "Already Packed" });
           } else {
             existingScan.packedTrackingNumbers.push(trackingNumber);
 
-            const allPacked = existingScan.trackingNumber.every((t) =>
+            const allPacked = existingScan.trackingNumber.every(t =>
               existingScan.packedTrackingNumbers.includes(t)
             );
 
@@ -1247,19 +1206,11 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
             existingScan.packerRole = role;
             await existingScan.save();
 
-            results.push({
-              trackingNumber,
-              status: "packed",
-              message: "Successfully Packed",
-            });
+            results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
           }
         }
       } else {
-        results.push({
-          trackingNumber,
-          status: "invalid_role",
-          message: "Invalid role",
-        });
+        results.push({ trackingNumber, status: "invalid_role", message: "Invalid role" });
       }
     }
 
@@ -1269,6 +1220,8 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 router.get("/api/orders/store", async (req, res) => {
   try {
@@ -1330,82 +1283,12 @@ router.get("/api/orders/store", async (req, res) => {
             };
           }),
         };
-        allOrders.push(structuredOrder);
+    allOrders.push(structuredOrder);
         // if (trackingNumbers.length > 0) {
         //   allOrders.push(structuredOrder);
         // }
       }
     }
-
-    router.post("/api/tiktok/tracking", async (req, res) => {
-      try {
-        const { updates } = req.body;
-
-        console.log("Received updates:", updates);
-        if (!Array.isArray(updates) || updates.length === 0) {
-          return res
-            .status(400)
-            .json({ error: "Invalid or empty updates array." });
-        }
-
-        const updateMap = new Map();
-
-        // Group tracking numbers by TikTokOrderId
-        for (const entry of updates) {
-          const { tiktokOrderId, trackingNumber } = entry;
-          if (!tiktokOrderId || !trackingNumber) continue;
-
-          if (!updateMap.has(tiktokOrderId)) {
-            updateMap.set(tiktokOrderId, new Set());
-          }
-          updateMap.get(tiktokOrderId).add(trackingNumber);
-        }
-
-        const bulkOps = [];
-
-        for (const [tiktokId, newTrackingNumbers] of updateMap.entries()) {
-          // Find all matching documents with that TikTok tag
-          const matchingOrders = await BackUp.find({
-            "tags.name": { $regex: `TikTokOrderID:${tiktokId}` },
-          });
-
-          for (const order of matchingOrders) {
-            const existingNumbers = Array.isArray(order.trackingNumber)
-              ? order.trackingNumber
-              : [];
-            const mergedSet = new Set([
-              ...existingNumbers,
-              ...newTrackingNumbers,
-            ]);
-
-            bulkOps.push({
-              updateOne: {
-                filter: { _id: order._id },
-                update: {
-                  $set: {
-                    trackingNumber: Array.from(mergedSet),
-                    updatedAt: new Date(),
-                  },
-                },
-              },
-            });
-          }
-        }
-
-        if (bulkOps.length > 0) {
-          await Order.bulkWrite(bulkOps);
-        }
-
-        res.json({
-          message: `Updated ${bulkOps.length} orders with TikTok tracking numbers.`,
-        });
-      } catch (error) {
-        console.error("Error in /api/tiktok/tracking:", error.message);
-        res
-          .status(500)
-          .json({ error: "Failed to update TikTok tracking numbers." });
-      }
-    });
 
     // Filter only NEW orders
     const existingOrders = await Order.find({
@@ -1436,6 +1319,73 @@ router.get("/api/orders/store", async (req, res) => {
     res.status(500).json({ error: "Failed to insert orders" });
   }
 });
+
+router.post("/api/tiktok/tracking", async (req, res) => {
+  try {
+    const { updates } = req.body;
+    
+    console.log("Received updates:", updates);
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: "Invalid or empty updates array." });
+    }
+
+    const updateMap = new Map();
+
+    // Group tracking numbers by TikTokOrderId
+    for (const entry of updates) {
+      const { tiktokOrderId, trackingNumber } = entry;
+      if (!tiktokOrderId || !trackingNumber) continue;
+
+      if (!updateMap.has(tiktokOrderId)) {
+        updateMap.set(tiktokOrderId, new Set());
+      }
+      updateMap.get(tiktokOrderId).add(trackingNumber);
+    }
+
+    const bulkOps = [];
+
+    for (const [tiktokId, newTrackingNumbers] of updateMap.entries()) {
+      // Find all matching documents with that TikTok tag
+      const matchingOrders = await BackUp.find({
+        "tags.name": { $regex: `TikTokOrderID:${tiktokId}` }
+      });
+
+      for (const order of matchingOrders) {
+        const existingNumbers = Array.isArray(order.trackingNumber) ? order.trackingNumber : [];
+        const mergedSet = new Set([...existingNumbers, ...newTrackingNumbers]);
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: order._id },
+            update: {
+              $set: {
+                trackingNumber: Array.from(mergedSet),
+                updatedAt: new Date()
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (bulkOps.length > 0) {
+      await Order.bulkWrite(bulkOps);
+    }
+
+    res.json({
+      message: `Updated ${bulkOps.length} order(s) with TikTok tracking numbers.`,
+    });
+
+  } catch (error) {
+    console.error("❌ Error in /api/tiktok/tracking:", error.message);
+    res.status(500).json({ error: "Failed to update TikTok tracking numbers." });
+  }
+});
+
+
+
+
+
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

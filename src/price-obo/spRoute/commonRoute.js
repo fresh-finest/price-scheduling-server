@@ -5,7 +5,7 @@ const axios = require("axios");
 const NodeCache = require("node-cache");
 const multer = require("multer");
 const csv = require("csv-parser");
-const bcrypt = require('bcryptjs');
+const bcrypt = require("bcryptjs");
 
 const fs = require("fs");
 const path = require("path");
@@ -82,6 +82,7 @@ const fetchDynamicQuantity = require("../../service/getDynamictQuantityService")
 const ScanOrder = require("../../model/scanOrder");
 const Order = require("../../model/Order");
 const FBMUser = require("../../model/fbmUser");
+const TrackScan = require("../../model/trackScan");
 
 const app = express();
 
@@ -949,12 +950,14 @@ router.get("/api/orders", async (req, res) => {
       query,
       since_id,
     } = req.query;
-    const dynamicCreatedAtMin = created_at_min || moment().subtract(30, "days").format("YYYY-MM-DD HH:mm:ss");
+    const dynamicCreatedAtMin =
+      created_at_min ||
+      moment().subtract(30, "days").format("YYYY-MM-DD HH:mm:ss");
     const params = {
       status,
       page,
       page_size,
-      created_at_min:dynamicCreatedAtMin,
+      created_at_min: dynamicCreatedAtMin,
       updated_at_min,
       tags,
       allocated_at,
@@ -1024,7 +1027,7 @@ router.get("/api/orders", async (req, res) => {
 });
 
 router.get("/api/orders/scan", async (req, res) => {
-  const { query, role,userName} = req.query;
+  const { query, role, userName } = req.query;
 
   console.log("Scan request received with query:", query, "and role:", role);
 
@@ -1034,9 +1037,9 @@ router.get("/api/orders/scan", async (req, res) => {
 
   let trackingNumber = query.trim();
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-     trackingNumber = trackingNumber.replace(/\D/g, '').slice(-22);
+    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
   }
- 
+
   try {
     const response = await axios.get(VEEQO_API_URL, {
       headers: {
@@ -1054,25 +1057,29 @@ router.get("/api/orders/scan", async (req, res) => {
       return res.status(404).json({ error: "Order not found!" });
     }
 
-  
     const { OrderId: orderId } = order1;
 
-    let existingScan = await ScanOrder.findOne({ orderId });
+    let existingScan = await TrackScan.findOne({ orderId });
 
     if (role === "picker") {
       if (!existingScan) {
-        existingScan = await ScanOrder.create({
-          pickerName:userName,
-          pickerRole:role,
+        existingScan = await TrackScan.create({
+          pickerName: userName,
+          pickerRole: role,
           orderId,
-          trackingNumber,
+          pickedTrackingNumbers: [trackingNumber],
           picked: true,
           packed: false,
           scanStatus: "picked",
           pickedAt: new Date(),
         });
       } else {
-        return res.status(400).json({ error: "Already picked" });
+       if (existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
+          return res.status(400).json({ error: "Already picked" });
+        }
+        existingScan.pickedTrackingNumbers.push(trackingNumber);
+        existingScan.pickedAt = new Date();
+        await existingScan.save();
       }
       return res.json({
         message: "Successfully Picked!",
@@ -1086,10 +1093,11 @@ router.get("/api/orders/scan", async (req, res) => {
       if (!existingScan || !existingScan.picked) {
         return res.status(400).json({ error: "Cannot pack before pick" });
       }
-      if (existingScan.packed) {
+       if (existingScan.packedTrackingNumbers?.includes(trackingNumber)) {
         return res.status(400).json({ error: "Already packed" });
       }
-      existingScan.packerName=userName;
+      existingScan.packedTrackingNumbers.push(trackingNumber);
+      existingScan.packerName = userName;
       existingScan.packerRole = role;
       existingScan.packed = true;
       existingScan.scanStatus = "packed";
@@ -1113,19 +1121,19 @@ router.get("/api/orders/scan", async (req, res) => {
 router.post("/api/orders/bulk/scan", async (req, res) => {
   try {
     const { email, password, userName, role, trackingNumbers = [] } = req.body;
+    console.log("Bulk scan request received with data:", req.body);
 
     if (!email || !password || !role || !userName || !Array.isArray(trackingNumbers)) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // ✅ Step 2: Authenticate user password
+    // ✅ Authenticate user
     const user = await FBMUser.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ error: "Invalid password" });
 
-    // ✅ Step 3: Continue with bulk scanning
     const results = [];
 
     for (let rawTracking of trackingNumbers) {
@@ -1135,22 +1143,23 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
         trackingNumber = trackingNumber.slice(-22);
       }
 
-      const order = await Order.findOne({ trackingNumber });
+      const order = await Order.findOne({ trackingNumber: { $in: [trackingNumber] } });
       if (!order) {
         results.push({ trackingNumber, status: "not_found", message: "Order not found" });
         continue;
       }
 
       const { OrderId: orderId } = order;
-      let existingScan = await ScanOrder.findOne({ orderId });
+      let existingScan = await TrackScan.findOne({ orderId });
 
       if (role === "picker") {
         if (!existingScan) {
-          await ScanOrder.create({
+          existingScan = await TrackScan.create({
             pickerName: userName,
             pickerRole: role,
             orderId,
-            trackingNumber,
+            pickedTrackingNumbers: [trackingNumber],
+            packedTrackingNumbers: [],
             picked: true,
             packed: false,
             scanStatus: "picked",
@@ -1158,21 +1167,47 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
           });
           results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
         } else {
-          results.push({ trackingNumber, status: "already_picked", message: "Already Picked" });
+          if (existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
+            results.push({ trackingNumber, status: "already_picked", message: "Already Picked" });
+          } else {
+            existingScan.pickedTrackingNumbers.push(trackingNumber);
+            existingScan.pickedAt = new Date();
+            await existingScan.save();
+            results.push({ trackingNumber, status: "picked", message: "Successfully Picked" });
+          }
         }
       } else if (role === "packer") {
         if (!existingScan || !existingScan.picked) {
           results.push({ trackingNumber, status: "not_ready", message: "Cannot pack before pick" });
-        } else if (existingScan.packed) {
-          results.push({ trackingNumber, status: "already_packed", message: "Already Packed" });
         } else {
-          existingScan.packerName = userName;
-          existingScan.packerRole = role;
-          existingScan.packed = true;
-          existingScan.scanStatus = "packed";
-          existingScan.packedAt = new Date();
-          await existingScan.save();
-          results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
+          if (!existingScan.pickedTrackingNumbers.includes(trackingNumber)) {
+            results.push({ trackingNumber, status: "not_picked", message: "This tracking number wasn't picked" });
+            continue;
+          }
+
+          if (!existingScan.packedTrackingNumbers) existingScan.packedTrackingNumbers = [];
+
+          if (existingScan.packedTrackingNumbers.includes(trackingNumber)) {
+            results.push({ trackingNumber, status: "already_packed", message: "Already Packed" });
+          } else {
+            existingScan.packedTrackingNumbers.push(trackingNumber);
+
+            const allPacked = existingScan.trackingNumber.every(t =>
+              existingScan.packedTrackingNumbers.includes(t)
+            );
+
+            if (allPacked) {
+              existingScan.packed = true;
+              existingScan.scanStatus = "packed";
+              existingScan.packedAt = new Date();
+            }
+
+            existingScan.packerName = userName;
+            existingScan.packerRole = role;
+            await existingScan.save();
+
+            results.push({ trackingNumber, status: "packed", message: "Successfully Packed" });
+          }
         }
       } else {
         results.push({ trackingNumber, status: "invalid_role", message: "Invalid role" });
@@ -1180,12 +1215,13 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
     }
 
     res.status(200).json({ success: true, summary: results });
-
   } catch (error) {
     console.error("Bulk Scan Error:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 router.get("/api/orders/store", async (req, res) => {
   try {
@@ -1210,6 +1246,12 @@ router.get("/api/orders/store", async (req, res) => {
       const rawOrders = response.data;
 
       for (const order of rawOrders) {
+        const allocations = order.allocations || [];
+
+        const trackingNumbers = allocations
+          .map((a) => a?.shipment?.tracking_number?.tracking_number)
+          .filter(Boolean);
+
         const structuredOrder = {
           id: String(order.id),
           OrderId: String(order.number),
@@ -1219,13 +1261,18 @@ router.get("/api/orders/store", async (req, res) => {
             order.allocations?.[0]?.shipment?.service_carrier_name || "",
           customerName: order.customer?.full_name || "",
           address: order.customer?.billing_address?.address1 || "",
-          trackingNumber:
-            order.allocations?.[0]?.shipment?.tracking_number?.tracking_number || "",
+          trackingNumber: trackingNumbers,
           shipmentId:
-            order.allocations?.[0]?.shipment?.tracking_number?.shipment_id || "",
+            order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||
+            "",
           trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
           status:
             order.allocations?.[0]?.shipment?.tracking_number?.status || "",
+          tags: (order.tags || []).map((tag) => ({
+            name: tag.name || "",
+          })),
+          channelCode: order.channel?.type_code || "",
+          channelName: order.channel?.name || "",
           items: (order.allocations?.[0]?.line_items || []).map((item) => {
             const sellable = item.sellable || {};
             return {
@@ -1237,7 +1284,7 @@ router.get("/api/orders/store", async (req, res) => {
           }),
         };
 
-        if (structuredOrder.trackingNumber) {
+        if (trackingNumbers.length > 0) {
           allOrders.push(structuredOrder);
         }
       }
@@ -1283,7 +1330,7 @@ const fetchWithRetry = async (url, config, retries = 7, delayMs = 3000) => {
     } catch (error) {
       if (attempt === retries) throw error;
       console.warn(`Retry ${attempt} failed. Retrying after ${delayMs}ms...`);
-      await delay(delayMs * attempt); 
+      await delay(delayMs * attempt);
     }
   }
 };
@@ -1328,13 +1375,13 @@ router.get("/api/update-status", async (req, res) => {
           }
         }
       } catch (err) {
-        console.log(err)
+        console.log(err);
         console.warn(
           `⚠️ Failed to update shipment ${order.shipmentId}: ${err.message}`
         );
       }
 
-      await delay(500); 
+      await delay(500);
     }
 
     if (bulkOps.length > 0) {
@@ -1349,7 +1396,6 @@ router.get("/api/update-status", async (req, res) => {
     res.status(500).json({ error: "Failed to update statuses." });
   }
 });
-
 
 router.get("/api/orders-list", async (req, res) => {
   try {
@@ -1368,7 +1414,7 @@ router.get("/api/orders-list", async (req, res) => {
 
     // Fetch orders and scanOrders
     const orders = await Order.find(orderQuery).sort({ created_at: -1 }).lean();
-    const scanOrders = await ScanOrder.find({}).lean();
+    const scanOrders = await TrackScan.find({}).lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
     const validStatuses = [
@@ -1392,6 +1438,8 @@ router.get("/api/orders-list", async (req, res) => {
         packerRole: scan?.packerRole || null,
         pickedAt: scan?.pickedAt || null,
         packedAt: scan?.packedAt || null,
+        pickedTrackingNumbers: scan?.pickedTrackingNumbers || [],
+        packedTrackingNumbers: scan?.packedTrackingNumbers || [],
       };
     });
 

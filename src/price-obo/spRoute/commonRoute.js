@@ -1336,57 +1336,74 @@ router.get("/api/orders/store", async (req, res) => {
         // }
       }
     }
-    
+
     router.post("/api/tiktok/tracking", async (req, res) => {
       try {
-        const updates = req.body?.updates;
+        const { updates } = req.body;
 
+        console.log("Received updates:", updates);
         if (!Array.isArray(updates) || updates.length === 0) {
-          return res.status(400).json({ error: "No updates provided." });
+          return res
+            .status(400)
+            .json({ error: "Invalid or empty updates array." });
+        }
+
+        const updateMap = new Map();
+
+        // Group tracking numbers by TikTokOrderId
+        for (const entry of updates) {
+          const { tiktokOrderId, trackingNumber } = entry;
+          if (!tiktokOrderId || !trackingNumber) continue;
+
+          if (!updateMap.has(tiktokOrderId)) {
+            updateMap.set(tiktokOrderId, new Set());
+          }
+          updateMap.get(tiktokOrderId).add(trackingNumber);
         }
 
         const bulkOps = [];
 
-        for (const update of updates) {
-          const { tiktokOrderId, trackingNumber } = update;
+        for (const [tiktokId, newTrackingNumbers] of updateMap.entries()) {
+          // Find all matching documents with that TikTok tag
+          const matchingOrders = await BackUp.find({
+            "tags.name": { $regex: `TikTokOrderID:${tiktokId}` },
+          });
 
-          if (!tiktokOrderId || !trackingNumber) continue;
+          for (const order of matchingOrders) {
+            const existingNumbers = Array.isArray(order.trackingNumber)
+              ? order.trackingNumber
+              : [];
+            const mergedSet = new Set([
+              ...existingNumbers,
+              ...newTrackingNumbers,
+            ]);
 
-          bulkOps.push({
-            updateOne: {
-              filter: {
-                tags: {
-                  $elemMatch: {
-                    name: {
-                      $regex: `TikTokOrderID:${tiktokOrderId}`,
-                      $options: "i",
-                    },
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: order._id },
+                update: {
+                  $set: {
+                    trackingNumber: Array.from(mergedSet),
+                    updatedAt: new Date(),
                   },
                 },
               },
-              update: {
-                $set: {
-                  trackingNumber,
-                  updatedAt: new Date(),
-                },
-              },
-            },
-          });
+            });
+          }
         }
 
-        if (bulkOps.length === 0) {
-          return res
-            .status(400)
-            .json({ error: "No valid updates to process." });
+        if (bulkOps.length > 0) {
+          await Order.bulkWrite(bulkOps);
         }
 
-        const result = await Order.bulkWrite(bulkOps);
-        res.status(200).json({
-          message: `Updated ${result.modifiedCount} orders with new tracking numbers.`,
+        res.json({
+          message: `Updated ${bulkOps.length} orders with TikTok tracking numbers.`,
         });
       } catch (error) {
-        console.error("Error updating TikTok tracking numbers:", error.message);
-        res.status(500).json({ error: "Failed to update tracking numbers." });
+        console.error("Error in /api/tiktok/tracking:", error.message);
+        res
+          .status(500)
+          .json({ error: "Failed to update TikTok tracking numbers." });
       }
     });
 

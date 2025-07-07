@@ -1320,6 +1320,104 @@ router.get("/api/orders/store", async (req, res) => {
   }
 });
 
+router.get("/api/shipped/store", async (req, res) => {
+  try {
+    const pageSize = 100;
+    const totalOrders = 1000;
+    const totalPages = Math.ceil(totalOrders / pageSize);
+    const allOrders = [];
+
+    for (let page = 1; page <= totalPages; page++) {
+      const response = await axios.get(VEEQO_API_URL, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": VEEQO_API_KEY,
+        },
+        params: {
+          page,
+          page_size: pageSize,
+          status: "shipped",
+        },
+      });
+
+      const rawOrders = response.data;
+
+      for (const order of rawOrders) {
+        const allocations = order.allocations || [];
+
+        const trackingNumbers = allocations
+          .map((a) => a?.shipment?.tracking_number?.tracking_number)
+          .filter(Boolean);
+
+        const structuredOrder = {
+          id: String(order.id),
+          OrderId: String(order.number),
+          created_at: order.shipped_at || "",
+          shipped_at: order.shipped_at || "",
+          carrier_name:
+            order.allocations?.[0]?.shipment?.service_carrier_name || "",
+          customerName: order.customer?.full_name || "",
+          address: order.customer?.billing_address?.address1 || "",
+          trackingNumber: trackingNumbers,
+          shipmentId:
+            order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||
+            "",
+          trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
+          status:
+            order.allocations?.[0]?.shipment?.tracking_number?.status || "",
+          tags: (order.tags || []).map((tag) => ({
+            name: tag.name || "",
+          })),
+          channelCode: order.channel?.type_code || "",
+          channelName: order.channel?.name || "",
+          items: (order.allocations?.[0]?.line_items || []).map((item) => {
+            const sellable = item.sellable || {};
+            return {
+              sku: sellable.sku_code || "",
+              quantity: item.quantity || 0,
+              title: sellable.product_title || sellable.title || "",
+              image: sellable.image_url || sellable.main_thumbnail_url || "",
+            };
+          }),
+        };
+    allOrders.push(structuredOrder);
+        // if (trackingNumbers.length > 0) {
+        //   allOrders.push(structuredOrder);
+        // }
+      }
+    }
+
+    // Filter only NEW orders
+    const existingOrders = await Order.find({
+      OrderId: { $in: allOrders.map((o) => o.OrderId) },
+    }).select("OrderId");
+
+    const existingOrderIds = new Set(existingOrders.map((o) => o.OrderId));
+
+    const newOrders = allOrders.filter(
+      (order) => !existingOrderIds.has(order.OrderId)
+    );
+
+    // Insert all new orders
+    if (newOrders.length > 0) {
+      await Order.insertMany(newOrders);
+    }
+
+    console.log(`Inserted ${newOrders.length} new orders.`);
+    res.status(200).json({
+      message: "New orders inserted",
+      insertedCount: newOrders.length,
+    });
+  } catch (error) {
+    console.error(
+      "Error fetching/inserting orders:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({ error: "Failed to insert orders" });
+  }
+});
+
+
 router.post("/api/tiktok/tracking", async (req, res) => {
   try {
     const { updates } = req.body;

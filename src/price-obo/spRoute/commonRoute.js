@@ -1527,8 +1527,12 @@ router.get("/api/orders-list", async (req, res) => {
 
     mergedOrders.forEach((order) => {
       // Scan status counts
-      totalByScanStatus[order.scanStatus] =
+     const trackingNumber = order.trackingNumber || [];
+
+      if (trackingNumber.length > 0) {
+         totalByScanStatus[order.scanStatus] =
         (totalByScanStatus[order.scanStatus] || 0) + 1;
+      }
 
       // Tracking status categorization
       const s = order.status?.toLowerCase().trim();

@@ -1507,10 +1507,14 @@ router.get("/api/orders-list", async (req, res) => {
       };
     });
 
+    //   (order) => order.scanStatus === scanStatus
     // Optional scanStatus filter
     if (scanStatus) {
       mergedOrders = mergedOrders.filter(
-        (order) => order.scanStatus === scanStatus
+       (order) =>
+        order.scanStatus === scanStatus &&
+        ((Array.isArray(order.trackingNumber) && order.trackingNumber.length > 0) ||
+         (typeof order.trackingNumber === "string" && order.trackingNumber.trim() !== ""))
       );
     }
 

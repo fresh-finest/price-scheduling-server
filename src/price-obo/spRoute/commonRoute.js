@@ -1321,6 +1321,7 @@ router.get("/api/orders/store", async (req, res) => {
 });
 
 router.get("/api/shipped/store", async (req, res) => {
+  console.log("Start fetching shipped orders...");
   try {
     const pageSize = 100;
     const totalOrders = 1000;
@@ -1403,7 +1404,7 @@ router.get("/api/shipped/store", async (req, res) => {
       await Order.insertMany(newOrders);
     }
 
-    console.log(`Inserted ${newOrders.length} new orders.`);
+    console.log(`Inserted ${newOrders.length} new shipped data.`);
     res.status(200).json({
       message: "New orders inserted",
       insertedCount: newOrders.length,

@@ -1562,33 +1562,66 @@ router.get("/api/update-status", async (req, res) => {
 
 router.get("/api/orders-list", async (req, res) => {
   try {
-    const { status, scanStatus, query } = req.query;
-
-    // Base query with optional status filter
-    const orderQuery = { ...(status && { status }) };
-
-    // Search by orderId or trackingNumber (case-insensitive)
-    if (query) {
-      orderQuery.$or = [
-        { OrderId: { $regex: query, $options: "i" } },
-        { trackingNumber: { $regex: query, $options: "i" } },
-      ];
-    }
-
-    // Fetch orders and scanOrders
-    const orders = await Order.find(orderQuery).sort({ created_at: -1 }).lean();
-    const scanOrders = await TrackScan.find({}).lean();
+    const {
+      status,
+      scanStatus,
+      query,
+      page = 1,
+      limit = 100,
+      startDate,
+      endDate,
+    } = req.query;
+    console.log("Fetching orders list with params:", req.query);
+    const allOrders = await Order.find().sort({created_at:-1}).lean();
+    const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
-    const validStatuses = [
-      "awaiting_collection",
-      "created",
-      "in_transit",
-      "out_for_delivery",
-      "delivered",
-    ];
+    // === FILTER: Status, Query, Date Range
+    const filteredForResult = allOrders.filter((order) => {
+      let matchesStatus = true;
+      if (status) {
+        const lowerStatus = order.status?.toLowerCase().trim();
+        if (status === "tracking_issue") {
+          matchesStatus = [
+            "delayed",
+            "cancelled",
+            "contact_support",
+            "recipient_refused",
+            "returned_to_sender",
+          ].includes(lowerStatus);
+        } else {
+          matchesStatus = lowerStatus === status;
+        }
+      }
 
-    let mergedOrders = orders.map((order) => {
+      const matchesQuery = query
+        ? (typeof order.OrderId === "string" &&
+            order.OrderId.toLowerCase().includes(query.toLowerCase())) ||
+          (Array.isArray(order.trackingNumber) &&
+            order.trackingNumber.some((num) =>
+              typeof num === "string"
+                ? num.toLowerCase().includes(query.toLowerCase())
+                : false
+            )) ||
+          (typeof order.trackingNumber === "string" &&
+            order.trackingNumber.toLowerCase().includes(query.toLowerCase()))
+        : true;
+
+      let matchesDateRange = true;
+      if (startDate || endDate) {
+        const shippedAt = new Date(order.shipped_at);
+        const start = startDate ? new Date(startDate + "T00:00:00.000Z") : null;
+        const end = endDate ? new Date(endDate + "T23:59:59.999Z") : null;
+
+        if (start && shippedAt < start) matchesDateRange = false;
+        if (end && shippedAt > end) matchesDateRange = false;
+      }
+
+      return matchesStatus && matchesQuery && matchesDateRange;
+    });
+
+    // === MERGE Scan Info
+    const mergedOrders = filteredForResult.map((order) => {
       const scan = scanMap.get(order.OrderId);
       return {
         ...order,
@@ -1606,68 +1639,91 @@ router.get("/api/orders-list", async (req, res) => {
       };
     });
 
-    //   (order) => order.scanStatus === scanStatus
-    // Optional scanStatus filter
-    if (scanStatus) {
-      mergedOrders = mergedOrders.filter(
-       (order) =>
-        order.scanStatus === scanStatus &&
-        ((Array.isArray(order.trackingNumber) && order.trackingNumber.length > 0) ||
-         (typeof order.trackingNumber === "string" && order.trackingNumber.trim() !== ""))
-      );
-    }
+    // === Scan Status Filter
+    const scanFilteredOrders = scanStatus
+      ? mergedOrders.filter(
+          (order) =>
+            order.scanStatus === scanStatus &&
+            Array.isArray(order.trackingNumber) &&
+            order.trackingNumber.length > 0
+        )
+      : mergedOrders;
 
-    // Totals
-    const totalByScanStatus = {};
-    const totalByGranularStatus = {
-      awaiting_collection: 0,
-      in_transit: 0,
-      delivered: 0,
-      created: 0,
-      out_for_delivery: 0,
-      tracking_issue: 0,
-    };
+    // === Count Function
+    const calculateStatusCounts = (orders) => {
+      const totalByScanStatus = {};
+      const totalByStatus = {
+        awaiting_collection: 0,
+        in_transit: 0,
+        delivered: 0,
+        created: 0,
+        out_for_delivery: 0,
+        tracking_issue: 0,
+      };
 
-    mergedOrders.forEach((order) => {
-      // Scan status counts
-     const trackingNumber = order.trackingNumber || [];
+      for (const order of orders) {
+        const scan = scanMap.get(order.OrderId);
+        const scanStatusVal = scan?.scanStatus || "pending";
+        const trackingNumber = order.trackingNumber || [];
 
-      if (trackingNumber.length > 0) {
-         totalByScanStatus[order.scanStatus] =
-        (totalByScanStatus[order.scanStatus] || 0) + 1;
+        if (Array.isArray(trackingNumber) && trackingNumber.length > 0) {
+          totalByScanStatus[scanStatusVal] =
+            (totalByScanStatus[scanStatusVal] || 0) + 1;
+        }
+
+        const s = order.status?.toLowerCase().trim();
+        if (s === "awaiting_collection") totalByStatus.awaiting_collection++;
+        else if (s === "in_transit") totalByStatus.in_transit++;
+        else if (s === "delivered") totalByStatus.delivered++;
+        else if (s === "created") totalByStatus.created++;
+        else if (s === "out_for_delivery") totalByStatus.out_for_delivery++;
+        else if (
+          [
+            "delayed",
+            "cancelled",
+            "contact_support",
+            "recipient_refused",
+            "returned_to_sender",
+          ].includes(s)
+        ) {
+          totalByStatus.tracking_issue++;
+        }
       }
 
-      // Tracking status categorization
-      const s = order.status?.toLowerCase().trim();
-      if (s === "awaiting_collection")
-        totalByGranularStatus.awaiting_collection += 1;
-      else if (s === "in_transit") totalByGranularStatus.in_transit += 1;
-      else if (s === "delivered") totalByGranularStatus.delivered += 1;
-      else if (s === "created") totalByGranularStatus.created += 1;
-      else if (s === "out_for_delivery")
-        totalByGranularStatus.out_for_delivery += 1;
-      else if (
-        s === "delayed" ||
-        s === "cancelled" ||
-        s === "contact_support" ||
-        s === "recipient_refused" ||
-        s === "returned_to_sender"
-      )
-        totalByGranularStatus.tracking_issue += 1;
-    });
+      return { totalByScanStatus, totalByStatus };
+    };
 
-    // Final response
+    const isSearchOrDateFilter = query || startDate || endDate;
+    const { totalByScanStatus, totalByStatus } = isSearchOrDateFilter
+      ? calculateStatusCounts(scanFilteredOrders)
+      : calculateStatusCounts(allOrders);
+
+    // === PAGINATION
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedOrders = scanFilteredOrders.slice(
+      startIndex,
+      startIndex + parseInt(limit)
+    );
+
+    let totalOrdersCount = allOrders.length;
+    if (isSearchOrDateFilter) {
+      totalOrdersCount = scanFilteredOrders.length;
+    }
+
+    // === FINAL RESPONSE
     res.status(200).json({
-      total: mergedOrders.length,
+      total: totalOrdersCount,
       totalByScanStatus,
-      totalByStatus: totalByGranularStatus,
-      result: mergedOrders,
+      totalByStatus,
+      products: paginatedOrders.length,
+      result: paginatedOrders,
     });
   } catch (error) {
     console.error("Error fetching orders list:", error.message);
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
 });
+
 
 
 module.exports = router;

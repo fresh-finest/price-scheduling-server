@@ -1785,13 +1785,12 @@ router.get("/tiktok/callback", async (req, res) => {
         grant_type: "authorized_code",
       },
     });
-    console.log("TikTok token exchange response1", JSON.stringify(tokenRes, null, 2));
-    console.log("TikTok token exchange response2:", JSON.stringify(tokenRes.data, null, 2));
+   
     const data = tokenRes.data.data;
     if (!data || !data.access_token) {
       return res.status(500).send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);
     }
-
+   console.log(data);
     const accessTokenExpireAt = new Date(data.access_token_expire_in * 1000);
     const refreshTokenExpireAt = new Date(data.refresh_token_expire_in * 1000);
 

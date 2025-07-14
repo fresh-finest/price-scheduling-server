@@ -1769,7 +1769,7 @@ router.get("/api/orders-list", async (req, res) => {
   }
 });
 
-const sellerTokens = {}; 
+const sellerTokens = {};
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;
@@ -1779,19 +1779,25 @@ router.get("/tiktok/callback", async (req, res) => {
 
   try {
     const tokenRes = await axios.post(
-      "https://auth.tiktok-shops.com/api/v2/token/get",
+      "https://auth.tiktok-shops.com/api/v2/token/get_by_code",
       {
         app_key: process.env.TIKTOK_APP_KEY,
         app_secret: process.env.TIKTOK_APP_SECRET,
-        auth_code: code,
+        code, // not auth_code
         grant_type: "authorized_code",
       }
     );
 
-   console.log("TikTok token exchange response:", JSON.stringify(tokenRes, null, 2));
+    console.log(
+      "TikTok token exchange response:",
+      JSON.stringify(tokenRes, null, 2)
+    );
 
     const data = tokenRes.data.data;
-     console.log("TikTok token exchange response2:", JSON.stringify(data, null, 2));
+    console.log(
+      "TikTok token exchange response2:",
+      JSON.stringify(data, null, 2)
+    );
     if (!data || !data.access_token) {
       return res
         .status(500)
@@ -1837,9 +1843,7 @@ router.get("/tiktok/callback", async (req, res) => {
       `Connected seller: ${data.seller_name} (open_id: ${data.open_id})`
     );
 
-   
     return res.redirect(`https://fbm.priceobo.com/`);
-
   } catch (error) {
     console.error(
       "Error exchanging token:",

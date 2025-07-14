@@ -1769,7 +1769,6 @@ router.get("/api/orders-list", async (req, res) => {
   }
 });
 
-const sellerTokens = {};
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;
@@ -1778,53 +1777,22 @@ router.get("/tiktok/callback", async (req, res) => {
   if (!code) return res.status(400).send("Missing authorization code");
 
   try {
-    const tokenRes = await axios.post(
-      "https://auth.tiktok-shops.com/api/v2/token/get_by_code",
-      {
+    const tokenRes = await axios.get("https://auth.tiktok-shops.com/api/v2/token/get", {
+      params: {
         app_key: process.env.TIKTOK_APP_KEY,
         app_secret: process.env.TIKTOK_APP_SECRET,
-        code, // not auth_code
+        auth_code: code, // not `code`, use `auth_code`
         grant_type: "authorized_code",
-      }
-    );
-
-    console.log(
-      "TikTok token exchange response:",
-      JSON.stringify(tokenRes, null, 2)
-    );
+      },
+    });
 
     const data = tokenRes.data.data;
-    console.log(
-      "TikTok token exchange response2:",
-      JSON.stringify(data, null, 2)
-    );
     if (!data || !data.access_token) {
-      return res
-        .status(500)
-        .send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);
+      return res.status(500).send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);
     }
 
-    // Save seller token using open_id
-    sellerTokens[data.open_id] = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      shop_region: shop_region || "US",
-      locale: locale || "en",
-      seller_name: data.seller_name,
-    };
-
-    if (!data?.access_token) {
-      return res
-        .status(500)
-        .send(`Token exchange failed: ${JSON.stringify(tokenRes.data)}`);
-    }
-
-    const accessTokenExpireAt = new Date(
-      Date.now() + data.access_token_expire_in * 1000
-    );
-    const refreshTokenExpireAt = new Date(
-      Date.now() + data.refresh_token_expire_in * 1000
-    );
+    const accessTokenExpireAt = new Date(data.access_token_expire_in * 1000);
+    const refreshTokenExpireAt = new Date(data.refresh_token_expire_in * 1000);
 
     await TikTokAuth.findOneAndUpdate(
       { open_id: data.open_id },
@@ -1839,17 +1807,12 @@ router.get("/tiktok/callback", async (req, res) => {
       },
       { upsert: true, new: true }
     );
-    console.log(
-      `Connected seller: ${data.seller_name} (open_id: ${data.open_id})`
-    );
 
+    console.log(`Connected seller: ${data.seller_name} (open_id: ${data.open_id})`);
     return res.redirect(`https://fbm.priceobo.com/`);
-  } catch (error) {
-    console.error(
-      "Error exchanging token:",
-      error.response?.data || error.message
-    );
-    res.status(500).send("Token exchange failed.");
+  } catch (err) {
+    console.error("Token exchange error:", err.response?.data || err.message);
+    return res.status(500).send("Token exchange failed.");
   }
 });
 

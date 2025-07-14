@@ -1773,7 +1773,7 @@ router.get("/api/orders-list", async (req, res) => {
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;
   console.log("req.query", req.query);
-
+  console.log(process.env.TIKTOK_APP_KEY,process.env.TIKTOK_APP_SECRET);
   if (!code) return res.status(400).send("Missing authorization code");
 
   try {
@@ -1785,7 +1785,8 @@ router.get("/tiktok/callback", async (req, res) => {
         grant_type: "authorized_code",
       },
     });
-
+    console.log("TikTok token exchange response1", JSON.stringify(tokenRes, null, 2));
+    console.log("TikTok token exchange response2:", JSON.stringify(tokenRes.data, null, 2));
     const data = tokenRes.data.data;
     if (!data || !data.access_token) {
       return res.status(500).send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);

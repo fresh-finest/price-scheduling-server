@@ -86,6 +86,7 @@ const FBMUser = require("../../model/fbmUser");
 const TrackScan = require("../../model/trackScan");
 const TikTokAuth = require("../../model/TikTokAuth");
 const TikTokOrder = require("../../model/TikTokOrder");
+const VTOrder = require("../../model/VTOrder");
 
 const app = express();
 
@@ -1368,7 +1369,10 @@ router.get("/api/orders/store", async (req, res) => {
           }
         }
 
-        allOrders.push(structuredOrder);
+        // allOrders.push(structuredOrder);
+        if(trackingNumbers.length>0){
+          allOrders.push(structuredOrder);
+        }
       }
     }
 
@@ -1494,7 +1498,10 @@ router.get("/api/shipped/store", async (req, res) => {
           }
         }
 
-        allOrders.push(structuredOrder);
+        // allOrders.push(structuredOrder);
+         if(trackingNumbers.length>0){
+          allOrders.push(structuredOrder);
+        }
       }
     }
 
@@ -1677,7 +1684,7 @@ router.get("/api/orders-list", async (req, res) => {
       endDate,
     } = req.query;
     console.log("Fetching orders list with params:", req.query);
-    const allOrders = await Order.find().sort({ created_at: -1 }).lean();
+    const allOrders = await VTOrder.find().sort({ created_at: -1 }).lean();
     // const allOrders = await Order.find({ warehouseId: { $ne: '7275426401325893419' } }).sort({ created_at: -1 }).lean();
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
@@ -2150,5 +2157,236 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
 
 
 
+router.post("/api/orders", async (req, res) => {
+  try {
+    let allOrders = [];
+    let fullDetails = [];
+    let pageToken = undefined;
+
+    const MAX_PAGES = 1;
+    const MAX_ORDERS = 50;
+    let pageCount = 0;
+
+    while (true) {
+      if (pageCount >= MAX_PAGES || allOrders.length >= MAX_ORDERS) {
+        console.log(
+          `✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`
+        );
+        break;
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const path = "/api/orders/search";
+
+      const body = {
+        page_size: 50,
+        shipping_type: "SELLER",
+        sort_field: "create_time",
+        sort_order: "DESC",
+        ...(pageToken ? { page_token: pageToken } : {}),
+      };
+
+      const queryParams = {
+        app_key: APP_KEY,
+        timestamp,
+      };
+
+      const sign = generateSign(
+        `${BASE_URL}${path}`,
+        queryParams,
+        body,
+        APP_SECRET
+      );
+
+      const queryStr = new URLSearchParams({
+        ...queryParams,
+        sign,
+        access_token: ACCESS_TOKEN,
+      }).toString();
+
+      const url = `${BASE_URL}${path}?${queryStr}`;
+
+      const orderListRes = await axios.post(url, body, {
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = orderListRes.data?.data;
+      const orders = data?.order_list || [];
+      const nextToken = data?.next_cursor;
+      const hasMore = data?.more;
+
+      if (orders.length > 0) {
+        allOrders.push(...orders);
+
+        const detailBody = { order_id_list: orders.map((o) => o.order_id) };
+        const detailTimestamp = Math.floor(Date.now() / 1000);
+        const detailQuery = {
+          app_key: APP_KEY,
+          timestamp: detailTimestamp,
+        };
+
+        const sign2 = generateSign(
+          `${BASE_URL}/api/orders/detail/query`,
+          detailQuery,
+          detailBody,
+          APP_SECRET
+        );
+        const query2 = new URLSearchParams({
+          ...detailQuery,
+          sign: sign2,
+          access_token: ACCESS_TOKEN,
+        }).toString();
+
+        const detailUrl = `${BASE_URL}/api/orders/detail/query?${query2}`;
+        const detailsRes = await axios.post(detailUrl, detailBody, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const detailedOrders = detailsRes.data?.data?.order_list || [];
+        console.log(
+          `📦 Got ${detailedOrders.length} detailed orders for page ${
+            pageCount + 1
+          }`
+        );
+
+        fullDetails.push(...detailedOrders);
+      }
+
+      if (!hasMore || !nextToken) {
+        console.log("🚫 No more pages");
+        break;
+      }
+
+      pageToken = nextToken;
+      pageCount++;
+      await new Promise((r) => setTimeout(r, 500)); // Throttle
+    }
+
+  
+
+    // Insert only new orders
+    let insertCount = 0;
+    const seenOrderIds = new Set();
+    let warehouseMatchCount = 1;
+
+    
+
+    for (let i = 0; i < fullDetails.length; i++) {
+      const order = fullDetails[i];
+      console.log(`${i} ${order.order_id}`);
+
+      try {
+        if (order?.warehouse_id === "7275426401325893419")
+          warehouseMatchCount++;
+      
+          if (
+          order?.warehouse_id !== "7275426401325893419" || !order?.rts_time
+        ) continue;
+
+        if (!order?.order_id || seenOrderIds.has(order.order_id)) continue;
+        seenOrderIds.add(order.order_id);
+
+        const exists = await TikTokOrder.exists({ OrderId: order.order_id });
+        if (exists) {
+          console.log(`⏭️ Already exists: ${order.order_id}`);
+          continue;
+        }
+
+        const trackingNumbers = Array.from(
+          new Set(
+            (order.order_line_list || [])
+              .map((line) => line.tracking_number)
+              .filter(Boolean)
+          )
+        );
+
+        const items = (order.item_list || []).map((item) => ({
+          sku: item.seller_sku || "",
+          quantity: item.quantity || 1,
+          title: item.product_name || "",
+          image: item.sku_image || "",
+        }));
+
+        const orderDoc = {
+          OrderId: order.order_id,
+          id: order.order_id,
+          shipped_at: order.shipped_time || "",
+          created_at: order.create_time || "",
+          carrier_name: order.shipping_provider || "",
+          customerName: order.recipient_address?.name || "",
+          address: order.recipient_address?.full_address || "",
+          trackingNumber: trackingNumbers,
+          tags: order.is_sample_order
+            ? [{ name: "sample" }]
+            : [{ name: "tiktok" }],
+          channelCode: order.channel_code || "",
+          channelName: order.channel_name || "",
+          items,
+          status: order.order_status || "UNKNOWN",
+        };
+
+        await TikTokOrder.create(orderDoc);
+        insertCount++;
+        console.log(`✅ Inserted order: ${order.order_id}`);
+      } catch (err) {
+        console.error(`❌ Error inserting ${order.order_id}:`, err.message);
+      }
+    }
+
+    console.log(`✅ Total NEW orders inserted: ${insertCount}`);
+    res.json({ inserted: insertCount, fetched: fullDetails });
+  } catch (err) {
+    console.error("❌ Fetch error:", err.response?.data || err.message);
+    res
+      .status(500)
+      .json({ error: err.response?.data || "Failed to fetch orders" });
+  }
+});
+
+
+router.get("/api/merge/order", async (req, res) => {
+  try {
+    const vqOrders = await Order.find().sort({ created_at: -1 });
+    const ttOrders = await TikTokOrder.find().sort({ created_at: -1 });
+
+    let insertedCount = 0;
+    const allOrders = [...vqOrders, ...ttOrders];
+
+    for (const order of allOrders) {
+      const merged = {
+        OrderId: order.OrderId,
+        id: order.id || order.OrderId,
+        shipped_at: order.shipped_at || "",
+        created_at: order.created_at || "",
+        carrier_name: order.carrier_name || "",
+        customerName: order.customerName || "",
+        address: order.address || "",
+        trackingNumber: order.trackingNumber || [],
+        trackingUrl: order.trackingUrl || "",
+        shipmentId: order.shipmentId || "",
+        tags: order.tags || [],
+        channelCode: order.channelCode || "tiktok",
+        channelName: order.channelName || "tiktok",
+        items: order.items || [],
+        status: order.status || "",
+      };
+
+      await VTOrder.findOneAndUpdate(
+        { OrderId: merged.OrderId },
+        { $set: merged },
+        { upsert: true, new: true }
+      );
+
+      insertedCount++;
+    }
+
+    res.json({
+      message: `✅ Merged ${insertedCount} orders into VTOrder collection`,
+    });
+  } catch (error) {
+    console.error("❌ Merge error:", error.message);
+    res.status(500).json({ error: "Failed to merge orders" });
+  }
+});
 
 module.exports = router;

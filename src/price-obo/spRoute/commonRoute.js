@@ -1280,6 +1280,22 @@ router.get("/api/orders/store", async (req, res) => {
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
+    // Retry helper for TikTok API
+    const fetchTikTokSummary = async (orderId, retries = 7) => {
+      const url = `http://localhost:3000/api/order/${orderId}/summary`;
+
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await axios.get(url);
+          return res.data;
+        } catch (err) {
+          console.warn(`Retry ${i + 1} failed for ${orderId}`);
+          if (i === retries - 1) throw err;
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
+        }
+      }
+    };
+
     for (let page = 1; page <= totalPages; page++) {
       const response = await axios.get(VEEQO_API_URL, {
         headers: {
@@ -1302,6 +1318,10 @@ router.get("/api/orders/store", async (req, res) => {
           .map((a) => a?.shipment?.tracking_number?.tracking_number)
           .filter(Boolean);
 
+        const tags = (order.tags || []).map((tag) => ({
+          name: tag.name || "",
+        }));
+
         const structuredOrder = {
           id: String(order.id),
           OrderId: String(order.number),
@@ -1318,9 +1338,7 @@ router.get("/api/orders/store", async (req, res) => {
           trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
           status:
             order.allocations?.[0]?.shipment?.tracking_number?.status || "",
-          tags: (order.tags || []).map((tag) => ({
-            name: tag.name || "",
-          })),
+          tags,
           channelCode: order.channel?.type_code || "",
           channelName: order.channel?.name || "",
           items: (order.allocations?.[0]?.line_items || []).map((item) => {
@@ -1333,25 +1351,36 @@ router.get("/api/orders/store", async (req, res) => {
             };
           }),
         };
+
+        // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
+        const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+        if (tiktokTag) {
+          const tiktokOrderId = tiktokTag.name.split(":")[1];
+          try {
+            const tik = await fetchTikTokSummary(tiktokOrderId);
+            structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
+
+            structuredOrder.trackingNumber = tik.tracking_numbers || [];
+            structuredOrder.status = "created";
+          } catch (err) {
+            console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
+          }
+        }
+
         allOrders.push(structuredOrder);
-        // if (trackingNumbers.length > 0) {
-        //   allOrders.push(structuredOrder);
-        // }
       }
     }
 
-    // Filter only NEW orders
+    // Only insert new ones
     const existingOrders = await Order.find({
       OrderId: { $in: allOrders.map((o) => o.OrderId) },
     }).select("OrderId");
 
     const existingOrderIds = new Set(existingOrders.map((o) => o.OrderId));
-
     const newOrders = allOrders.filter(
       (order) => !existingOrderIds.has(order.OrderId)
     );
 
-    // Insert all new orders
     if (newOrders.length > 0) {
       await Order.insertMany(newOrders);
     }
@@ -1363,7 +1392,7 @@ router.get("/api/orders/store", async (req, res) => {
     });
   } catch (error) {
     console.error(
-      "Error fetching/inserting orders:",
+      "❌ Error inserting orders:",
       error.response?.data || error.message
     );
     res.status(500).json({ error: "Failed to insert orders" });
@@ -1371,12 +1400,27 @@ router.get("/api/orders/store", async (req, res) => {
 });
 
 router.get("/api/shipped/store", async (req, res) => {
-  console.log("Start fetching shipped orders...");
-  try {
-    const pageSize = 100;
-    const totalOrders = 1000;
+   try {
+    const pageSize = 50;
+    const totalOrders = 100;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
+
+    // Retry helper for TikTok API
+    const fetchTikTokSummary = async (orderId, retries = 7) => {
+      const url = `http://localhost:3000/api/order/${orderId}/summary`;
+
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await axios.get(url);
+          return res.data;
+        } catch (err) {
+          console.warn(`Retry ${i + 1} failed for ${orderId}`);
+          if (i === retries - 1) throw err;
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
+        }
+      }
+    };
 
     for (let page = 1; page <= totalPages; page++) {
       const response = await axios.get(VEEQO_API_URL, {
@@ -1400,6 +1444,10 @@ router.get("/api/shipped/store", async (req, res) => {
           .map((a) => a?.shipment?.tracking_number?.tracking_number)
           .filter(Boolean);
 
+        const tags = (order.tags || []).map((tag) => ({
+          name: tag.name || "",
+        }));
+
         const structuredOrder = {
           id: String(order.id),
           OrderId: String(order.number),
@@ -1416,9 +1464,7 @@ router.get("/api/shipped/store", async (req, res) => {
           trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
           status:
             order.allocations?.[0]?.shipment?.tracking_number?.status || "",
-          tags: (order.tags || []).map((tag) => ({
-            name: tag.name || "",
-          })),
+          tags,
           channelCode: order.channel?.type_code || "",
           channelName: order.channel?.name || "",
           items: (order.allocations?.[0]?.line_items || []).map((item) => {
@@ -1431,37 +1477,48 @@ router.get("/api/shipped/store", async (req, res) => {
             };
           }),
         };
+
+        // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
+        const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+        if (tiktokTag) {
+          const tiktokOrderId = tiktokTag.name.split(":")[1];
+          try {
+            const tik = await fetchTikTokSummary(tiktokOrderId);
+            structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
+
+            structuredOrder.trackingNumber = tik.tracking_numbers || [];
+            structuredOrder.status = "created";
+          } catch (err) {
+            console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
+          }
+        }
+
         allOrders.push(structuredOrder);
-        // if (trackingNumbers.length > 0) {
-        //   allOrders.push(structuredOrder);
-        // }
       }
     }
 
-    // Filter only NEW orders
+    // Only insert new ones
     const existingOrders = await Order.find({
       OrderId: { $in: allOrders.map((o) => o.OrderId) },
     }).select("OrderId");
 
     const existingOrderIds = new Set(existingOrders.map((o) => o.OrderId));
-
     const newOrders = allOrders.filter(
       (order) => !existingOrderIds.has(order.OrderId)
     );
 
-    // Insert all new orders
     if (newOrders.length > 0) {
       await Order.insertMany(newOrders);
     }
 
-    console.log(`Inserted ${newOrders.length} new shipped data.`);
+    console.log(`Inserted ${newOrders.length} new orders.`);
     res.status(200).json({
       message: "New orders inserted",
       insertedCount: newOrders.length,
     });
   } catch (error) {
     console.error(
-      "Error fetching/inserting orders:",
+      "❌ Error inserting orders:",
       error.response?.data || error.message
     );
     res.status(500).json({ error: "Failed to insert orders" });
@@ -1641,7 +1698,7 @@ router.get("/api/orders-list", async (req, res) => {
         }
       }
 
-      const matchesQuery = query
+   const matchesQuery = query
         ? (typeof order.OrderId === "string" &&
             order.OrderId.toLowerCase().includes(query.toLowerCase())) ||
           (Array.isArray(order.trackingNumber) &&
@@ -1651,7 +1708,9 @@ router.get("/api/orders-list", async (req, res) => {
                 : false
             )) ||
           (typeof order.trackingNumber === "string" &&
-            order.trackingNumber.toLowerCase().includes(query.toLowerCase()))
+            order.trackingNumber.toLowerCase().includes(query.toLowerCase())) ||
+          (typeof order.tiktokId === "string" &&
+            order.tiktokId.toLowerCase().includes(query.toLowerCase()))
         : true;
 
       let matchesDateRange = true;
@@ -1897,27 +1956,7 @@ const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 
 
-// const generateSign = (uri, query, body, appSecret) => {
-//   const excludeKeys = ["access_token", "sign"];
-//   const sortedParams = Object.keys(query)
-//     .filter((key) => !excludeKeys.includes(key))
-//     .sort()
-//     .map((key) => `${key}${query[key]}`)
-//     .join("");
-
-//   const path = new URL(uri).pathname;
-//   let signString = `${path}${sortedParams}`;
-
-//   if (body && Object.keys(body).length > 0) {
-//     signString += JSON.stringify(body);
-//   }
-
-//   signString = `${appSecret}${signString}${appSecret}`;
-//   const hmac = crypto.createHmac("sha256", appSecret);
-//   hmac.update(signString);
-//   return hmac.digest("hex");
-// };
-const generateSign = (path, query, body, appSecret) => {
+const generateSign = (uri, query, body, appSecret) => {
   const excludeKeys = ["access_token", "sign"];
   const sortedParams = Object.keys(query)
     .filter((key) => !excludeKeys.includes(key))
@@ -1925,7 +1964,7 @@ const generateSign = (path, query, body, appSecret) => {
     .map((key) => `${key}${query[key]}`)
     .join("");
 
-  // ✅ Don't try to parse path using new URL()
+  const path = new URL(uri).pathname;
   let signString = `${path}${sortedParams}`;
 
   if (body && Object.keys(body).length > 0) {
@@ -1933,167 +1972,179 @@ const generateSign = (path, query, body, appSecret) => {
   }
 
   signString = `${appSecret}${signString}${appSecret}`;
-
   const hmac = crypto.createHmac("sha256", appSecret);
   hmac.update(signString);
   return hmac.digest("hex");
 };
 
-const SHOP_CIPHER = "X8pMhAAAAABbG8PzDyczhbbNrFLc5cq5twFc89QeZhzfZbvW9aBwfA";
-router.post("/api/ttorder/store", async (req, res) => {
+
+const MAX_RETRIES = 10;
+const RETRY_DELAY_MS = 1000;
+function mapStatus(orderStatus) {
+  switch (orderStatus) {
+    case 111:
+    case 112:
+      return "awaiting_collection";
+    case 121:
+      return "in_transit";
+    case 122:
+    case 130:
+      return "delivered";
+    case 140:
+      return "recipient_refused";
+    default:
+      return "unknown";
+  }
+}
+
+async function Retry(tiktokOrderId) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/api/order/${tiktokOrderId}/summary`
+      );
+
+      if (response.data && response.data.order_id) {
+        return response.data;
+      }
+
+      console.warn(`⚠️ Attempt ${attempt}: Empty or invalid data`);
+    } catch (error) {
+      const isDeprecationError = error?.response?.data?.message?.includes(
+        "V1 API is being deprecated"
+      );
+
+      if (isDeprecationError) {
+        console.warn(`⚠️ Attempt ${attempt}: API deprecated`);
+      } else {
+        console.warn(`⚠️ Attempt ${attempt}: ${error.message}`);
+      }
+
+      if (attempt === MAX_RETRIES) throw error;
+    }
+
+    await new Promise((res) => setTimeout(res, RETRY_DELAY_MS));
+  }
+
+  throw new Error(`❌ Failed to fetch TikTok summary for ${tiktokOrderId}`);
+}
+
+router.get("/api/tiktokorder/status", async (req, res) => {
   try {
-    let allOrders = [];
-    let fullDetails = [];
-    let pageToken = undefined;
+    const orders = await Order.find({
+      tags: { $elemMatch: { name: /^TikTokOrderID:/ } },
+    });
 
-    const MAX_PAGES = 5;
-    const MAX_ORDERS = 250;
-    let pageCount = 0;
+    let updatedCount = 0;
+    const updates = [];
 
-    while (true) {
-      if (pageCount >= MAX_PAGES || allOrders.length >= MAX_ORDERS) {
-        console.log(
-          `✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`
-        );
-        break;
-      }
+    for (const order of orders) {
+      const tag = order.tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+      if (!tag) continue;
 
-      const timestamp = Math.floor(Date.now() / 1000);
-      const path = "/order/202309/orders/search";
-
-      const queryParams = {
-        app_key: APP_KEY,
-        timestamp,
-        shop_cipher: SHOP_CIPHER,
-         page_size: 50,
-        ...(pageToken ? { page_token: pageToken } : {}),
-      };
-
-      const body = {
-        page_size: 50,
-        shipping_type: "SELLER",
-        sort_field: "create_time",
-        sort_order: "DESC",
-      };
-
-      const sign = generateSign(path, queryParams, body, APP_SECRET);
-      const queryStr = new URLSearchParams({
-        ...queryParams,
-        sign,
-      }).toString();
-
-      const headers = {
-        "Content-Type": "application/json",
-        "x-tts-access-token": ACCESS_TOKEN, // ✅ Required header in V2
-      };
-
-      const url = `${BASE_URL}${path}?${queryStr}`;
-      const orderListRes = await axios.post(url, body, { headers });
-
-      const data = orderListRes.data?.data;
-      const orders = data?.order_list || [];
-      const nextToken = data?.next_cursor;
-      const hasMore = data?.more;
-
-      console.log(`🔁 Page ${pageCount + 1} — Fetched ${orders.length} orders`);
-
-      if (orders.length > 0) {
-        allOrders.push(...orders);
-
-        const detailBody = { order_id_list: orders.map((o) => o.order_id) };
-        const detailTimestamp = Math.floor(Date.now() / 1000);
-        const detailQuery = {
-          app_key: APP_KEY,
-          timestamp: detailTimestamp,
-        };
-     const detailPath = "/order/202309/orders/detail/query";
-
-        const sign2 = generateSign(
-          detailPath,
-          detailQuery,
-          detailBody,
-          APP_SECRET
-        );
-        const query2 = new URLSearchParams({
-          ...detailQuery,
-          sign: sign2,
-          access_token: ACCESS_TOKEN,
-        }).toString();
-
-        const detailUrl = `${BASE_URL}/api/orders/detail/query?${query2}`;
-        const detailsRes = await axios.post(detailUrl, detailBody, {
-          headers: { "Content-Type": "application/json" },
-        });
-
-        fullDetails.push(...(detailsRes.data?.data?.order_list || []));
-      }
-
-      if (!hasMore || !nextToken) {
-        console.log("🚫 No more pages");
-        break;
-      }
-
-      pageToken = nextToken;
-      pageCount++;
-
-      // Optional delay
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    // ✅ Move insertion outside the while loop
-    let insertCount = 0;
-
-    for (const order of fullDetails) {
+      const tiktokOrderId = tag.name.split(":")[1];
+      
       try {
-        if (order?.warehouse_id !== "7275426401325893419" || !order?.rts_time)
-          continue;
+        const data = await Retry(tiktokOrderId);
+        const { order_id, rts_time, tracking_numbers, order_status } = data;
 
-        const orderDoc = {
-          OrderId: order.order_id,
-          id: order.order_id,
-          shipped_at: new Date(order.rts_time * 1000).toISOString(),
-          created_at: new Date(order.rts_time * 1000).toISOString(),
-          carrier_name: order.shipping_provider || "",
-          customerName: order.recipient_address?.name || "",
-          address: order.recipient_address?.full_address || "",
-          trackingNumber: [
-            ...new Set(
-              order.order_line_list.map((line) => line.tracking_number)
-            ),
-          ],
-          tags: order.is_sample_order ? [{ name: "sample" }] : [],
-          items: order.item_list.map((item) => ({
-            sku: item.seller_sku,
-            quantity: item.quantity,
-            title: item.product_name,
-            image: item.sku_image,
-          })),
-          status: `${order.order_status}`,
-        };
-
-        await TikTokOrder.findOneAndUpdate(
-          { OrderId: order.order_id },
-          { $set: orderDoc },
-          { upsert: true, new: true }
+        const updated = await Order.findByIdAndUpdate(
+          order._id,
+          {
+            $set: {
+              tiktokId: order_id,
+              trackingNumber: tracking_numbers || [],
+              status: mapStatus(order_status),
+            },
+          },
+          { new: true }
         );
 
-        insertCount++;
+        updates.push(updated);
+        updatedCount++;
       } catch (err) {
-        console.error(
-          `❌ Failed to insert order ${order.order_id}:`,
-          err.message
-        );
+        console.error(`Failed for ${tiktokOrderId}:`, err.message);
       }
     }
 
-    console.log(`✅ Total orders inserted/updated in DB: ${insertCount}`);
-    res.json({ result: fullDetails, inserted: insertCount });
+    res.json({
+      updatedCount,
+      message: `${updatedCount} TikTok orders updated in BackUp collection.`,
+    });
   } catch (err) {
-    console.error("❌ Fetch error:", err.response?.data || err.message);
-    res
-      .status(500)
-      .json({ error: err.response?.data || "Failed to fetch orders" });
+    console.error("Error:", err.message);
+    res.status(500).json({ error: "Failed to update TikTok order statuses." });
   }
 });
+
+router.get("/api/order/:orderId/summary", async (req, res) => {
+  const orderId = req.params.orderId;
+  if (!orderId) return res.status(400).json({ error: "Missing orderId" });
+
+  try {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const path = "/api/orders/detail/query";
+
+    const body = {
+      order_id_list: [orderId],
+    };
+
+    const queryParams = {
+      app_key: APP_KEY,
+      timestamp,
+    };
+
+    const sign = generateSign(
+      `${BASE_URL}${path}`,
+      queryParams,
+      body,
+      APP_SECRET
+    );
+
+    const query = new URLSearchParams({
+      ...queryParams,
+      sign,
+      access_token: ACCESS_TOKEN,
+    }).toString();
+
+    const url = `${BASE_URL}${path}?${query}`;
+
+    const detailRes = await axios.post(url, body, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const order = detailRes.data?.data?.order_list?.[0];
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const trackingNumbers = Array.from(
+      new Set(
+        (order.order_line_list || [])
+          .map((line) => line.tracking_number)
+          .filter(Boolean)
+      )
+    );
+
+    res.json({
+      order_id: order.order_id,
+      order_status: order.order_status,
+      rts_time: order?.rts_time || order.update_time,
+      tracking_numbers: trackingNumbers,
+    });
+  } catch (err) {
+    console.error(
+      "Order summary fetch error:",
+      err.response?.data || err.message
+    );
+    res
+      .status(500)
+      .json({ error: err.response?.data || "Failed to fetch order summary" });
+  }
+});
+
+
+
 
 module.exports = router;

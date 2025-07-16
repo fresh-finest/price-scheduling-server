@@ -7,6 +7,7 @@ const orderSchema = mongoose.Schema(
       required: true,
       unique: true,
     },
+    tiktokId:{type:String},
     id: { type: String },
     shipped_at: { type: String },
     created_at: { type: String },

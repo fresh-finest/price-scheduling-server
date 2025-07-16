@@ -1054,7 +1054,7 @@ router.get("/api/orders/scan", async (req, res) => {
         query: trackingNumber,
       },
     });
-    const order1 = await Order.findOne({ trackingNumber });
+    const order1 = await VTOrder.findOne({ trackingNumber });
     const order = response.data[0]; // Assume first match
 
     if (!order1) {
@@ -1157,7 +1157,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
         trackingNumber = trackingNumber.slice(-22);
       }
 
-      const order = await Order.findOne({
+      const order = await VTOrder.findOne({
         trackingNumber: { $in: [trackingNumber] },
       });
       if (!order) {

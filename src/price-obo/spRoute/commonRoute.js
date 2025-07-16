@@ -1891,12 +1891,33 @@ router.post("/api/tiktok/orders", async (req, res) => {
 
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
-const ACCESS_TOKEN ="TTP_i6jFxgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_MW9oV9eaSoBpg_arBtDw5fyDOLuSsYKpseIaxDqUH5gim1dLWctrNwwCREVpW2Tw"; // latest token from correct app
-// const BASE_URL = "https://open-api.tiktokglobalshop.com";
-const BASE_URL = "https://open-api.tiktokshop.com";
-const PATH = "/api/orders/search";
+const ACCESS_TOKEN =
+  "TTP_i6jFxgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_MW9oV9eaSoBpg_arBtDw5fyDOLuSsYKpseIaxDqUH5gim1dLWctrNwwCREVpW2Tw"; // latest token from correct app
+const BASE_URL = "https://open-api.tiktokglobalshop.com";
+// const BASE_URL = "https://open-api.tiktokshop.com";
 
-const generateSign = (uri, query, body, appSecret) => {
+
+// const generateSign = (uri, query, body, appSecret) => {
+//   const excludeKeys = ["access_token", "sign"];
+//   const sortedParams = Object.keys(query)
+//     .filter((key) => !excludeKeys.includes(key))
+//     .sort()
+//     .map((key) => `${key}${query[key]}`)
+//     .join("");
+
+//   const path = new URL(uri).pathname;
+//   let signString = `${path}${sortedParams}`;
+
+//   if (body && Object.keys(body).length > 0) {
+//     signString += JSON.stringify(body);
+//   }
+
+//   signString = `${appSecret}${signString}${appSecret}`;
+//   const hmac = crypto.createHmac("sha256", appSecret);
+//   hmac.update(signString);
+//   return hmac.digest("hex");
+// };
+const generateSign = (path, query, body, appSecret) => {
   const excludeKeys = ["access_token", "sign"];
   const sortedParams = Object.keys(query)
     .filter((key) => !excludeKeys.includes(key))
@@ -1904,7 +1925,7 @@ const generateSign = (uri, query, body, appSecret) => {
     .map((key) => `${key}${query[key]}`)
     .join("");
 
-  const path = new URL(uri).pathname;
+  // ✅ Don't try to parse path using new URL()
   let signString = `${path}${sortedParams}`;
 
   if (body && Object.keys(body).length > 0) {
@@ -1912,10 +1933,12 @@ const generateSign = (uri, query, body, appSecret) => {
   }
 
   signString = `${appSecret}${signString}${appSecret}`;
+
   const hmac = crypto.createHmac("sha256", appSecret);
   hmac.update(signString);
   return hmac.digest("hex");
 };
+
 const SHOP_CIPHER = "X8pMhAAAAABbG8PzDyczhbbNrFLc5cq5twFc89QeZhzfZbvW9aBwfA";
 router.post("/api/ttorder/store", async (req, res) => {
   try {
@@ -1942,6 +1965,7 @@ router.post("/api/ttorder/store", async (req, res) => {
         app_key: APP_KEY,
         timestamp,
         shop_cipher: SHOP_CIPHER,
+         page_size: 50,
         ...(pageToken ? { page_token: pageToken } : {}),
       };
 
@@ -1952,12 +1976,7 @@ router.post("/api/ttorder/store", async (req, res) => {
         sort_order: "DESC",
       };
 
-      const sign = generateSign(
-        `${BASE_URL}${path}`,
-        queryParams,
-        body,
-        APP_SECRET
-      );
+      const sign = generateSign(path, queryParams, body, APP_SECRET);
       const queryStr = new URLSearchParams({
         ...queryParams,
         sign,
@@ -1969,8 +1988,7 @@ router.post("/api/ttorder/store", async (req, res) => {
       };
 
       const url = `${BASE_URL}${path}?${queryStr}`;
-     const orderListRes = await axios.post(url, body, { headers });
-
+      const orderListRes = await axios.post(url, body, { headers });
 
       const data = orderListRes.data?.data;
       const orders = data?.order_list || [];

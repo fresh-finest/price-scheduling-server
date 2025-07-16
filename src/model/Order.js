@@ -20,6 +20,7 @@ const orderSchema = mongoose.Schema(
     tags: [{ name: String }],
     channelCode: { type: String },
     channelName: { type: String },
+    warehouseId:{type:String},
     items: [
       {
         sku: { type: String },

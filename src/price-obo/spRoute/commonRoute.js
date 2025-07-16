@@ -1361,6 +1361,7 @@ router.get("/api/orders/store", async (req, res) => {
             structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
 
             structuredOrder.trackingNumber = tik.tracking_numbers || [];
+            structuredOrder.warehouseId=tik.warehouse_id;
             structuredOrder.status = "created";
           } catch (err) {
             console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
@@ -1485,7 +1486,7 @@ router.get("/api/shipped/store", async (req, res) => {
           try {
             const tik = await fetchTikTokSummary(tiktokOrderId);
             structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
-
+            structuredOrder.warehouseId=tik.warehouse_id;
             structuredOrder.trackingNumber = tik.tracking_numbers || [];
             structuredOrder.status = "created";
           } catch (err) {
@@ -1676,7 +1677,8 @@ router.get("/api/orders-list", async (req, res) => {
       endDate,
     } = req.query;
     console.log("Fetching orders list with params:", req.query);
-    const allOrders = await Order.find().sort({ created_at: -1 }).lean();
+    // const allOrders = await Order.find().sort({ created_at: -1 }).lean();
+    const allOrders = await BackUp.find({ warehouseId: { $ne: '7275426401325893419' } }).sort({ created_at: -1 }).lean();
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
@@ -2046,7 +2048,7 @@ router.get("/api/tiktokorder/status", async (req, res) => {
       
       try {
         const data = await Retry(tiktokOrderId);
-        const { order_id, rts_time, tracking_numbers, order_status } = data;
+        const { order_id, rts_time, tracking_numbers, order_status,warehouse_id } = data;
 
         const updated = await Order.findByIdAndUpdate(
           order._id,
@@ -2054,6 +2056,7 @@ router.get("/api/tiktokorder/status", async (req, res) => {
             $set: {
               tiktokId: order_id,
               trackingNumber: tracking_numbers || [],
+              warehouseId:warehouse_id,
               status: mapStatus(order_status),
             },
           },
@@ -2131,6 +2134,7 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
       order_id: order.order_id,
       order_status: order.order_status,
       rts_time: order?.rts_time || order.update_time,
+      warehouse_id:order.warehouse_id,
       tracking_numbers: trackingNumbers,
     });
   } catch (err) {

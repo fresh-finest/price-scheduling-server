@@ -6,6 +6,7 @@ const NodeCache = require("node-cache");
 const multer = require("multer");
 const csv = require("csv-parser");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const fs = require("fs");
 const path = require("path");
@@ -84,6 +85,7 @@ const Order = require("../../model/Order");
 const FBMUser = require("../../model/fbmUser");
 const TrackScan = require("../../model/trackScan");
 const TikTokAuth = require("../../model/TikTokAuth");
+const TikTokOrder = require("../../model/TikTokOrder");
 
 const app = express();
 
@@ -1769,28 +1771,32 @@ router.get("/api/orders-list", async (req, res) => {
   }
 });
 
-
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;
   console.log("req.query", req.query);
-  console.log(process.env.TIKTOK_APP_KEY,process.env.TIKTOK_APP_SECRET);
+  console.log(process.env.TIKTOK_APP_KEY, process.env.TIKTOK_APP_SECRET);
   if (!code) return res.status(400).send("Missing authorization code");
 
   try {
-    const tokenRes = await axios.get("https://auth.tiktok-shops.com/api/v2/token/get", {
-      params: {
-        app_key: process.env.TIKTOK_APP_KEY,
-        app_secret: process.env.TIKTOK_APP_SECRET,
-        auth_code: code, // not `code`, use `auth_code`
-        grant_type: "authorized_code",
-      },
-    });
-   
+    const tokenRes = await axios.get(
+      "https://auth.tiktok-shops.com/api/v2/token/get",
+      {
+        params: {
+          app_key: process.env.TIKTOK_APP_KEY,
+          app_secret: process.env.TIKTOK_APP_SECRET,
+          auth_code: code, // not `code`, use `auth_code`
+          grant_type: "authorized_code",
+        },
+      }
+    );
+
     const data = tokenRes.data.data;
     if (!data || !data.access_token) {
-      return res.status(500).send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);
+      return res
+        .status(500)
+        .send(`Failed to get token: ${JSON.stringify(tokenRes.data)}`);
     }
-   console.log(data);
+    console.log(data);
     const accessTokenExpireAt = new Date(data.access_token_expire_in * 1000);
     const refreshTokenExpireAt = new Date(data.refresh_token_expire_in * 1000);
 
@@ -1808,11 +1814,266 @@ router.get("/tiktok/callback", async (req, res) => {
       { upsert: true, new: true }
     );
 
-    console.log(`Connected seller: ${data.seller_name} (open_id: ${data.open_id})`);
+    console.log(
+      `Connected seller: ${data.seller_name} (open_id: ${data.open_id})`
+    );
     return res.redirect(`https://fbm.priceobo.com/`);
   } catch (err) {
     console.error("Token exchange error:", err.response?.data || err.message);
     return res.status(500).send("Token exchange failed.");
+  }
+});
+
+const TIKTOK_APP_KEY = process.env.TIKTOK_APP_KEY;
+const TIKTOK_APP_SECRET = process.env.TIKTOK_APP_SECRET;
+
+router.post("/api/tiktok/orders", async (req, res) => {
+  try {
+    const seller = await TikTokAuth.findOne({
+      open_id: "X8pMhAAAAABbG8PzDyczhbbNrFLc5cq5twFc89QeZhzfZbvW9aBwfA",
+    });
+
+    if (!seller) {
+      return res.status(404).json({ error: "Seller not found" });
+    }
+
+    const accessToken = seller.access_token.trim(); // Trim whitespace
+    const shopCipher = seller.open_id.trim();
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    console.log(TIKTOK_APP_SECRET);
+    // 🧪 Build correct sign string
+    const signInput = `app_key${TIKTOK_APP_KEY}shop_cipher${shopCipher}timestamp${timestamp}`;
+    const sign = crypto
+      .createHmac("sha256", TIKTOK_APP_SECRET)
+      .update(signInput)
+      .digest("hex");
+
+    // 🧪 Build request URL
+    const url =
+      `https://open-api.tiktokshop.com/order/202309/orders/search` +
+      `?app_key=${TIKTOK_APP_KEY}&timestamp=${timestamp}&shop_cipher=${encodeURIComponent(
+        shopCipher
+      )}&sign=${sign}`;
+
+    console.log("🔍 Debug:");
+    console.log("signInput:", signInput);
+    console.log("sign:", sign);
+    console.log("URL:", url);
+
+    const response = await axios.post(
+      url,
+      {
+        page_size: 50,
+        sort_field: "create_time",
+        sort_order: "DESC",
+      },
+      {
+        headers: {
+          "x-tts-access-token": accessToken,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return res.status(200).json({ data: response.data });
+  } catch (error) {
+    console.error(
+      "❌ TikTok order fetch failed:",
+      error.response?.data || error.message
+    );
+    return res.status(500).json({
+      error: "Failed to fetch TikTok orders",
+      details: error.response?.data || error.message,
+    });
+  }
+});
+
+const APP_KEY = "6gi3nino9sia3";
+const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
+const ACCESS_TOKEN ="TTP_i6jFxgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_MW9oV9eaSoBpg_arBtDw5fyDOLuSsYKpseIaxDqUH5gim1dLWctrNwwCREVpW2Tw"; // latest token from correct app
+// const BASE_URL = "https://open-api.tiktokglobalshop.com";
+const BASE_URL = "https://open-api.tiktokshop.com";
+const PATH = "/api/orders/search";
+
+const generateSign = (uri, query, body, appSecret) => {
+  const excludeKeys = ["access_token", "sign"];
+  const sortedParams = Object.keys(query)
+    .filter((key) => !excludeKeys.includes(key))
+    .sort()
+    .map((key) => `${key}${query[key]}`)
+    .join("");
+
+  const path = new URL(uri).pathname;
+  let signString = `${path}${sortedParams}`;
+
+  if (body && Object.keys(body).length > 0) {
+    signString += JSON.stringify(body);
+  }
+
+  signString = `${appSecret}${signString}${appSecret}`;
+  const hmac = crypto.createHmac("sha256", appSecret);
+  hmac.update(signString);
+  return hmac.digest("hex");
+};
+const SHOP_CIPHER = "X8pMhAAAAABbG8PzDyczhbbNrFLc5cq5twFc89QeZhzfZbvW9aBwfA";
+router.post("/api/ttorder/store", async (req, res) => {
+  try {
+    let allOrders = [];
+    let fullDetails = [];
+    let pageToken = undefined;
+
+    const MAX_PAGES = 5;
+    const MAX_ORDERS = 250;
+    let pageCount = 0;
+
+    while (true) {
+      if (pageCount >= MAX_PAGES || allOrders.length >= MAX_ORDERS) {
+        console.log(
+          `✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`
+        );
+        break;
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const path = "/order/202309/orders/search";
+
+      const queryParams = {
+        app_key: APP_KEY,
+        timestamp,
+        shop_cipher: SHOP_CIPHER,
+        ...(pageToken ? { page_token: pageToken } : {}),
+      };
+
+      const body = {
+        page_size: 50,
+        shipping_type: "SELLER",
+        sort_field: "create_time",
+        sort_order: "DESC",
+      };
+
+      const sign = generateSign(
+        `${BASE_URL}${path}`,
+        queryParams,
+        body,
+        APP_SECRET
+      );
+      const queryStr = new URLSearchParams({
+        ...queryParams,
+        sign,
+      }).toString();
+
+      const headers = {
+        "Content-Type": "application/json",
+        "x-tts-access-token": ACCESS_TOKEN, // ✅ Required header in V2
+      };
+
+      const url = `${BASE_URL}${path}?${queryStr}`;
+     const orderListRes = await axios.post(url, body, { headers });
+
+
+      const data = orderListRes.data?.data;
+      const orders = data?.order_list || [];
+      const nextToken = data?.next_cursor;
+      const hasMore = data?.more;
+
+      console.log(`🔁 Page ${pageCount + 1} — Fetched ${orders.length} orders`);
+
+      if (orders.length > 0) {
+        allOrders.push(...orders);
+
+        const detailBody = { order_id_list: orders.map((o) => o.order_id) };
+        const detailTimestamp = Math.floor(Date.now() / 1000);
+        const detailQuery = {
+          app_key: APP_KEY,
+          timestamp: detailTimestamp,
+        };
+
+        const sign2 = generateSign(
+          `${BASE_URL}/order/202309/orders/detail/query`,
+          detailQuery,
+          detailBody,
+          APP_SECRET
+        );
+        const query2 = new URLSearchParams({
+          ...detailQuery,
+          sign: sign2,
+          access_token: ACCESS_TOKEN,
+        }).toString();
+
+        const detailUrl = `${BASE_URL}/api/orders/detail/query?${query2}`;
+        const detailsRes = await axios.post(detailUrl, detailBody, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        fullDetails.push(...(detailsRes.data?.data?.order_list || []));
+      }
+
+      if (!hasMore || !nextToken) {
+        console.log("🚫 No more pages");
+        break;
+      }
+
+      pageToken = nextToken;
+      pageCount++;
+
+      // Optional delay
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    // ✅ Move insertion outside the while loop
+    let insertCount = 0;
+
+    for (const order of fullDetails) {
+      try {
+        if (order?.warehouse_id !== "7275426401325893419" || !order?.rts_time)
+          continue;
+
+        const orderDoc = {
+          OrderId: order.order_id,
+          id: order.order_id,
+          shipped_at: new Date(order.rts_time * 1000).toISOString(),
+          created_at: new Date(order.rts_time * 1000).toISOString(),
+          carrier_name: order.shipping_provider || "",
+          customerName: order.recipient_address?.name || "",
+          address: order.recipient_address?.full_address || "",
+          trackingNumber: [
+            ...new Set(
+              order.order_line_list.map((line) => line.tracking_number)
+            ),
+          ],
+          tags: order.is_sample_order ? [{ name: "sample" }] : [],
+          items: order.item_list.map((item) => ({
+            sku: item.seller_sku,
+            quantity: item.quantity,
+            title: item.product_name,
+            image: item.sku_image,
+          })),
+          status: `${order.order_status}`,
+        };
+
+        await TikTokOrder.findOneAndUpdate(
+          { OrderId: order.order_id },
+          { $set: orderDoc },
+          { upsert: true, new: true }
+        );
+
+        insertCount++;
+      } catch (err) {
+        console.error(
+          `❌ Failed to insert order ${order.order_id}:`,
+          err.message
+        );
+      }
+    }
+
+    console.log(`✅ Total orders inserted/updated in DB: ${insertCount}`);
+    res.json({ result: fullDetails, inserted: insertCount });
+  } catch (err) {
+    console.error("❌ Fetch error:", err.response?.data || err.message);
+    res
+      .status(500)
+      .json({ error: err.response?.data || "Failed to fetch orders" });
   }
 });
 

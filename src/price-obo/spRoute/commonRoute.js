@@ -1682,14 +1682,16 @@ router.get("/api/orders-list", async (req, res) => {
       limit = 100,
       startDate,
       endDate,
+      tagType, // expected values: target | tiktok | temu | flip
     } = req.query;
+
     console.log("Fetching orders list with params:", req.query);
+
     const allOrders = await VTOrder.find().sort({ created_at: -1 }).lean();
-    // const allOrders = await Order.find({ warehouseId: { $ne: '7275426401325893419' } }).sort({ created_at: -1 }).lean();
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
-    // === FILTER: Status, Query, Date Range
+    // === FILTER: Status, Query, Date Range, Tag
     const filteredForResult = allOrders.filter((order) => {
       let matchesStatus = true;
       if (status) {
@@ -1707,7 +1709,7 @@ router.get("/api/orders-list", async (req, res) => {
         }
       }
 
-   const matchesQuery = query
+      const matchesQuery = query
         ? (typeof order.OrderId === "string" &&
             order.OrderId.toLowerCase().includes(query.toLowerCase())) ||
           (Array.isArray(order.trackingNumber) &&
@@ -1732,7 +1734,34 @@ router.get("/api/orders-list", async (req, res) => {
         if (end && shippedAt > end) matchesDateRange = false;
       }
 
-      return matchesStatus && matchesQuery && matchesDateRange;
+      let matchesTag = true;
+      if (tagType) {
+        const tagNames = (order.tags || []).map((tag) => tag.name.toLowerCase());
+        const hasTags = tagNames.length > 0;
+
+        switch (tagType.toLowerCase()) {
+          case "target":
+            matchesTag = hasTags && tagNames.some((name) => name.includes("target"));
+            break;
+          case "tiktok":
+            matchesTag = hasTags && tagNames.some((name) => name.includes("tiktok"));
+            break;
+          case "temu":
+            matchesTag = hasTags && tagNames.some((name) => name.includes("temu"));
+            break;
+          case "flip":
+            matchesTag = hasTags && tagNames.some((name) => name.includes("flip"));
+            break;
+          default:
+            matchesTag = true;
+        }
+
+        if (!hasTags && order.channelName) {
+          matchesTag = order.channelName.toLowerCase().includes(tagType.toLowerCase());
+        }
+      }
+
+      return matchesStatus && matchesQuery && matchesDateRange && matchesTag;
     });
 
     // === MERGE Scan Info
@@ -1808,7 +1837,7 @@ router.get("/api/orders-list", async (req, res) => {
       return { totalByScanStatus, totalByStatus };
     };
 
-    const isSearchOrDateFilter = query || startDate || endDate;
+    const isSearchOrDateFilter = query || startDate || endDate || tagType;
     const { totalByScanStatus, totalByStatus } = isSearchOrDateFilter
       ? calculateStatusCounts(scanFilteredOrders)
       : calculateStatusCounts(allOrders);
@@ -1838,6 +1867,7 @@ router.get("/api/orders-list", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
 });
+
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;

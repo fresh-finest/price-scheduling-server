@@ -2006,9 +2006,10 @@ router.post("/api/ttorder/store", async (req, res) => {
           app_key: APP_KEY,
           timestamp: detailTimestamp,
         };
+     const detailPath = "/order/202309/orders/detail/query";
 
         const sign2 = generateSign(
-          `${BASE_URL}/order/202309/orders/detail/query`,
+          detailPath,
           detailQuery,
           detailBody,
           APP_SECRET

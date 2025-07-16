@@ -1678,7 +1678,7 @@ router.get("/api/orders-list", async (req, res) => {
     } = req.query;
     console.log("Fetching orders list with params:", req.query);
     // const allOrders = await Order.find().sort({ created_at: -1 }).lean();
-    const allOrders = await BackUp.find({ warehouseId: { $ne: '7275426401325893419' } }).sort({ created_at: -1 }).lean();
+    const allOrders = await Order.find({ warehouseId: { $ne: '7275426401325893419' } }).sort({ created_at: -1 }).lean();
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 

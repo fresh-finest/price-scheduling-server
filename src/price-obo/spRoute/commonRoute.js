@@ -1687,7 +1687,10 @@ router.get("/api/orders-list", async (req, res) => {
 
     console.log("Fetching orders list with params:", req.query);
 
-    const allOrders = await VTOrder.find().sort({ created_at: -1 }).lean();
+    // const allOrders = await VTOrder.find().sort({ created_at: -1 }).lean();
+     const allOrders = await VTOrder.find().limit(700).sort({ shipped_at: 1 }).lean();
+ 
+
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
 
@@ -1739,6 +1742,7 @@ router.get("/api/orders-list", async (req, res) => {
         const tagNames = (order.tags || []).map((tag) =>
           tag.name.toLowerCase()
         );
+            const channelNames = order.channelName;
         const hasTags = tagNames.length > 0;
 
         switch (tagType.toLowerCase()) {
@@ -1747,8 +1751,7 @@ router.get("/api/orders-list", async (req, res) => {
               hasTags && tagNames.some((name) => name.includes("target"));
             break;
           case "tiktok":
-            matchesTag =
-              hasTags && tagNames.some((name) => name.includes("tiktok"));
+            matchesTag = channelNames && channelNames.includes("tiktok");
             break;
           case "temu":
             matchesTag =
@@ -1757,6 +1760,15 @@ router.get("/api/orders-list", async (req, res) => {
           case "flip":
             matchesTag =
               hasTags && tagNames.some((name) => name.includes("flip"));
+            break;
+          case "amazon":
+            matchesTag = channelNames && channelNames.includes("amazon");
+            break;
+          case "ebay":
+            matchesTag = channelNames && channelNames.includes("ebay");
+            break;
+          case "phone":
+            matchesTag = channelNames && channelNames.includes("phone");
             break;
           default:
             matchesTag = true;
@@ -2103,6 +2115,7 @@ router.get("/api/tiktokorder/status", async (req, res) => {
           order._id,
           {
             $set: {
+              created_at:shippedAtDate,
               shipped_at: shippedAtDate,
               tiktokId: order_id,
               trackingNumber: tracking_numbers || [],

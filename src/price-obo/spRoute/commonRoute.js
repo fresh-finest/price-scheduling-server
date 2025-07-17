@@ -2342,8 +2342,8 @@ router.post("/api/orders", async (req, res) => {
           address: order.recipient_address?.full_address || "",
           trackingNumber: trackingNumbers,
           tags: order.is_sample_order ? [{ name: "sample" }] : [{ name: "tiktok" }],
-          channelCode: order.channel_code || "",
-          channelName: order.channel_name || "",
+          channelCode: order.channel_code || "tiktok",
+          channelName: order.channel_name || "tiktok",
           items,
           status: order.order_status || "UNKNOWN",
         };
@@ -2366,15 +2366,59 @@ router.post("/api/orders", async (req, res) => {
 
 
 
+// router.get("/api/merge/order", async (req, res) => {
+//   try {
+//     const vqOrders = await Order.find().sort({ created_at: -1 });
+//     const ttOrders = await TikTokOrder.find().sort({ created_at: -1 });
+
+//     let insertedCount = 0;
+//     const allOrders = [...vqOrders, ...ttOrders];
+
+//     for (const order of allOrders) {
+//       const merged = {
+//         OrderId: order.OrderId,
+//         id: order.id || order.OrderId,
+//         shipped_at: order.shipped_at || "",
+//         created_at: order.created_at || "",
+//         carrier_name: order.carrier_name || "",
+//         customerName: order.customerName || "",
+//         address: order.address || "",
+//         trackingNumber: order.trackingNumber || [],
+//         trackingUrl: order.trackingUrl || "",
+//         shipmentId: order.shipmentId || "",
+//         tags: order.tags || [],
+//         channelCode: order.channelCode || "tiktok",
+//         channelName: order.channelName || "tiktok",
+//         items: order.items || [],
+//         status: order.status || "",
+//       };
+
+//       await VTOrder.findOneAndUpdate(
+//         { OrderId: merged.OrderId },
+//         { $set: merged },
+//         { upsert: true, new: true }
+//       );
+
+//       insertedCount++;
+//     }
+
+//     res.json({
+//       message: `✅ Merged ${insertedCount} orders into VTOrder collection`,
+//     });
+//   } catch (error) {
+//     console.error("❌ Merge error:", error.message);
+//     res.status(500).json({ error: "Failed to merge orders" });
+//   }
+// });
 router.get("/api/merge/order", async (req, res) => {
   try {
     const vqOrders = await Order.find().sort({ created_at: -1 });
     const ttOrders = await TikTokOrder.find().sort({ created_at: -1 });
 
     let insertedCount = 0;
-    const allOrders = [...vqOrders, ...ttOrders];
 
-    for (const order of allOrders) {
+    // ✅ Include all BackUp orders
+    for (const order of vqOrders) {
       const merged = {
         OrderId: order.OrderId,
         id: order.id || order.OrderId,
@@ -2387,8 +2431,40 @@ router.get("/api/merge/order", async (req, res) => {
         trackingUrl: order.trackingUrl || "",
         shipmentId: order.shipmentId || "",
         tags: order.tags || [],
-        channelCode: order.channelCode || "tiktok",
-        channelName: order.channelName || "tiktok",
+        channelCode: order.channelCode || "",
+        channelName: order.channelName || "",
+        items: order.items || [],
+        status: order.status || "",
+      };
+
+      await VTOrder.findOneAndUpdate(
+        { OrderId: merged.OrderId },
+        { $set: merged },
+        { upsert: true, new: true }
+      );
+
+      insertedCount++;
+    }
+
+    // ✅ Include TikTokOrder orders ONLY if trackingNumber exists
+    for (const order of ttOrders) {
+      const hasTracking = Array.isArray(order.trackingNumber) && order.trackingNumber.length > 0;
+      if (!hasTracking) continue;
+
+      const merged = {
+        OrderId: order.OrderId,
+        id: order.id || order.OrderId,
+        shipped_at: order.shipped_at || "",
+        created_at: order.created_at || "",
+        carrier_name: order.carrier_name || "",
+        customerName: order.customerName || "",
+        address: order.address || "",
+        trackingNumber: order.trackingNumber || [],
+        trackingUrl: order.trackingUrl || "",
+        shipmentId: order.shipmentId || "",
+        tags: order.tags || [],
+        channelCode: "tiktok",
+        channelName: "tiktok",
         items: order.items || [],
         status: order.status || "",
       };
@@ -2410,5 +2486,6 @@ router.get("/api/merge/order", async (req, res) => {
     res.status(500).json({ error: "Failed to merge orders" });
   }
 });
+
 
 module.exports = router;

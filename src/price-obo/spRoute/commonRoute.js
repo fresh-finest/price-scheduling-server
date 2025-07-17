@@ -1689,7 +1689,6 @@ router.get("/api/orders-list", async (req, res) => {
     console.log("Fetching orders list with params:", req.query);
 
     const allOrders = await VTOrder.find().sort({ shipped_at: -1 }).lean();
-  
 
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));
@@ -1742,7 +1741,7 @@ router.get("/api/orders-list", async (req, res) => {
         const tagNames = (order.tags || []).map((tag) =>
           tag.name.toLowerCase()
         );
-            const channelNames = order.channelName;
+        const channelNames = order.channelName;
         const hasTags = tagNames.length > 0;
 
         switch (tagType.toLowerCase()) {
@@ -1769,6 +1768,18 @@ router.get("/api/orders-list", async (req, res) => {
             break;
           case "phone":
             matchesTag = channelNames && channelNames.includes("phone");
+            break;
+          case "syruvia":
+            const knownTags = ["target", "temu", "flip"];
+            const knownChannels = ["tiktok", "amazon", "ebay", "phone"];
+            matchesTag = !(
+              (hasTags &&
+                tagNames.some((name) =>
+                  knownTags.some((tag) => name.includes(tag))
+                )) ||
+              (channelNames &&
+                knownChannels.some((ch) => channelNames.includes(ch)))
+            );
             break;
           default:
             matchesTag = true;
@@ -2115,7 +2126,7 @@ router.get("/api/tiktokorder/status", async (req, res) => {
           order._id,
           {
             $set: {
-              created_at:shippedAtDate,
+              created_at: shippedAtDate,
               shipped_at: shippedAtDate,
               tiktokId: order_id,
               trackingNumber: tracking_numbers || [],

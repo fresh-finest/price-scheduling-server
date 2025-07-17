@@ -1282,20 +1282,20 @@ router.get("/api/orders/store", async (req, res) => {
     const allOrders = [];
 
     // Retry helper for TikTok API
-    const fetchTikTokSummary = async (orderId, retries = 7) => {
-      const url = `http://localhost:3000/api/order/${orderId}/summary`;
+    // const fetchTikTokSummary = async (orderId, retries = 7) => {
+    //   const url = `http://localhost:3000/api/order/${orderId}/summary`;
 
-      for (let i = 0; i < retries; i++) {
-        try {
-          const res = await axios.get(url);
-          return res.data;
-        } catch (err) {
-          console.warn(`Retry ${i + 1} failed for ${orderId}`);
-          if (i === retries - 1) throw err;
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
-        }
-      }
-    };
+    //   for (let i = 0; i < retries; i++) {
+    //     try {
+    //       const res = await axios.get(url);
+    //       return res.data;
+    //     } catch (err) {
+    //       console.warn(`Retry ${i + 1} failed for ${orderId}`);
+    //       if (i === retries - 1) throw err;
+    //       await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
+    //     }
+    //   }
+    // };
 
     for (let page = 1; page <= totalPages; page++) {
       const response = await axios.get(VEEQO_API_URL, {
@@ -1354,20 +1354,20 @@ router.get("/api/orders/store", async (req, res) => {
         };
 
         // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
-        const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
-        if (tiktokTag) {
-          const tiktokOrderId = tiktokTag.name.split(":")[1];
-          try {
-            const tik = await fetchTikTokSummary(tiktokOrderId);
-            structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
+        // const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+        // if (tiktokTag) {
+        //   const tiktokOrderId = tiktokTag.name.split(":")[1];
+        //   try {
+        //     const tik = await fetchTikTokSummary(tiktokOrderId);
+        //     structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
 
-            structuredOrder.trackingNumber = tik.tracking_numbers || [];
-            structuredOrder.warehouseId=tik.warehouse_id;
-            structuredOrder.status = "created";
-          } catch (err) {
-            console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
-          }
-        }
+        //     structuredOrder.trackingNumber = tik.tracking_numbers || [];
+        //     structuredOrder.warehouseId=tik.warehouse_id;
+        //     structuredOrder.status = "created";
+        //   } catch (err) {
+        //     console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
+        //   }
+        // }
 
         // allOrders.push(structuredOrder);
         if(trackingNumbers.length>0){
@@ -1412,20 +1412,20 @@ router.get("/api/shipped/store", async (req, res) => {
     const allOrders = [];
 
     // Retry helper for TikTok API
-    const fetchTikTokSummary = async (orderId, retries = 7) => {
-      const url = `http://localhost:3000/api/order/${orderId}/summary`;
+    // const fetchTikTokSummary = async (orderId, retries = 7) => {
+    //   const url = `http://localhost:3000/api/order/${orderId}/summary`;
 
-      for (let i = 0; i < retries; i++) {
-        try {
-          const res = await axios.get(url);
-          return res.data;
-        } catch (err) {
-          console.warn(`Retry ${i + 1} failed for ${orderId}`);
-          if (i === retries - 1) throw err;
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
-        }
-      }
-    };
+    //   for (let i = 0; i < retries; i++) {
+    //     try {
+    //       const res = await axios.get(url);
+    //       return res.data;
+    //     } catch (err) {
+    //       console.warn(`Retry ${i + 1} failed for ${orderId}`);
+    //       if (i === retries - 1) throw err;
+    //       await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
+    //     }
+    //   }
+    // };
 
     for (let page = 1; page <= totalPages; page++) {
       const response = await axios.get(VEEQO_API_URL, {
@@ -1484,19 +1484,19 @@ router.get("/api/shipped/store", async (req, res) => {
         };
 
         // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
-        const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
-        if (tiktokTag) {
-          const tiktokOrderId = tiktokTag.name.split(":")[1];
-          try {
-            const tik = await fetchTikTokSummary(tiktokOrderId);
-            structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
-            structuredOrder.warehouseId=tik.warehouse_id;
-            structuredOrder.trackingNumber = tik.tracking_numbers || [];
-            structuredOrder.status = "created";
-          } catch (err) {
-            console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
-          }
-        }
+        // const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+        // if (tiktokTag) {
+        //   const tiktokOrderId = tiktokTag.name.split(":")[1];
+        //   try {
+        //     const tik = await fetchTikTokSummary(tiktokOrderId);
+        //     structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
+        //     structuredOrder.warehouseId=tik.warehouse_id;
+        //     structuredOrder.trackingNumber = tik.tracking_numbers || [];
+        //     structuredOrder.status = "created";
+        //   } catch (err) {
+        //     console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
+        //   }
+        // }
 
         // allOrders.push(structuredOrder);
          if(trackingNumbers.length>0){
@@ -2070,24 +2070,23 @@ async function Retry(tiktokOrderId) {
 
 router.get("/api/tiktokorder/status", async (req, res) => {
   try {
-    const orders = await Order.find({
-      tags: { $elemMatch: { name: /^TikTokOrderID:/ } },
-    });
+    // const orders = await Order.find({
+    //   tags: { $elemMatch: { name: /^TikTokOrderID:/ } },
+    // });
 
+    const orders = await TikTokOrder.find();
     let updatedCount = 0;
     const updates = [];
 
     for (const order of orders) {
-      const tag = order.tags.find((t) => t.name.startsWith("TikTokOrderID:"));
-      if (!tag) continue;
-
-      const tiktokOrderId = tag.name.split(":")[1];
-      
+   
+      const tiktokOrderId = order.OrderId;
+      console.log(tiktokOrderId)
       try {
         const data = await Retry(tiktokOrderId);
         const { order_id, rts_time, tracking_numbers, order_status,warehouse_id } = data;
 
-        const updated = await Order.findByIdAndUpdate(
+        const updated = await TikTokOrder.findByIdAndUpdate(
           order._id,
           {
             $set: {
@@ -2186,6 +2185,18 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
 });
 
 
+// Retry helper
+async function withRetry(fn, retries = 5, delay = 500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`🔁 Retry attempt ${attempt} failed: ${err.message}`);
+      await new Promise((res) => setTimeout(res, delay));
+    }
+  }
+}
 
 router.post("/api/orders", async (req, res) => {
   try {
@@ -2199,9 +2210,7 @@ router.post("/api/orders", async (req, res) => {
 
     while (true) {
       if (pageCount >= MAX_PAGES || allOrders.length >= MAX_ORDERS) {
-        console.log(
-          `✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`
-        );
+        console.log(`✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`);
         break;
       }
 
@@ -2221,12 +2230,7 @@ router.post("/api/orders", async (req, res) => {
         timestamp,
       };
 
-      const sign = generateSign(
-        `${BASE_URL}${path}`,
-        queryParams,
-        body,
-        APP_SECRET
-      );
+      const sign = generateSign(`${BASE_URL}${path}`, queryParams, body, APP_SECRET);
 
       const queryStr = new URLSearchParams({
         ...queryParams,
@@ -2236,9 +2240,11 @@ router.post("/api/orders", async (req, res) => {
 
       const url = `${BASE_URL}${path}?${queryStr}`;
 
-      const orderListRes = await axios.post(url, body, {
-        headers: { "Content-Type": "application/json" },
-      });
+      const orderListRes = await withRetry(() =>
+        axios.post(url, body, {
+          headers: { "Content-Type": "application/json" },
+        })
+      );
 
       const data = orderListRes.data?.data;
       const orders = data?.order_list || [];
@@ -2261,6 +2267,7 @@ router.post("/api/orders", async (req, res) => {
           detailBody,
           APP_SECRET
         );
+
         const query2 = new URLSearchParams({
           ...detailQuery,
           sign: sign2,
@@ -2268,17 +2275,15 @@ router.post("/api/orders", async (req, res) => {
         }).toString();
 
         const detailUrl = `${BASE_URL}/api/orders/detail/query?${query2}`;
-        const detailsRes = await axios.post(detailUrl, detailBody, {
-          headers: { "Content-Type": "application/json" },
-        });
 
-        const detailedOrders = detailsRes.data?.data?.order_list || [];
-        console.log(
-          `📦 Got ${detailedOrders.length} detailed orders for page ${
-            pageCount + 1
-          }`
+        const detailsRes = await withRetry(() =>
+          axios.post(detailUrl, detailBody, {
+            headers: { "Content-Type": "application/json" },
+          })
         );
 
+        const detailedOrders = detailsRes.data?.data?.order_list || [];
+        console.log(`📦 Got ${detailedOrders.length} detailed orders for page ${pageCount + 1}`);
         fullDetails.push(...detailedOrders);
       }
 
@@ -2292,26 +2297,16 @@ router.post("/api/orders", async (req, res) => {
       await new Promise((r) => setTimeout(r, 500)); // Throttle
     }
 
-  
-
     // Insert only new orders
     let insertCount = 0;
     const seenOrderIds = new Set();
-    let warehouseMatchCount = 1;
-
-    
 
     for (let i = 0; i < fullDetails.length; i++) {
       const order = fullDetails[i];
       console.log(`${i} ${order.order_id}`);
 
       try {
-        if (order?.warehouse_id === "7275426401325893419")
-          warehouseMatchCount++;
-      
-          if (
-          order?.warehouse_id !== "7275426401325893419" || !order?.rts_time
-        ) continue;
+        if (order?.warehouse_id !== "7275426401325893419") continue;
 
         if (!order?.order_id || seenOrderIds.has(order.order_id)) continue;
         seenOrderIds.add(order.order_id);
@@ -2346,9 +2341,7 @@ router.post("/api/orders", async (req, res) => {
           customerName: order.recipient_address?.name || "",
           address: order.recipient_address?.full_address || "",
           trackingNumber: trackingNumbers,
-          tags: order.is_sample_order
-            ? [{ name: "sample" }]
-            : [{ name: "tiktok" }],
+          tags: order.is_sample_order ? [{ name: "sample" }] : [{ name: "tiktok" }],
           channelCode: order.channel_code || "",
           channelName: order.channel_name || "",
           items,
@@ -2367,11 +2360,10 @@ router.post("/api/orders", async (req, res) => {
     res.json({ inserted: insertCount, fetched: fullDetails });
   } catch (err) {
     console.error("❌ Fetch error:", err.response?.data || err.message);
-    res
-      .status(500)
-      .json({ error: err.response?.data || "Failed to fetch orders" });
+    res.status(500).json({ error: err.response?.data || "Failed to fetch orders" });
   }
 });
+
 
 
 router.get("/api/merge/order", async (req, res) => {

@@ -216,7 +216,7 @@ cron.schedule("0 18 * * *", async () => {
   timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
 
-cron.schedule("0 16 * * *", async () => {
+cron.schedule("*/20 * * * *", async () => {
   try {
     console.log("⏳ Running daily 6:00 PM BST cron job to fetch/store orders...");
 

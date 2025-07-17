@@ -197,7 +197,7 @@ cron.schedule("*/59 * * * *", async () => {
   try {
     console.log("⏳ Running cron job to fetch/store orders...");
 
-    await axios.post("http://localhost:3000/api/merge/order");
+    await axios.get("http://localhost:3000/api/merge/order");
 
   } catch (error) {
     console.error("Cron job failed:", error.response?.data || error.message);

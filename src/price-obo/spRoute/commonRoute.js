@@ -1055,6 +1055,7 @@ router.get("/api/orders/scan", async (req, res) => {
       },
     });
     const order1 = await VTOrder.findOne({ trackingNumber });
+    console.log(order1);
     const order = response.data[0]; // Assume first match
 
     if (!order1) {
@@ -1687,7 +1688,8 @@ router.get("/api/orders-list", async (req, res) => {
 
     console.log("Fetching orders list with params:", req.query);
 
-    const allOrders = await VTOrder.find().sort({ shipped_at: -1 }).lean();
+    // const allOrders = await VTOrder.find().sort({ shipped_at: -1 }).lean();
+     const allOrders = await VTOrder.find().limit(2100).sort({ shipped_at: -1 }).lean();
  
  
 
@@ -2373,7 +2375,6 @@ router.post("/api/orders", async (req, res) => {
           OrderId: order.order_id,
           id: order.order_id,
           shipped_at: order.shipped_time || "",
-          created_at: order.create_time || "",
           carrier_name: order.shipping_provider || "",
           customerName: order.recipient_address?.name || "",
           address: order.recipient_address?.full_address || "",
@@ -2462,7 +2463,6 @@ router.get("/api/merge/order", async (req, res) => {
         OrderId: order.OrderId,
         id: order.id || order.OrderId,
         shipped_at: order.shipped_at || "",
-        created_at: order.created_at || "",
         carrier_name: order.carrier_name || "",
         customerName: order.customerName || "",
         address: order.address || "",
@@ -2495,7 +2495,6 @@ router.get("/api/merge/order", async (req, res) => {
         OrderId: order.OrderId,
         id: order.id || order.OrderId,
         shipped_at: order.shipped_at || "",
-        created_at: order.created_at || "",
         carrier_name: order.carrier_name || "",
         customerName: order.customerName || "",
         address: order.address || "",

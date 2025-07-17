@@ -1688,10 +1688,8 @@ router.get("/api/orders-list", async (req, res) => {
 
     console.log("Fetching orders list with params:", req.query);
 
-    // const allOrders = await VTOrder.find().sort({ shipped_at: -1 }).lean();
-     const allOrders = await VTOrder.find().limit(2100).sort({ shipped_at: -1 }).lean();
- 
- 
+    const allOrders = await VTOrder.find().sort({ shipped_at: -1 }).lean();
+  
 
     const scanOrders = await TrackScan.find().lean();
     const scanMap = new Map(scanOrders.map((scan) => [scan.orderId, scan]));

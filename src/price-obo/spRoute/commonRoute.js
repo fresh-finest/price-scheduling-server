@@ -2459,6 +2459,12 @@ router.post("/api/orders", async (req, res) => {
 //     res.status(500).json({ error: "Failed to merge orders" });
 //   }
 // });
+
+const sanitizeString = (value) => {
+  if (typeof value !== "string") return value;
+  return value.replace(/[^\u0000-\u007F]/g, ""); // removes emojis and non-ASCII
+};
+
 router.get("/api/merge/order", async (req, res) => {
   try {
     const vqOrders = await Order.find().sort({ created_at: -1 });
@@ -2473,8 +2479,8 @@ router.get("/api/merge/order", async (req, res) => {
         id: order.id || order.OrderId,
         shipped_at: order.shipped_at || "",
         carrier_name: order.carrier_name || "",
-        customerName: order.customerName || "",
-        address: order.address || "",
+        customerName: sanitizeString(order.customerName || ""),
+        address: sanitizeString(order.address || ""),
         trackingNumber: order.trackingNumber || [],
         trackingUrl: order.trackingUrl || "",
         shipmentId: order.shipmentId || "",
@@ -2505,8 +2511,9 @@ router.get("/api/merge/order", async (req, res) => {
         id: order.id || order.OrderId,
         shipped_at: order.shipped_at || "",
         carrier_name: order.carrier_name || "",
-        customerName: order.customerName || "",
-        address: order.address || "",
+        customerName: sanitizeString(order.customerName || ""),
+        address: sanitizeString(order.address || ""),
+
         trackingNumber: order.trackingNumber || [],
         trackingUrl: order.trackingUrl || "",
         shipmentId: order.shipmentId || "",

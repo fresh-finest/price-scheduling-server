@@ -1370,7 +1370,7 @@ router.get("/api/orders/store", async (req, res) => {
         // }
 
         // allOrders.push(structuredOrder);
-        if(trackingNumbers.length>0){
+        if (trackingNumbers.length > 0) {
           allOrders.push(structuredOrder);
         }
       }
@@ -1405,7 +1405,7 @@ router.get("/api/orders/store", async (req, res) => {
 });
 
 router.get("/api/shipped/store", async (req, res) => {
-   try {
+  try {
     const pageSize = 50;
     const totalOrders = 100;
     const totalPages = Math.ceil(totalOrders / pageSize);
@@ -1499,7 +1499,7 @@ router.get("/api/shipped/store", async (req, res) => {
         // }
 
         // allOrders.push(structuredOrder);
-         if(trackingNumbers.length>0){
+        if (trackingNumbers.length > 0) {
           allOrders.push(structuredOrder);
         }
       }
@@ -1736,28 +1736,36 @@ router.get("/api/orders-list", async (req, res) => {
 
       let matchesTag = true;
       if (tagType) {
-        const tagNames = (order.tags || []).map((tag) => tag.name.toLowerCase());
+        const tagNames = (order.tags || []).map((tag) =>
+          tag.name.toLowerCase()
+        );
         const hasTags = tagNames.length > 0;
 
         switch (tagType.toLowerCase()) {
           case "target":
-            matchesTag = hasTags && tagNames.some((name) => name.includes("target"));
+            matchesTag =
+              hasTags && tagNames.some((name) => name.includes("target"));
             break;
           case "tiktok":
-            matchesTag = hasTags && tagNames.some((name) => name.includes("tiktok"));
+            matchesTag =
+              hasTags && tagNames.some((name) => name.includes("tiktok"));
             break;
           case "temu":
-            matchesTag = hasTags && tagNames.some((name) => name.includes("temu"));
+            matchesTag =
+              hasTags && tagNames.some((name) => name.includes("temu"));
             break;
           case "flip":
-            matchesTag = hasTags && tagNames.some((name) => name.includes("flip"));
+            matchesTag =
+              hasTags && tagNames.some((name) => name.includes("flip"));
             break;
           default:
             matchesTag = true;
         }
 
         if (!hasTags && order.channelName) {
-          matchesTag = order.channelName.toLowerCase().includes(tagType.toLowerCase());
+          matchesTag = order.channelName
+            .toLowerCase()
+            .includes(tagType.toLowerCase());
         }
       }
 
@@ -1867,7 +1875,6 @@ router.get("/api/orders-list", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
 });
-
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;
@@ -1994,7 +2001,6 @@ const ACCESS_TOKEN =
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 
-
 const generateSign = (uri, query, body, appSecret) => {
   const excludeKeys = ["access_token", "sign"];
   const sortedParams = Object.keys(query)
@@ -2015,7 +2021,6 @@ const generateSign = (uri, query, body, appSecret) => {
   hmac.update(signString);
   return hmac.digest("hex");
 };
-
 
 const MAX_RETRIES = 10;
 const RETRY_DELAY_MS = 1000;
@@ -2079,20 +2084,29 @@ router.get("/api/tiktokorder/status", async (req, res) => {
     const updates = [];
 
     for (const order of orders) {
-   
       const tiktokOrderId = order.OrderId;
-      console.log(tiktokOrderId)
+      console.log(tiktokOrderId);
       try {
         const data = await Retry(tiktokOrderId);
-        const { order_id, rts_time, tracking_numbers, order_status,warehouse_id } = data;
-
+        const {
+          order_id,
+          rts_time,
+          tracking_numbers,
+          order_status,
+          warehouse_id,
+        } = data;
+        const shippedAtDate =
+          rts_time && !isNaN(rts_time)
+            ? new Date(rts_time * 1000).toISOString()
+            : new Date().toISOString();
         const updated = await TikTokOrder.findByIdAndUpdate(
           order._id,
           {
             $set: {
+              shipped_at: shippedAtDate,
               tiktokId: order_id,
               trackingNumber: tracking_numbers || [],
-              warehouseId:warehouse_id,
+              warehouseId: warehouse_id,
               status: mapStatus(order_status),
             },
           },
@@ -2170,7 +2184,7 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
       order_id: order.order_id,
       order_status: order.order_status,
       rts_time: order?.rts_time || order.update_time,
-      warehouse_id:order.warehouse_id,
+      warehouse_id: order.warehouse_id,
       tracking_numbers: trackingNumbers,
     });
   } catch (err) {
@@ -2183,7 +2197,6 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
       .json({ error: err.response?.data || "Failed to fetch order summary" });
   }
 });
-
 
 // Retry helper
 async function withRetry(fn, retries = 5, delay = 500) {
@@ -2210,7 +2223,9 @@ router.post("/api/orders", async (req, res) => {
 
     while (true) {
       if (pageCount >= MAX_PAGES || allOrders.length >= MAX_ORDERS) {
-        console.log(`✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`);
+        console.log(
+          `✅ Reached limit: ${pageCount} pages or ${allOrders.length} orders`
+        );
         break;
       }
 
@@ -2230,7 +2245,12 @@ router.post("/api/orders", async (req, res) => {
         timestamp,
       };
 
-      const sign = generateSign(`${BASE_URL}${path}`, queryParams, body, APP_SECRET);
+      const sign = generateSign(
+        `${BASE_URL}${path}`,
+        queryParams,
+        body,
+        APP_SECRET
+      );
 
       const queryStr = new URLSearchParams({
         ...queryParams,
@@ -2283,7 +2303,11 @@ router.post("/api/orders", async (req, res) => {
         );
 
         const detailedOrders = detailsRes.data?.data?.order_list || [];
-        console.log(`📦 Got ${detailedOrders.length} detailed orders for page ${pageCount + 1}`);
+        console.log(
+          `📦 Got ${detailedOrders.length} detailed orders for page ${
+            pageCount + 1
+          }`
+        );
         fullDetails.push(...detailedOrders);
       }
 
@@ -2341,7 +2365,9 @@ router.post("/api/orders", async (req, res) => {
           customerName: order.recipient_address?.name || "",
           address: order.recipient_address?.full_address || "",
           trackingNumber: trackingNumbers,
-          tags: order.is_sample_order ? [{ name: "sample" }] : [{ name: "tiktok" }],
+          tags: order.is_sample_order
+            ? [{ name: "sample" }]
+            : [{ name: "tiktok" }],
           channelCode: order.channel_code || "tiktok",
           channelName: order.channel_name || "tiktok",
           items,
@@ -2360,11 +2386,11 @@ router.post("/api/orders", async (req, res) => {
     res.json({ inserted: insertCount, fetched: fullDetails });
   } catch (err) {
     console.error("❌ Fetch error:", err.response?.data || err.message);
-    res.status(500).json({ error: err.response?.data || "Failed to fetch orders" });
+    res
+      .status(500)
+      .json({ error: err.response?.data || "Failed to fetch orders" });
   }
 });
-
-
 
 // router.get("/api/merge/order", async (req, res) => {
 //   try {
@@ -2448,7 +2474,8 @@ router.get("/api/merge/order", async (req, res) => {
 
     // ✅ Include TikTokOrder orders ONLY if trackingNumber exists
     for (const order of ttOrders) {
-      const hasTracking = Array.isArray(order.trackingNumber) && order.trackingNumber.length > 0;
+      const hasTracking =
+        Array.isArray(order.trackingNumber) && order.trackingNumber.length > 0;
       if (!hasTracking) continue;
 
       const merged = {
@@ -2486,6 +2513,5 @@ router.get("/api/merge/order", async (req, res) => {
     res.status(500).json({ error: "Failed to merge orders" });
   }
 });
-
 
 module.exports = router;

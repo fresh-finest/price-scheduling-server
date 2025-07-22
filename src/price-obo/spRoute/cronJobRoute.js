@@ -184,7 +184,7 @@ cron.schedule("*/15 * * * *", async () => {
 
 cron.schedule("*/15 * * * *", async () => {
   try {
-    console.log("⏳ Running cron job to fetch/store orders...");
+    console.log("⏳ Running cron tiktok store orders...");
 
     await axios.post("http://localhost:3000/api/orders");
 
@@ -193,16 +193,16 @@ cron.schedule("*/15 * * * *", async () => {
   }
 });
 
-// cron.schedule("*/59 * * * *", async () => {
-//   try {
-//     console.log("⏳ Running cron job to fetch/store orders...");
+cron.schedule("*/40 * * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
 
-//     await axios.get("http://localhost:3000/api/merge/order");
+    await axios.get("http://localhost:3000/api/merge/order");
 
-//   } catch (error) {
-//     console.error("Cron job failed:", error.response?.data || error.message);
-//   }
-// });
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
 
 // cron.schedule("0 18 * * *", async () => {
 //   try {

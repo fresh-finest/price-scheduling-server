@@ -87,6 +87,8 @@ const TrackScan = require("../../model/trackScan");
 const TikTokAuth = require("../../model/TikTokAuth");
 const TikTokOrder = require("../../model/TikTokOrder");
 const VTOrder = require("../../model/VTOrder");
+const VTMergeOrder = require("../../model/VTMergeOrder");
+const ReserveProduct = require("../../model/ReserveProduct");
 
 const app = express();
 
@@ -2020,9 +2022,10 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_i6jFxgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_MW9oV9eaSoBpg_arBtDw5fyDOLuSsYKpseIaxDqUH5gim1dLWctrNwwCREVpW2Tw"; // latest token from correct app
+  "TTP_GYuwUgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk8Zx7NrT2jf7yf5XLq4b_d9PwE_Fp9RcSsglbZdXj34bHgdmlgB40YUx0fDrqnTy08"; // latest token from correct app
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
+
 
 const generateSign = (uri, query, body, appSecret) => {
   const excludeKeys = ["access_token", "sign"];
@@ -2234,6 +2237,16 @@ async function withRetry(fn, retries = 5, delay = 500) {
     }
   }
 }
+const sanitizeStringStore = (value) => {
+  if (typeof value !== "string") return "";
+  return value
+    .normalize("NFKC") // Unicode-safe normalization
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control chars
+    .replace(/[\uD800-\uDFFF]/g, "")              // invalid surrogate pairs
+    .replace(/\uFFFD/g, "")                       // replacement char
+    .trim();
+};
+
 
 router.post("/api/orders", async (req, res) => {
   try {
@@ -2385,8 +2398,9 @@ router.post("/api/orders", async (req, res) => {
           id: order.order_id,
           shipped_at: order.shipped_time || "",
           carrier_name: order.shipping_provider || "",
-          customerName: order.recipient_address?.name || "",
-          address: order.recipient_address?.full_address || "",
+          customerName: sanitizeStringStore(order.recipient_address?.name || ""),
+          address: sanitizeStringStore(order.recipient_address?.full_address || ""),
+
           trackingNumber: trackingNumbers,
           tags: order.is_sample_order
             ? [{ name: "sample" }]
@@ -2461,14 +2475,26 @@ router.post("/api/orders", async (req, res) => {
 // });
 
 const sanitizeString = (value) => {
-  if (typeof value !== "string") return value;
-  return value.replace(/[^\u0000-\u007F]/g, ""); // removes emojis and non-ASCII
+  if (typeof value !== "string") return "";
+  // Remove invalid surrogate pairs and non-UTF-8 characters
+  return value
+    .normalize("NFKD") // normalize to decompose characters
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control chars
+    .replace(/[\uD800-\uDFFF]/g, "") // remove surrogate pairs
+    .replace(/[^\x00-\x7F]/g, ""); // remove non-ASCII (you may omit this if Unicode is OK)
 };
+
 
 router.get("/api/merge/order", async (req, res) => {
   try {
-    const vqOrders = await Order.find().sort({ created_at: -1 });
-    const ttOrders = await TikTokOrder.find().sort({ created_at: -1 });
+    console.log("merging");
+
+    const vqOrders = await Order.find().sort({ shipped_at: -1 });
+
+    // ⛔ Skip customerName and address from TikTokOrder
+    const ttOrders = await TikTokOrder.find()
+      .sort({ created_at: -1 })
+      .select("-customerName -address");
 
     let insertedCount = 0;
 
@@ -2511,9 +2537,11 @@ router.get("/api/merge/order", async (req, res) => {
         id: order.id || order.OrderId,
         shipped_at: order.shipped_at || "",
         carrier_name: order.carrier_name || "",
-        customerName: sanitizeString(order.customerName || ""),
-        address: sanitizeString(order.address || ""),
 
+        // ⛔ Skip customerName and address from merged result
+        customerName: "",
+        address: "",
+       
         trackingNumber: order.trackingNumber || [],
         trackingUrl: order.trackingUrl || "",
         shipmentId: order.shipmentId || "",
@@ -2539,6 +2567,80 @@ router.get("/api/merge/order", async (req, res) => {
   } catch (error) {
     console.error("❌ Merge error:", error.message);
     res.status(500).json({ error: "Failed to merge orders" });
+  }
+});
+
+
+router.get("/api/tikok-orders", async (req, res) => {
+  try {
+    const result = await TikTokOrder.find()
+      .sort({ createdAt: -1 })
+      .select("-customerName -address"); // exclude fields
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router.put("/api/tiktok-orders/strip-sensitive", async (req, res) => {
+  try {
+    const result = await TikTokOrder.updateMany(
+      {},
+      {
+        $unset: {
+          customerName: "",
+          address: "",
+        },
+      }
+    );
+
+    res.json({
+      message: `✅ Removed customerName and address from ${result.modifiedCount} TikTok orders.`,
+    });
+  } catch (error) {
+    console.error("❌ Failed to remove fields:", error.message);
+    res.status(500).json({ error: "Failed to remove fields" });
+  }
+});
+
+
+
+router.post("/api/upload/products", async (req, res) => {
+  try {
+    const products = req.body;
+    console.log(products);
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: "Invalid or empty product list." });
+    }
+
+    const validProducts = products.filter(
+      (p) => p.sku && p.product && typeof p.qty === "number" && !isNaN(p.qty)
+    );
+
+    if (validProducts.length === 0) {
+      return res.status(400).json({ error: "No valid products to insert." });
+    }
+
+    const result = await ReserveProduct.insertMany(validProducts, {
+      ordered: false, // allows skipping duplicates or errors
+    });
+
+    res.status(200).json({
+      message: "Bulk upload successful",
+      insertedCount: result.length,
+      insertedIds: result.map((doc) => doc.sku),
+    });
+  } catch (error) {
+    console.error("Bulk upload error:", error);
+    res.status(500).json({ error: "Failed to upload products." });
+  }
+});
+router.get("/api/reserve-products", async (req, res) => {
+  try {
+    const result = await ReserveProduct.find();
+    res.json(result);
+  } catch (error) {
+    res.json(error);
   }
 });
 

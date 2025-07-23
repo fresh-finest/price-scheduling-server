@@ -1090,7 +1090,7 @@ router.get("/api/orders/scan", async (req, res) => {
       }
       return res.json({
         message: "Successfully Picked!",
-        order,
+        data: order1,
         scanStatus: existingScan,
       });
     }
@@ -1113,7 +1113,7 @@ router.get("/api/orders/scan", async (req, res) => {
 
       return res.json({
         message: "Successfully Packed!",
-        order,
+        data: order1,
         scanStatus: existingScan,
       });
     }
@@ -1463,8 +1463,8 @@ router.get("/api/shipped/store", async (req, res) => {
           shipped_at: order.shipped_at || "",
           carrier_name:
             order.allocations?.[0]?.shipment?.service_carrier_name || "",
-          customerName: order.customer?.full_name || "",
-          address: order.customer?.billing_address?.address1 || "",
+          // customerName: order.customer?.full_name || "",
+          // address: order.customer?.billing_address?.address1 || "",
           trackingNumber: trackingNumbers,
           shipmentId:
             order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||

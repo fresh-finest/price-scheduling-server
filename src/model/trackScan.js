@@ -13,6 +13,9 @@ const trackScanSchema = mongoose.Schema({
   packed: { type: Boolean, default: false },
   pickedAt: { type: Date },
   packedAt: { type: Date },
+  packedProduct: [String],
+  packedUPC: [String],
+  scanproductAt: { type: Date },
   scanStatus: { type: String, default: "pending" },
 }, { timestamps: true });
 

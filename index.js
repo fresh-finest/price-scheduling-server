@@ -17,6 +17,7 @@ const session = require('express-session');
 const { agenda, autoJobsAgenda } = require("./src/price-obo/Agenda");
 const routes = require("./src/price-obo/spRoute/priceRoute");
 const commonRoutes = require("./src/price-obo/spRoute/commonRoute");
+const warehouseRoutes = require("./src/price-obo/spRoute/warehouseRoute")
 const autoPriceRoute = require("./src/price-obo/spRoute/autoPriceRoute");
 const rotateClientSecret = require("./src/price-obo/rotateClientSecret");
 const { scheduleCronJobs } = require("./src/price-obo/spRoute/cronJobRoute");
@@ -229,6 +230,7 @@ agenda.on("complete", async (job) => {
 
 app.use(routes);
 app.use(commonRoutes);
+app.use(warehouseRoutes);
 app.use(autoPriceRoute);
 scheduleCronJobs();
 

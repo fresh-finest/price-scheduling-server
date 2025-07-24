@@ -1,10 +1,14 @@
 const mongoose = require("mongoose");
 
 // Counter schema (for generating incremental caseId)
-
+const counterSchema = mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  seq: { type: Number, default: 1000 },
+});
+const Counter = mongoose.model("Counter", counterSchema);
 
 // Main IssueScan schema
-const issuScanSchema = mongoose.Schema(
+const caseScanSchema = mongoose.Schema(
   {
     caseId: { type: String },
     OrderId: { type: String }, 
@@ -40,6 +44,24 @@ const issuScanSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+// Auto-generate caseId before save
+caseScanSchema.pre("save", async function (next) {
+  if (this.isNew && !this.caseId) {
+    try {
+      const counter = await Counter.findOneAndUpdate(
+        { id: "issueScan_caseId" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.caseId = counter.seq.toString(); // store as string
+      next();
+    } catch (err) {
+      next(err);
+    }
+  } else {
+    next();
+  }
+});
 
-const IssueScan = mongoose.model("IssueScan", issuScanSchema);
-module.exports = IssueScan;
+const CaseScan = mongoose.model("CaseScan", caseScanSchema);
+module.exports = CaseScan;

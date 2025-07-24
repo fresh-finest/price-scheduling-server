@@ -5,12 +5,13 @@ const bcrypt = require("bcryptjs");
 
 const moment = require("moment-timezone");
 const ReserveProduct = require("../../model/ReserveProduct");
-const IssueScan = require("../../model/IssueScan");
+const IssueScan = require("../../model/IssueScan")
 const VTOrder = require("../../model/VTOrder");
 
 const TrackScan = require("../../model/trackScan");
 const FBMUser = require("../../model/fbmUser");
 const sendIssueAlertEmail = require("../../service/IssueEmailService");
+const CaseScan = require("../../model/CaseScan");
 
 router.post("/api/upload/products", async (req, res) => {
   try {
@@ -404,7 +405,7 @@ router.get("/api/product/issue", async (req, res) => {
 
     
     if (startDate && endDate) {
-        const res = await IssueScan.find({
+        const res = await CaseScan.find({
         createdAt: {
           $gte: new Date(startDate),
           $lte: new Date(endDate),
@@ -415,11 +416,11 @@ router.get("/api/product/issue", async (req, res) => {
     }
 
     // Get filtered results
-    const result = await IssueScan.find(filter).sort({ createdAt: -1 });
+    const result = await CaseScan.find(filter).sort({ createdAt: -1 });
 
     // Global counts (independent of search)
-    const resolvedCount = await IssueScan.countDocuments({ resolved: true });
-    const unresolvedCount = await IssueScan.countDocuments({ resolved: false });
+    const resolvedCount = await CaseScan.countDocuments({ resolved: true });
+    const unresolvedCount = await CaseScan.countDocuments({ resolved: false });
 
     const total = resolvedCount + unresolvedCount;
 
@@ -450,7 +451,7 @@ router.put("/api/product/issue/:id/stock", async (req, res) => {
     if (!validPassword)
       return res.status(401).json({ error: "Invalid password" });
 
-    const result = await IssueScan.updateOne(
+    const result = await CaseScan.updateOne(
       { _id: id },
       {
         $set: {
@@ -485,7 +486,7 @@ router.put("/api/product/issue/:id/status", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword)
       return res.status(401).json({ error: "Invalid password" });
-    const result = await IssueScan.updateOne(
+    const result = await CaseScan.updateOne(
       { _id: id },
       {
         $set: {
@@ -508,7 +509,7 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
   const updatedProduct = req.body; // { upc, qty, stock }
   console.log(req.body);
   try {
-    const result = await IssueScan.updateOne(
+    const result = await CaseScan.updateOne(
       { _id: id, "items.sku": sku },
       {
         $set: {
@@ -550,7 +551,7 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
     }
 
     // Prevent duplicate IssueScan
-    const existing = await IssueScan.findOne({ trackingNumber: trackingId });
+    const existing = await CaseScan.findOne({ trackingNumber: trackingId });
     if (existing) {
       return res
         .status(409)
@@ -583,14 +584,14 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
     }
 
     // Create new IssueScan document
-    const issueDoc = new IssueScan({
+    const issueDoc = new CaseScan({
       OrderId: order.OrderId,
       trackingNumber: order.trackingNumber,
       items,
       products: allProducts, // ← Inject here
     });
 
-    // await issueDoc.save();
+    await issueDoc.save();
     //    await sendIssueAlertEmail(
     //   ["bb@brecx.com","ew@brecx.com","bryanr.brecx@gmail.com","pm@brecx.com","cr@brecx.com"],
     //   `❗New Case Created - Order ${order.OrderId}`,
@@ -615,14 +616,15 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
 
 router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
   const { _id, product } = req.params;
+  console.log(_id,product);
   const { stock } = req.body; // true or false
-
+  console.log(stock);
   if (typeof stock !== "boolean") {
     return res.status(400).json({ error: "Missing or invalid 'stock' value in body." });
   }
 
   try {
-    const updated = await IssueScan.updateOne(
+    const updated = await CaseScan.updateOne(
       { _id, "products.product": product },
       { $set: { "products.$.stock": stock } }
     );
@@ -632,7 +634,7 @@ router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
     }
 
     res.status(200).json({
-      message: `Stock updated for product ${product} in Order}`,
+      message: `Stock updated for product ${product} in Order`,
     });
   } catch (err) {
     console.error("Update error:", err);

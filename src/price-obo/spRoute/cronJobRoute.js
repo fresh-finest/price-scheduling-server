@@ -204,17 +204,17 @@ cron.schedule("*/40 * * * *", async () => {
   }
 });
 
-// cron.schedule("0 18 * * *", async () => {
-//   try {
-//     console.log("⏳ Running daily 6:00 PM BST cron job to fetch/store orders...");
+cron.schedule("0 18 * * *", async () => {
+  try {
+    console.log("⏳ Running daily 6:00 PM BST cron job to fetch/store orders...");
 
-//      await axios.get("http://localhost:3000/api/update-status");
-//   } catch (error) {
-//     console.error("Cron job failed:", error.response?.data || error.message);
-//   }
-// }, {
-//   timezone: "Asia/Dhaka" // Set to Bangladesh time
-// });
+     await axios.get("http://localhost:3000/api/update-status");
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
 
 cron.schedule("*/20 * * * *", async () => {
   try {

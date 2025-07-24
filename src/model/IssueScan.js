@@ -11,27 +11,25 @@ const Counter = mongoose.model("Counter", counterSchema);
 const issuScanSchema = mongoose.Schema(
   {
     caseId: { type: String },
-    OrderId: { type: String },
+    OrderId: { type: String }, 
     items: [
       {
         sku: { type: String },
         quantity: { type: Number },
         title: { type: String },
         image: { type: String },
-        stock: { type: Boolean, default: true },
       },
     ],
     products: [
       {
-        sku: { type: String },
+        sku:{type:String},
         product: { type: String },
         upc: { type: String },
         qty: { type: Number },
-        stock: { type: Boolean, default: true },
+        stock:{type:Boolean,default:true}
       },
     ],
     trackingNumber: [{ type: String }],
-    stockOut: { type: Boolean, default: false },
     issue: { type: Boolean, default: false },
     resolved: { type: Boolean, default: false },
     whNote: { type: String },
@@ -39,6 +37,9 @@ const issuScanSchema = mongoose.Schema(
     status: { type: String },
     whUser: { type: String },
     officeUser: { type: String },
+    whDate: {type:Date},
+    officeDate:{type:Date}
+
   },
   { timestamps: true }
 );

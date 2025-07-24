@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-
+const bcrypt = require("bcryptjs");
 
 const moment = require("moment-timezone");
 const ReserveProduct = require("../../model/ReserveProduct");
@@ -9,6 +9,8 @@ const IssueScan = require("../../model/IssueScan");
 const VTOrder = require("../../model/VTOrder");
 
 const TrackScan = require("../../model/trackScan");
+const FBMUser = require("../../model/fbmUser");
+const sendIssueAlertEmail = require("../../service/IssueEmailService");
 
 router.post("/api/upload/products", async (req, res) => {
   try {
@@ -84,6 +86,81 @@ router.post("/api/upload/products", async (req, res) => {
     res.status(500).json({ error: "Failed to upload products." });
   }
 });
+
+router.put("/api/reserve-product/clean", async (req, res) => {
+  try {
+    const allDocs = await ReserveProduct.find();
+
+    let cleanedCount = 0;
+
+    for (const doc of allDocs) {
+      const seen = new Set();
+      const uniqueProducts = [];
+
+      for (const p of doc.products) {
+        const key = `${p.product}-${p.upc}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueProducts.push(p);
+        }
+      }
+
+      // If cleanup is needed, update document
+      if (uniqueProducts.length !== doc.products.length) {
+        doc.products = uniqueProducts;
+        await doc.save();
+        cleanedCount++;
+      }
+    }
+
+    res.json({
+      message: `Cleanup complete!`,
+      cleanedSkus: cleanedCount,
+    });
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to clean duplicate product entries." });
+  }
+});
+
+router.put("/api/reserve-product/clean", async (req, res) => {
+  try {
+    const allDocs = await ReserveProduct.find();
+
+    let cleanedCount = 0;
+
+    for (const doc of allDocs) {
+      const seen = new Set();
+      const uniqueProducts = [];
+
+      for (const p of doc.products) {
+        const key = `${p.product}-${p.upc}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueProducts.push(p);
+        }
+      }
+
+      // If cleanup is needed, update document
+      if (uniqueProducts.length !== doc.products.length) {
+        doc.products = uniqueProducts;
+        await doc.save();
+        cleanedCount++;
+      }
+    }
+
+    res.json({
+      message: `Cleanup complete!`,
+      cleanedSkus: cleanedCount,
+    });
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    res.status(500).json({ error: "Failed to clean duplicate product entries." });
+  }
+});
+
 
 router.get("/api/reserve-products", async (req, res) => {
   try {
@@ -360,9 +437,19 @@ router.get("/api/product/issue", async (req, res) => {
 
 router.put("/api/product/issue/:id/stock", async (req, res) => {
   const { id } = req.params;
-  const { stockOut } = req.body; // expecting boolean: true or false
+  const { stockOut, whUser, email, password } = req.body; 
+  console.log(req.body);
+  try { 
+    if (!email || !password) {
+      return res.status("Missing Password!");
+    }
+    const user = await FBMUser.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-  try {
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword)
+      return res.status(401).json({ error: "Invalid password" });
+
     const result = await IssueScan.updateOne(
       { _id: id },
       {
@@ -370,6 +457,8 @@ router.put("/api/product/issue/:id/stock", async (req, res) => {
           stockOut: stockOut,
           resolved: !stockOut,
           whNote: stockOut ? "Out of Stock" : "In Stock",
+          whUser: whUser,
+          whDate: new Date()
         },
       }
     );
@@ -384,13 +473,25 @@ router.put("/api/product/issue/:id/stock", async (req, res) => {
 router.put("/api/product/issue/:id/status", async (req, res) => {
   const { id } = req.params;
   const data = req.body;
+
   try {
+    const { email, password } = data;
+    if (!email || !password) {
+      return res.status("Missing Password!");
+    }
+    const user = await FBMUser.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword)
+      return res.status(401).json({ error: "Invalid password" });
     const result = await IssueScan.updateOne(
       { _id: id },
       {
         $set: {
           ...data,
           resolved: true,
+          officeDate: new Date(),
         },
       }
     );
@@ -430,5 +531,114 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+router.post("/api/product-scan/:trackingId/case", async (req, res) => {
+  const { trackingId } = req.params;
+
+  if (!trackingId) {
+    return res.status(400).json({ error: "Tracking ID is required" });
+  }
+
+  try {
+    // Find VTOrder by trackingNumber
+    const order = await VTOrder.findOne({ trackingNumber: trackingId });
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ error: "Order not found for this tracking ID" });
+    }
+
+    // Prevent duplicate IssueScan
+    const existing = await IssueScan.findOne({ trackingNumber: trackingId });
+    if (existing) {
+      return res
+        .status(409)
+        .json({ error: "Issue already exists for this tracking number" });
+    }
+
+    // Prepare items
+    const items = order.items.map((item) => ({
+      sku: item.sku,
+      quantity: item.quantity,
+      title: item.title,
+      image: item.image,
+    }));
+
+    // Get and merge ReserveProduct data for each SKU
+    const allProducts = [];
+    for (const item of items) {
+      const reserve = await ReserveProduct.findOne({ sku: item.sku });
+
+      if (reserve && Array.isArray(reserve.products)) {
+        for (const p of reserve.products) {
+          allProducts.push({
+            sku: item.sku,
+            product: p.product,
+            upc: p.upc,
+            qty: p.qty,
+          });
+        }
+      }
+    }
+
+    // Create new IssueScan document
+    const issueDoc = new IssueScan({
+      OrderId: order.OrderId,
+      trackingNumber: order.trackingNumber,
+      items,
+      products: allProducts, // ← Inject here
+    });
+
+    // await issueDoc.save();
+    //    await sendIssueAlertEmail(
+    //   ["bb@brecx.com","ew@brecx.com","bryanr.brecx@gmail.com","pm@brecx.com","cr@brecx.com"],
+    //   `❗New Case Created - Order ${order.OrderId}`,
+    //   `Issue for Tracking: ${trackingId}\nOrder ID: ${order.OrderId}`,
+    //   `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingId}</p>`
+    // );
+
+    await TrackScan.findOneAndUpdate(
+      { trackingNumber: trackingId },
+      { $set: { issue: true } }
+    );
+
+    res.status(201).json({
+      message: "Issue created!",
+      issue: issueDoc,
+    });
+  } catch (error) {
+    console.error("Error creating issue:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
+  const { _id, product } = req.params;
+  const { stock } = req.body; // true or false
+
+  if (typeof stock !== "boolean") {
+    return res.status(400).json({ error: "Missing or invalid 'stock' value in body." });
+  }
+
+  try {
+    const updated = await IssueScan.updateOne(
+      { _id, "products.product": product },
+      { $set: { "products.$.stock": stock } }
+    );
+
+    if (updated.modifiedCount === 0) {
+      return res.status(404).json({ message: "No matching product found to update." });
+    }
+
+    res.status(200).json({
+      message: `Stock updated for product ${product} in Order}`,
+    });
+  } catch (err) {
+    console.error("Update error:", err);
+    res.status(500).json({ error: "Failed to update product stock." });
+  }
+});
+
 
 module.exports = router;

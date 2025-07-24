@@ -592,12 +592,12 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
     });
 
     await issueDoc.save();
-    //    await sendIssueAlertEmail(
-    //   ["bb@brecx.com","ew@brecx.com","bryanr.brecx@gmail.com","pm@brecx.com","cr@brecx.com"],
-    //   `❗New Case Created - Order ${order.OrderId}`,
-    //   `Issue for Tracking: ${trackingId}\nOrder ID: ${order.OrderId}`,
-    //   `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingId}</p>`
-    // );
+       await sendIssueAlertEmail(
+      ["bb@brecx.com","ew@brecx.com","bryanr.brecx@gmail.com","pm@brecx.com","cr@brecx.com"],
+      `❗New Case Created - Order ${order.OrderId}`,
+      `Issue for Tracking: ${trackingId}\nOrder ID: ${order.OrderId}`,
+      `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingId}</p>`
+    );
 
     await TrackScan.findOneAndUpdate(
       { trackingNumber: trackingId },

@@ -2575,8 +2575,7 @@ router.get("/api/tikok-orders", async (req, res) => {
   try {
     const result = await TikTokOrder.find()
       .sort({ createdAt: -1 })
-      .select("-customerName -address"); // exclude fields
-
+      .select("-customerName -address"); 
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2605,43 +2604,5 @@ router.put("/api/tiktok-orders/strip-sensitive", async (req, res) => {
 
 
 
-router.post("/api/upload/products", async (req, res) => {
-  try {
-    const products = req.body;
-    console.log(products);
-    if (!Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({ error: "Invalid or empty product list." });
-    }
-
-    const validProducts = products.filter(
-      (p) => p.sku && p.product && typeof p.qty === "number" && !isNaN(p.qty)
-    );
-
-    if (validProducts.length === 0) {
-      return res.status(400).json({ error: "No valid products to insert." });
-    }
-
-    const result = await ReserveProduct.insertMany(validProducts, {
-      ordered: false, // allows skipping duplicates or errors
-    });
-
-    res.status(200).json({
-      message: "Bulk upload successful",
-      insertedCount: result.length,
-      insertedIds: result.map((doc) => doc.sku),
-    });
-  } catch (error) {
-    console.error("Bulk upload error:", error);
-    res.status(500).json({ error: "Failed to upload products." });
-  }
-});
-router.get("/api/reserve-products", async (req, res) => {
-  try {
-    const result = await ReserveProduct.find();
-    res.json(result);
-  } catch (error) {
-    res.json(error);
-  }
-});
 
 module.exports = router;

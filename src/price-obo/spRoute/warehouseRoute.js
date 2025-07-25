@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 
 const moment = require("moment-timezone");
 const ReserveProduct = require("../../model/ReserveProduct");
-const IssueScan = require("../../model/IssueScan")
+const IssueScan = require("../../model/IssueScan");
 const VTOrder = require("../../model/VTOrder");
 
 const TrackScan = require("../../model/trackScan");
@@ -126,54 +126,21 @@ router.put("/api/reserve-product/clean", async (req, res) => {
   }
 });
 
-router.put("/api/reserve-product/clean", async (req, res) => {
-  try {
-    const allDocs = await ReserveProduct.find();
-
-    let cleanedCount = 0;
-
-    for (const doc of allDocs) {
-      const seen = new Set();
-      const uniqueProducts = [];
-
-      for (const p of doc.products) {
-        const key = `${p.product}-${p.upc}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueProducts.push(p);
-        }
-      }
-
-      // If cleanup is needed, update document
-      if (uniqueProducts.length !== doc.products.length) {
-        doc.products = uniqueProducts;
-        await doc.save();
-        cleanedCount++;
-      }
-    }
-
-    res.json({
-      message: `Cleanup complete!`,
-      cleanedSkus: cleanedCount,
-    });
-  } catch (error) {
-    console.error("Cleanup error:", error);
-    res.status(500).json({ error: "Failed to clean duplicate product entries." });
-  }
-});
-
-
 router.get("/api/reserve-products", async (req, res) => {
   try {
     const { search } = req.query;
-
+    console.log(search);
     const filter = {};
 
     if (search) {
-      filter.sku = { $regex: search, $options: "i" }; // case-insensitive search
+      filter.$or = [
+        { sku: { $regex: search, $options: "i" } },
+        { "products.upc": { $regex: search, $options: "i" } },
+        { "products.product": { $regex: search, $options: "i" } },
+      ];
     }
 
-    const result = await ReserveProduct.find(filter).sort({ createdAt: -1 }); // only works if you added timestamps to schema
+    const result = await ReserveProduct.find(filter).sort({ createdAt: -1 }); 
 
     res.json(result);
   } catch (error) {
@@ -263,7 +230,6 @@ router.get("/api/product-scan/:upc", async (req, res) => {
         .json({ message: "No items found for this tracking number." });
     }
 
-    
     const backUpScan = await TrackScan.findOne({
       pickedTrackingNumbers: trackingNumber,
     });
@@ -283,7 +249,6 @@ router.get("/api/product-scan/:upc", async (req, res) => {
 
     let foundProduct = null;
 
-   
     for (const item of vtOrder.items) {
       const sku = item.sku;
 
@@ -293,7 +258,7 @@ router.get("/api/product-scan/:upc", async (req, res) => {
       const match = reserve.products.find((p) => p.upc === upc);
       if (match) {
         foundProduct = match.product;
-        break; 
+        break;
       }
     }
 
@@ -370,31 +335,36 @@ router.post("/api/product/:trackingId/issue", async (req, res) => {
   }
 });
 
-router.get("/api/reserve-product/:sku/sku",async(req,res)=>{
-  const {sku} = req.params;
+router.get("/api/reserve-product/:sku/sku", async (req, res) => {
+  const { sku } = req.params;
   try {
-    const result = await ReserveProduct.find({sku});
-    res.json({result});
+    const result = await ReserveProduct.find({ sku });
+    res.json({ result });
   } catch (error) {
     console.log(error);
   }
-})
+});
 router.get("/api/product/issue", async (req, res) => {
   try {
-    const { resolved, search, startDate, endDate } = req.query;
+    const {
+      resolved,
+      search,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 100,
+    } = req.query;
 
     const filter = {};
 
-    // Apply resolved filter
     if (resolved === "true") {
       filter.resolved = true;
     } else if (resolved === "false") {
       filter.resolved = false;
     }
 
-    // Apply search filter on caseId, trackingId, items.sku
     if (search) {
-      const regex = new RegExp(search, "i"); // case-insensitive match
+      const regex = new RegExp(search, "i");
       filter.$or = [
         { caseId: regex },
         { trackingNumber: regex },
@@ -403,32 +373,37 @@ router.get("/api/product/issue", async (req, res) => {
       ];
     }
 
-    
     if (startDate && endDate) {
-        const res = await CaseScan.find({
-        createdAt: {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
-        },
-      
-      });
-      console.log(res);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      filter.createdAt = { $gte: start, $lte: end };
     }
 
-    // Get filtered results
-    const result = await CaseScan.find(filter).sort({ createdAt: -1 });
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const result = await CaseScan.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    // Global counts (independent of search)
+    const totalCount = await CaseScan.countDocuments(filter);
+    const hasMore = skip + result.length < totalCount;
+
     const resolvedCount = await CaseScan.countDocuments({ resolved: true });
     const unresolvedCount = await CaseScan.countDocuments({ resolved: false });
-
     const total = resolvedCount + unresolvedCount;
 
     res.json({
       quantity: total,
       resolvedCount,
       unresolvedCount,
-      result
+      result,
+      currentPage: parseInt(page),
+      totalCount,
+      hasMore,
     });
   } catch (error) {
     console.error("Issue fetch error:", error);
@@ -438,9 +413,9 @@ router.get("/api/product/issue", async (req, res) => {
 
 router.put("/api/product/issue/:id/stock", async (req, res) => {
   const { id } = req.params;
-  const { stockOut, whUser, email, password } = req.body; 
+  const { stockOut, whUser, email, password } = req.body;
   console.log(req.body);
-  try { 
+  try {
     if (!email || !password) {
       return res.status("Missing Password!");
     }
@@ -459,7 +434,7 @@ router.put("/api/product/issue/:id/stock", async (req, res) => {
           resolved: !stockOut,
           whNote: stockOut ? "Out of Stock" : "In Stock",
           whUser: whUser,
-          whDate: new Date()
+          whDate: new Date(),
         },
       }
     );
@@ -503,7 +478,6 @@ router.put("/api/product/issue/:id/status", async (req, res) => {
   }
 });
 
-
 router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
   const { sku, id } = req.params;
   const updatedProduct = req.body; // { upc, qty, stock }
@@ -513,8 +487,8 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
       { _id: id, "items.sku": sku },
       {
         $set: {
-          "products.$.sku":updatedProduct.sku,
-          "products.$.product":updatedProduct.product,
+          "products.$.sku": updatedProduct.sku,
+          "products.$.product": updatedProduct.product,
           "products.$.upc": updatedProduct.upc,
           "products.$.qty": updatedProduct.qty,
           "products.$.stock": updatedProduct.stock,
@@ -523,10 +497,15 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
     );
 
     if (result.modifiedCount === 0) {
-      return res.status(404).json({ message: "Product not found or not updated." });
+      return res
+        .status(404)
+        .json({ message: "Product not found or not updated." });
     }
 
-    res.json({ message: `Product ${sku} updated successfully in IssueScan ${id}`, result });
+    res.json({
+      message: `Product ${sku} updated successfully in IssueScan ${id}`,
+      result,
+    });
   } catch (error) {
     console.error("Update error:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -539,10 +518,15 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   if (!trackingId) {
     return res.status(400).json({ error: "Tracking ID is required" });
   }
+  let trackingNumber = trackingId.trim();
+
+  if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+  }
 
   try {
     // Find VTOrder by trackingNumber
-    const order = await VTOrder.findOne({ trackingNumber: trackingId });
+    const order = await VTOrder.findOne({ trackingNumber: trackingNumber });
 
     if (!order) {
       return res
@@ -551,7 +535,7 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
     }
 
     // Prevent duplicate IssueScan
-    const existing = await CaseScan.findOne({ trackingNumber: trackingId });
+    const existing = await CaseScan.findOne({ trackingNumber: trackingNumber });
     if (existing) {
       return res
         .status(409)
@@ -592,15 +576,21 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
     });
 
     await issueDoc.save();
-       await sendIssueAlertEmail(
-      ["bb@brecx.com","ew@brecx.com","bryanr.brecx@gmail.com","pm@brecx.com","cr@brecx.com"],
+    await sendIssueAlertEmail(
+      [
+        "bb@brecx.com",
+        "ew@brecx.com",
+        "bryanr.brecx@gmail.com",
+        "pm@brecx.com",
+        "cr@brecx.com",
+      ],
       `❗New Case Created - Order ${order.OrderId}`,
-      `Issue for Tracking: ${trackingId}\nOrder ID: ${order.OrderId}`,
-      `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingId}</p>`
+      `Issue for Tracking: ${trackingNumber}\nOrder ID: ${order.OrderId}`,
+      `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingNumber}</p>`
     );
 
     await TrackScan.findOneAndUpdate(
-      { trackingNumber: trackingId },
+      { trackingNumber: trackingNumber },
       { $set: { issue: true } }
     );
 
@@ -616,11 +606,13 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
 
 router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
   const { _id, product } = req.params;
-  console.log(_id,product);
+  console.log(_id, product);
   const { stock } = req.body; // true or false
   console.log(stock);
   if (typeof stock !== "boolean") {
-    return res.status(400).json({ error: "Missing or invalid 'stock' value in body." });
+    return res
+      .status(400)
+      .json({ error: "Missing or invalid 'stock' value in body." });
   }
 
   try {
@@ -630,7 +622,9 @@ router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
     );
 
     if (updated.modifiedCount === 0) {
-      return res.status(404).json({ message: "No matching product found to update." });
+      return res
+        .status(404)
+        .json({ message: "No matching product found to update." });
     }
 
     res.status(200).json({
@@ -641,6 +635,5 @@ router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
     res.status(500).json({ error: "Failed to update product stock." });
   }
 });
-
 
 module.exports = router;

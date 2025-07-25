@@ -35,6 +35,7 @@ const caseScanSchema = mongoose.Schema(
     whNote: { type: String },
     note: { type: String },
     status: { type: String },
+    caseUser:{type:String},
     whUser: { type: String },
     officeUser: { type: String },
     whDate: {type:Date},

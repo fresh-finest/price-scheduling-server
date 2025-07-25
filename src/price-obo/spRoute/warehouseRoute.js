@@ -514,7 +514,7 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
 
 router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   const { trackingId } = req.params;
-
+   const {userName} = req.body;
   if (!trackingId) {
     return res.status(400).json({ error: "Tracking ID is required" });
   }
@@ -523,7 +523,9 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
     trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
   }
-
+ if(!userName){
+    return res.status(404).json({error:"User not found!"})
+  }
   try {
     // Find VTOrder by trackingNumber
     const order = await VTOrder.findOne({ trackingNumber: trackingNumber });
@@ -573,21 +575,22 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
       trackingNumber: order.trackingNumber,
       items,
       products: allProducts, // ← Inject here
+      caseUser:userName || "Unknown"
     });
 
     await issueDoc.save();
-    await sendIssueAlertEmail(
-      [
-        "bb@brecx.com",
-        "ew@brecx.com",
-        "bryanr.brecx@gmail.com",
-        "pm@brecx.com",
-        "cr@brecx.com",
-      ],
-      `❗New Case Created - Order ${order.OrderId}`,
-      `Issue for Tracking: ${trackingNumber}\nOrder ID: ${order.OrderId}`,
-      `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingNumber}</p>`
-    );
+    // await sendIssueAlertEmail(
+    //   [
+    //     "bb@brecx.com",
+    //     "ew@brecx.com",
+    //     "bryanr.brecx@gmail.com",
+    //     "pm@brecx.com",
+    //     "cr@brecx.com",
+    //   ],
+    //   `❗New Case Created - Order ${order.OrderId}`,
+    //   `Issue for Tracking: ${trackingNumber}\nOrder ID: ${order.OrderId}`,
+    //   `<h3>New Issue Created</h3><p><strong>Order:</strong> ${order.OrderId}</p><p><strong>Tracking:</strong> ${trackingNumber}</p>`
+    // );
 
     await TrackScan.findOneAndUpdate(
       { trackingNumber: trackingNumber },

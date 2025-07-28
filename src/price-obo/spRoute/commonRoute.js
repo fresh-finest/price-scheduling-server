@@ -1463,8 +1463,8 @@ router.get("/api/shipped/store", async (req, res) => {
           shipped_at: order.shipped_at || "",
           carrier_name:
             order.allocations?.[0]?.shipment?.service_carrier_name || "",
-          // customerName: order.customer?.full_name || "",
-          // address: order.customer?.billing_address?.address1 || "",
+          customerName: order.customer?.full_name || "",
+          address: order.customer?.billing_address?.address1 || "",
           trackingNumber: trackingNumbers,
           shipmentId:
             order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||
@@ -1600,7 +1600,7 @@ router.post("/api/tiktok/tracking", async (req, res) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchWithRetry = async (url, config, retries = 7, delayMs = 3000) => {
+const fetchWithRetry = async (url, config, retries = 3, delayMs = 3000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await axios.get(url, config);
@@ -1624,6 +1624,7 @@ router.get("/api/update-status", async (req, res) => {
     const bulkOps = [];
 
     for (const order of orders) {
+     
       try {
         const response = await fetchWithRetry(
           `${SHIPPING_EVENTS_URL}/${order.shipmentId}`,
@@ -1654,7 +1655,7 @@ router.get("/api/update-status", async (req, res) => {
           }
         }
       } catch (err) {
-        console.log(err);
+       
         console.warn(
           `⚠️ Failed to update shipment ${order.shipmentId}: ${err.message}`
         );
@@ -2215,7 +2216,7 @@ router.get("/api/tiktokorder/update-status", async (req, res) => {
 
     res.json({
       updatedCount,
-      message: `${updatedCount} TikTok orders updated in BackUp collection.`,
+      message: `${updatedCount} TikTok orders updated.`,
     });
   } catch (err) {
     console.error("Error:", err.message);
@@ -2281,10 +2282,7 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
       tracking_numbers: trackingNumbers,
     });
   } catch (err) {
-    console.error(
-      "Order summary fetch error:",
-      err.response?.data || err.message
-    );
+ 
     res
       .status(500)
       .json({ error: err.response?.data || "Failed to fetch order summary" });

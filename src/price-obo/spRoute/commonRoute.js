@@ -1618,6 +1618,7 @@ router.get("/api/update-status", async (req, res) => {
   try {
     const orders = await Order.find({
       shipmentId: { $exists: true, $ne: "" },
+      status: { $ne: "delivered" },
     }).lean();
 
     const bulkOps = [];
@@ -2022,10 +2023,9 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_GYuwUgAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk8Zx7NrT2jf7yf5XLq4b_d9PwE_Fp9RcSsglbZdXj34bHgdmlgB40YUx0fDrqnTy08"; // latest token from correct app
+  "TTP_r2Qm-AAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk9VXAR95oaapzzIbH_WlktiALFdI_ir-MRwO4N-V-j3TWbvWjYfR_7q74plDhewwXs"; // latest token from correct app
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
-
 
 const generateSign = (uri, query, body, appSecret) => {
   const excludeKeys = ["access_token", "sign"];
@@ -2105,7 +2105,73 @@ router.get("/api/tiktokorder/status", async (req, res) => {
     //   tags: { $elemMatch: { name: /^TikTokOrderID:/ } },
     // });
 
-    const orders = await TikTokOrder.find();
+    const orders = await TikTokOrder.find({
+      trackingNumber: { $size: 0 },
+      status: { $ne: "delivered" },
+    }).lean();
+
+    let updatedCount = 0;
+    const updates = [];
+
+    for (const order of orders) {
+      const tiktokOrderId = order.OrderId;
+      console.log(tiktokOrderId);
+      try {
+        const data = await Retry(tiktokOrderId);
+        const {
+          order_id,
+          rts_time,
+          tracking_numbers,
+          order_status,
+          warehouse_id,
+        } = data;
+        const shippedAtDate =
+          rts_time && !isNaN(rts_time)
+            ? new Date(rts_time * 1000).toISOString()
+            : new Date().toISOString();
+        const updated = await TikTokOrder.findByIdAndUpdate(
+          order._id,
+          {
+            $set: {
+              created_at: shippedAtDate,
+              shipped_at: shippedAtDate,
+              tiktokId: order_id,
+              trackingNumber: tracking_numbers || [],
+              warehouseId: warehouse_id,
+              status: mapStatus(order_status),
+            },
+          },
+          { new: true }
+        );
+
+        updates.push(updated);
+        updatedCount++;
+      } catch (err) {
+        console.error(`Failed for ${tiktokOrderId}:`, err.message);
+      }
+    }
+
+    res.json({
+      updatedCount,
+      message: `${updatedCount} TikTok orders updated in BackUp collection.`,
+    });
+  } catch (err) {
+    console.error("Error:", err.message);
+    res.status(500).json({ error: "Failed to update TikTok order statuses." });
+  }
+});
+
+
+router.get("/api/tiktokorder/update-status", async (req, res) => {
+  try {
+    // const orders = await Order.find({
+    //   tags: { $elemMatch: { name: /^TikTokOrderID:/ } },
+    // });
+
+    const orders = await TikTokOrder.find({
+      status: { $ne: "delivered" },
+    }).lean();
+
     let updatedCount = 0;
     const updates = [];
 
@@ -2242,11 +2308,10 @@ const sanitizeStringStore = (value) => {
   return value
     .normalize("NFKC") // Unicode-safe normalization
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control chars
-    .replace(/[\uD800-\uDFFF]/g, "")              // invalid surrogate pairs
-    .replace(/\uFFFD/g, "")                       // replacement char
+    .replace(/[\uD800-\uDFFF]/g, "") // invalid surrogate pairs
+    .replace(/\uFFFD/g, "") // replacement char
     .trim();
 };
-
 
 router.post("/api/orders", async (req, res) => {
   try {
@@ -2398,8 +2463,12 @@ router.post("/api/orders", async (req, res) => {
           id: order.order_id,
           shipped_at: order.shipped_time || "",
           carrier_name: order.shipping_provider || "",
-          customerName: sanitizeStringStore(order.recipient_address?.name || ""),
-          address: sanitizeStringStore(order.recipient_address?.full_address || ""),
+          customerName: sanitizeStringStore(
+            order.recipient_address?.name || ""
+          ),
+          address: sanitizeStringStore(
+            order.recipient_address?.full_address || ""
+          ),
 
           trackingNumber: trackingNumbers,
           tags: order.is_sample_order
@@ -2484,7 +2553,6 @@ const sanitizeString = (value) => {
     .replace(/[^\x00-\x7F]/g, ""); // remove non-ASCII (you may omit this if Unicode is OK)
 };
 
-
 router.get("/api/merge/order", async (req, res) => {
   try {
     console.log("merging");
@@ -2541,7 +2609,7 @@ router.get("/api/merge/order", async (req, res) => {
         // ⛔ Skip customerName and address from merged result
         customerName: "",
         address: "",
-       
+
         trackingNumber: order.trackingNumber || [],
         trackingUrl: order.trackingUrl || "",
         shipmentId: order.shipmentId || "",
@@ -2570,12 +2638,11 @@ router.get("/api/merge/order", async (req, res) => {
   }
 });
 
-
 router.get("/api/tikok-orders", async (req, res) => {
   try {
     const result = await TikTokOrder.find()
       .sort({ createdAt: -1 })
-      .select("-customerName -address"); 
+      // .select("-customerName -address");
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2601,8 +2668,5 @@ router.put("/api/tiktok-orders/strip-sensitive", async (req, res) => {
     res.status(500).json({ error: "Failed to remove fields" });
   }
 });
-
-
-
 
 module.exports = router;

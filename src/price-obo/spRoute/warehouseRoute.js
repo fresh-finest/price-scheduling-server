@@ -211,6 +211,72 @@ router.put("/api/reserve-product/:product/update", async (req, res) => {
   }
 });
 
+router.put("/api/reserve-product/:sku/sku/:product/update", async (req, res) => {
+  const { sku, product } = req.params;
+  const { qty, upc, product: newProduct } = req.body;
+  console.log(sku,product);
+  try {
+    const result = await ReserveProduct.updateOne(
+      { sku, "products.product": product },
+      {
+        $set: {
+          ...(qty !== undefined && { "products.$.qty": qty }),
+          ...(upc && { "products.$.upc": upc }),
+          ...(newProduct && { "products.$.product": newProduct })
+        }
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Product not found or no changes made." });
+    }
+
+    res.json({ message: "Product updated successfully.", result });
+  } catch (error) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
+router.delete("/api/reserve-product/:sku/sku/:product/delete", async (req, res) => {
+  const { sku, product } = req.params;
+
+  try {
+    const result = await ReserveProduct.updateOne(
+      { sku },
+      { $pull: { products: { product } } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "No matching product found to delete." });
+    }
+
+    res.json({ message: "Product removed successfully from the array.", result });
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.delete("/api/reserve-product/sku/:sku/delete", async (req, res) => {
+  const { sku } = req.params;
+
+  try {
+    const result = await ReserveProduct.deleteOne({ sku });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "No document found with this SKU." });
+    }
+
+    res.json({ message: `SKU '${sku}' deleted successfully.`, result });
+  } catch (error) {
+    console.error("Delete by SKU error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 router.get("/api/product-scan/:upc", async (req, res) => {
   const upc = req.params.upc;
   const trackingNumber = req.query.trackingNumber;

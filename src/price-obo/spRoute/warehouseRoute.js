@@ -270,44 +270,46 @@ router.post("/api/sku-to-product", async (req, res) => {
 
 router.post("/api/product-upc/upload", async (req, res) => {
   const data = req.body;
- 
 
   if (!Array.isArray(data) || data.length === 0) {
     return res.status(400).json({ message: "Invalid or empty data array" });
   }
 
   try {
-    const { product } = data[0];
-    
-    const existingProduct = await ProductUpc.findOne({ product });
-    
-    if (existingProduct) {
-      return res.json({ message: "Product already exist" });
+    // Extract unique products from incoming data
+    const incomingProducts = [...new Set(data.map(item => item.product).filter(Boolean))];
+
+    // Check if any of those products already exist
+    const existing = await ProductUpc.find({ product: { $in: incomingProducts } });
+
+    if (existing.length > 0) {
+      const existingNames = existing.map(p => p.product);
+      return res.status(400).json({
+        message: "One or more products already exist.",
+        existingProducts: existingNames
+      });
     }
 
+    // Proceed with bulk upload
     const bulkOps = [];
 
-    data.forEach((item) => {
-      const { product, upc } = item;
-
+    data.forEach(({ product, upc }) => {
       if (!product || !upc) return;
 
       bulkOps.push({
         updateOne: {
           filter: { product, upc },
-          update: {
-            $setOnInsert: { product, upc },
-          },
-          upsert: true,
-        },
+          update: { $setOnInsert: { product, upc } },
+          upsert: true
+        }
       });
     });
 
     const result = await ProductUpc.bulkWrite(bulkOps);
 
     res.json({
-      message: "Bulk upload successful (product + upc only, qty untouched)",
-      result,
+      message: "Added successful!",
+      result
     });
   } catch (error) {
     console.error("Bulk upload error:", error);

@@ -13,7 +13,7 @@ const skuStateSchema = new mongoose.Schema({
 
 const SkuState = mongoose.model("Skustate", skuStateSchema);
 
-exports.deletePriceState = async (sku) => {
+const deletePriceState = async (sku) => {
   if (!sku) {
     throw new Error("Sku is required to delete");
   }
@@ -42,9 +42,9 @@ const generatePrice = async (
   targetQuantity,
   ruleId
 ) => {
-  console.log()
+  
   console.log(percentage, amount, type);
-  console.log(targetQuantity);
+ 
   const metrics = await fetchSalesQuantity(sku, "sku");
   const quantity = metrics[metrics.length - 1].unitCount;
   const dyanamicQuantity = await fetchDynamicQuantity(sku, "sku");
@@ -125,6 +125,7 @@ const generatePrice = async (
       if (newPrice > maxPrice) {
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
+        await skuStateDelete(sku)
       }
     } else {
       newPrice = lastPrice + priceDifference * parseFloat(percentage);
@@ -132,6 +133,7 @@ const generatePrice = async (
       if (newPrice > maxPrice) {
         newPrice = parseFloat(maxPrice);
         await cancelAutoJobs(sku);
+        await skuStateDelete(sku)
       }
     }
   } else if (type === "decreasing") {
@@ -142,12 +144,14 @@ const generatePrice = async (
       if (newPrice < minPrice) {
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
+         await skuStateDelete(sku)
       }
     } else {
       newPrice = lastPrice - priceDifference * parseFloat(percentage);
       if (newPrice < minPrice) {
         newPrice = parseFloat(minPrice);
         await cancelAutoJobs(sku);
+         await skuStateDelete(sku)
       }
     }
   } else if (type === "increasingRepeat") {
@@ -233,6 +237,7 @@ const generatePrice = async (
       newPrice = parseFloat(maxPrice);
       console.log("dyanamicQuantity is greater than", targetQuantity);
        await cancelAutoJobs(sku);
+        await skuStateDelete(sku)
     } else {
       console.log("quantity is less than", targetQuantity);
       newPrice = parseFloat(minPrice);

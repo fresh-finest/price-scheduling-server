@@ -270,13 +270,21 @@ router.post("/api/sku-to-product", async (req, res) => {
 
 router.post("/api/product-upc/upload", async (req, res) => {
   const data = req.body;
-  console.log(data);
+ 
 
   if (!Array.isArray(data) || data.length === 0) {
     return res.status(400).json({ message: "Invalid or empty data array" });
   }
 
   try {
+    const { product } = data[0];
+    
+    const existingProduct = await ProductUpc.findOne({ product });
+    
+    if (existingProduct) {
+      return res.json({ message: "Product already exist" });
+    }
+
     const bulkOps = [];
 
     data.forEach((item) => {
@@ -288,10 +296,10 @@ router.post("/api/product-upc/upload", async (req, res) => {
         updateOne: {
           filter: { product, upc },
           update: {
-            $setOnInsert: { product, upc } 
+            $setOnInsert: { product, upc },
           },
-          upsert: true
-        }
+          upsert: true,
+        },
       });
     });
 
@@ -299,13 +307,14 @@ router.post("/api/product-upc/upload", async (req, res) => {
 
     res.json({
       message: "Bulk upload successful (product + upc only, qty untouched)",
-      result
+      result,
     });
   } catch (error) {
     console.error("Bulk upload error:", error);
     res.status(500).json({ message: "Bulk upload failed", error });
   }
 });
+
 
 router.get("/api/product-upc", async (req, res) => {
   try {

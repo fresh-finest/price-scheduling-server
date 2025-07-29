@@ -335,14 +335,27 @@ router.get("/api/product-upc/product/:product", async (req, res) => {
 
 
     const result = await ProductUpc.findOne({product});
-    const upc= result.upc;
-    res.json({ upc });
+    const upc= result?.upc;
+    if(!upc){
+      return res.json({message:"Product not found!"})
+    }
+    if(upc){
+      res.json({ upc });
+    }
   } catch (error) {
     console.error("Error fetching product-upc:", error);
     res.status(500).json({ error: "Failed to fetch data." });
   }
 });
-
+router.delete("/api/product-upc/product/:product",async(req,res)=>{
+  try {
+    const {product} = req.params;
+    const result = await ProductUpc.findOneAndDelete({product});
+    res.json({message:"Deleted!"});
+  } catch (error) {
+    res.json({error});
+  }
+})
 router.put("/api/product-upc/:product/product", async (req, res) => {
   const { product } = req.params;
   const { upc} = req.body;

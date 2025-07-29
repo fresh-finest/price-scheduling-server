@@ -12,11 +12,11 @@ const TrackScan = require("../../model/trackScan");
 const FBMUser = require("../../model/fbmUser");
 const sendIssueAlertEmail = require("../../service/IssueEmailService");
 const CaseScan = require("../../model/CaseScan");
+const ProductUpc = require("../../model/ProductUpc");
 
 router.post("/api/upload/products", async (req, res) => {
   try {
     const products = req.body;
-    console.log(products);
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ error: "Invalid or empty product list." });
     }
@@ -25,62 +25,49 @@ router.post("/api/upload/products", async (req, res) => {
 
     for (const item of products) {
       const { sku, product, upc, qty } = item;
-      console.log(sku);
-      // if (!sku || !product || !upc || typeof qty !== "number") continue;
-      if (!sku) continue;
+      if (!sku || !product) continue;
 
       if (!groupedBySku[sku]) {
-        groupedBySku[sku] = [];
+        groupedBySku[sku] = new Map(); // Use Map to prevent duplicate products
       }
 
-      groupedBySku[sku].push({ product, upc, qty });
+      if (!groupedBySku[sku].has(product)) {
+        groupedBySku[sku].set(product, { product, upc, qty });
+      }
     }
 
     for (const sku in groupedBySku) {
-      const entries = groupedBySku[sku];
+      const entries = Array.from(groupedBySku[sku].values());
 
       let existingDoc = await ReserveProduct.findOne({ sku });
-      console.log(existingDoc);
+
       if (!existingDoc) {
-        // Create new document
         const newDoc = new ReserveProduct({
           sku,
-          products: entries.map((p) => ({
-            product: p.product,
-            upc: p?.upc || "",
-            qty: p?.qty || 0,
-          })),
+          products: entries,
         });
-
         await newDoc.save();
       } else {
-        // Update existing document smartly
         for (const entry of entries) {
           const { product, upc, qty } = entry;
 
           const existingProduct = existingDoc.products.find(
-            (p) => p.product === product && p.upc === upc
+            (p) => p.product === product
           );
 
           if (existingProduct) {
-            // Replace qty
             existingProduct.qty = qty;
+            existingProduct.upc = upc;
           } else {
-            // Push new entry
-            existingDoc.products.push({
-              product,
-              upc,
-              qty,
-            });
+            existingDoc.products.push({ product, upc, qty });
           }
         }
-
         await existingDoc.save();
       }
     }
 
     res.status(200).json({
-      message: "Smart bulk upload complete.",
+      message: "Smart bulk upload complete. Duplicates per SKU avoided.",
     });
   } catch (error) {
     console.error("Bulk upload error:", error);
@@ -238,6 +225,166 @@ router.put("/api/reserve-product/:sku/sku/:product/update", async (req, res) => 
   }
 });
 
+router.post("/api/sku-to-product", async (req, res) => {
+  try {
+    const allReserves = await ReserveProduct.find();
+
+    const seenProducts = new Set();
+    const bulkOps = [];
+
+    for (const reserve of allReserves) {
+      for (const item of reserve.products) {
+        const { product, upc, qty } = item;
+
+        if (!product || !upc || qty === undefined) continue;
+
+        if (seenProducts.has(product)) continue;
+        seenProducts.add(product);
+
+        bulkOps.push({
+          updateOne: {
+            filter: { product },
+            update: { $set: { upc, qty } }, 
+            upsert: true
+          }
+        });
+      }
+    }
+
+    if (bulkOps.length === 0) {
+      return res.status(200).json({ message: "No unique products found to upsert." });
+    }
+
+    const result = await ProductUpc.bulkWrite(bulkOps);
+
+    res.json({
+      message: "Successfully synced!",
+      upserts: result.upsertedCount,
+      modified: result.modifiedCount
+    });
+  } catch (error) {
+    console.error("Sync error:", error);
+    res.status(500).json({ error: "Failed to sync products." });
+  }
+});
+
+router.post("/api/product-upc/upload", async (req, res) => {
+  const data = req.body;
+  console.log(data);
+
+  if (!Array.isArray(data) || data.length === 0) {
+    return res.status(400).json({ message: "Invalid or empty data array" });
+  }
+
+  try {
+    const bulkOps = [];
+
+    data.forEach((item) => {
+      const { product, upc } = item;
+
+      if (!product || !upc) return;
+
+      bulkOps.push({
+        updateOne: {
+          filter: { product, upc },
+          update: {
+            $setOnInsert: { product, upc } 
+          },
+          upsert: true
+        }
+      });
+    });
+
+    const result = await ProductUpc.bulkWrite(bulkOps);
+
+    res.json({
+      message: "Bulk upload successful (product + upc only, qty untouched)",
+      result
+    });
+  } catch (error) {
+    console.error("Bulk upload error:", error);
+    res.status(500).json({ message: "Bulk upload failed", error });
+  }
+});
+
+router.get("/api/product-upc", async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    const filter = {};
+
+    if (search) {
+      // Search in both `product` and `upc` fields using OR
+      filter.$or = [
+        { product: { $regex: search, $options: "i" } },
+        { upc: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const result = await ProductUpc.find(filter);
+    res.json({ result });
+  } catch (error) {
+    console.error("Error fetching product-upc:", error);
+    res.status(500).json({ error: "Failed to fetch data." });
+  }
+});
+
+router.get("/api/product-upc/product/:product", async (req, res) => {
+  try {
+    const { product } = req.params;
+
+
+    const result = await ProductUpc.findOne({product});
+    const upc= result.upc;
+    res.json({ upc });
+  } catch (error) {
+    console.error("Error fetching product-upc:", error);
+    res.status(500).json({ error: "Failed to fetch data." });
+  }
+});
+
+router.put("/api/product-upc/:product/product", async (req, res) => {
+  const { product } = req.params;
+  const { upc} = req.body;
+
+  if (!product || !upc ) {
+    return res.status(400).json({ error: "Missing product, upc" });
+  }
+
+  try {
+    // Update embedded products in ReserveProduct
+    const reserveResult = await ReserveProduct.updateMany(
+      { "products.product": product },
+      {
+        $set: {
+          "products.$[elem].upc": upc,
+        },
+      },
+      {
+        arrayFilters: [{ "elem.product": product }],
+      }
+    );
+
+    // Update flat ProductUpc entries
+    const upcResult = await ProductUpc.updateMany(
+      { product },
+      {
+        $set: {
+          upc
+        },
+      }
+    );
+
+    res.json({
+      message: `Updated product '${product}' in ReserveProduct and ProductUpc.`,
+      reserveModifiedCount: reserveResult.modifiedCount,
+      productUpcModifiedCount: upcResult.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Update failed:", error);
+    res.status(500).json({ error: "Update failed" });
+  }
+});
 
 
 router.delete("/api/reserve-product/:sku/sku/:product/delete", async (req, res) => {

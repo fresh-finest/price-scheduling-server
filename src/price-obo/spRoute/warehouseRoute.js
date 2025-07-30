@@ -115,20 +115,35 @@ router.put("/api/reserve-product/clean", async (req, res) => {
 
 router.get("/api/reserve-products", async (req, res) => {
   try {
-    const { search } = req.query;
-    console.log(search);
+    const { search, missingUpc } = req.query;
     const filter = {};
 
     if (search) {
       filter.$or = [
         { sku: { $regex: search, $options: "i" } },
-        { "products.upc": { $regex: search, $options: "i" } },
         { "products.product": { $regex: search, $options: "i" } },
+        { "products.upc": { $regex: search, $options: "i" } }
       ];
     }
 
-    const result = await ReserveProduct.find(filter).sort({ createdAt: -1 }); 
+    if (missingUpc === "true") {
+      filter.$or = [
+        { products: { $size: 0 } }, // Empty products array
+        {
+          products: {
+            $elemMatch: {
+              $or: [
+                { upc: "" },
+                { upc: { $exists: false } },
+                { upc: null }
+              ]
+            }
+          }
+        }
+      ];
+    }
 
+    const result = await ReserveProduct.find(filter).sort({ createdAt: -1 });
     res.json(result);
   } catch (error) {
     console.error("Reserve product fetch error:", error);

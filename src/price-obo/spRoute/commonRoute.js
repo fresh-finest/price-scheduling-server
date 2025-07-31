@@ -1624,7 +1624,6 @@ router.get("/api/update-status", async (req, res) => {
     const bulkOps = [];
 
     for (const order of orders) {
-     
       try {
         const response = await fetchWithRetry(
           `${SHIPPING_EVENTS_URL}/${order.shipmentId}`,
@@ -1655,7 +1654,6 @@ router.get("/api/update-status", async (req, res) => {
           }
         }
       } catch (err) {
-       
         console.warn(
           `⚠️ Failed to update shipment ${order.shipmentId}: ${err.message}`
         );
@@ -1806,15 +1804,22 @@ router.get("/api/orders-list", async (req, res) => {
         ...order,
         picked: scan?.picked || false,
         packed: scan?.packed || false,
+        isPalette:scan?.isPalette || false,
         scanStatus: scan?.scanStatus || "pending",
         pickerName: scan?.pickerName || null,
         pickerRole: scan?.pickerRole || null,
         packerName: scan?.packerName || null,
         packerRole: scan?.packerRole || null,
+        paletterName: scan?.paletterName || null,
+        paletterRole: scan?.paletterRole || null,
         pickedAt: scan?.pickedAt || null,
         packedAt: scan?.packedAt || null,
+        paletteAt:scan?.paletteAt || null,
         pickedTrackingNumbers: scan?.pickedTrackingNumbers || [],
         packedTrackingNumbers: scan?.packedTrackingNumbers || [],
+        palleteTrackingNumbers:scan?.palleteTrackingNumbers || [],
+        packedProduct: scan?.packedProduct || [],
+        packedUPC: scan?.packedUPC || [],
       };
     });
 
@@ -2162,7 +2167,6 @@ router.get("/api/tiktokorder/status", async (req, res) => {
   }
 });
 
-
 router.get("/api/tiktokorder/update-status", async (req, res) => {
   try {
     // const orders = await Order.find({
@@ -2282,7 +2286,6 @@ router.get("/api/order/:orderId/summary", async (req, res) => {
       tracking_numbers: trackingNumbers,
     });
   } catch (err) {
- 
     res
       .status(500)
       .json({ error: err.response?.data || "Failed to fetch order summary" });
@@ -2638,9 +2641,8 @@ router.get("/api/merge/order", async (req, res) => {
 
 router.get("/api/tikok-orders", async (req, res) => {
   try {
-    const result = await TikTokOrder.find()
-      .sort({ createdAt: -1 })
-      // .select("-customerName -address");
+    const result = await Order.find().sort({ createdAt: -1 });
+    // .select("-customerName -address");
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });

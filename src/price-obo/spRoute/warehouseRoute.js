@@ -890,4 +890,175 @@ router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
   }
 });
 
+// pallete scan 
+
+router.get("/api/pallete-scan",async(req,res)=>{
+
+   const { query, role, userName } = req.query;
+
+  try {
+    let trackingNumber = query.trim();
+  console.log(trackingNumber);
+  if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+  }
+
+    const order1 = await VTOrder.findOne({ trackingNumber });
+
+    console.log("Order found:", order1);
+    if (!order1) {
+      return res.status(404).json({ error: "Order not found!" });
+    }
+
+     const { OrderId: orderId } = order1;
+
+    let existingScan = await TrackScan.findOne({ orderId });
+     if (role === "packer") {
+      // Packer can only scan after picker
+      if (!existingScan || !existingScan.packed) {
+        return res.status(400).json({ error: "Cannot Pallete before pack" });
+      }
+      if (existingScan.palleteTrackingNumbers?.includes(trackingNumber)) {
+        return res.status(400).json({ error: "Already On Pallete." });
+      }
+      existingScan.palleteTrackingNumbers.push(trackingNumber);
+      existingScan.paletterName = userName;
+      existingScan.paletterRole = role;
+      existingScan.isPalette = true;
+      existingScan.scanStatus = "palette";
+      existingScan.paletteAt = new Date();
+      await existingScan.save();
+
+      return res.json({
+        message: "Successfully Palette!",
+        data: order1,
+        scanStatus: existingScan,
+      });
+    }
+
+    return res.status(400).json({ error: "Invalid user Role" });
+
+
+  } catch (error) {
+     console.error("Scan error:", error.response?.data || error.message);
+    return res.status(500).json({ error: "Failed to process scan" });
+
+  }
+})
+
+router.post("/api/bulk/pallete-scan",async(req,res)=>{
+  try {
+     const { email, password, userName, role, trackingNumbers = [] } = req.body;
+    
+
+    if (
+      !email ||
+      !password ||
+      !role ||
+      !userName ||
+      !Array.isArray(trackingNumbers)
+    ) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+     const user = await FBMUser.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword)
+      return res.status(401).json({ error: "Invalid password" });
+
+    const results = [];
+   for (let rawTracking of trackingNumbers) {
+      let trackingNumber = rawTracking.trim();
+
+      if (
+        !trackingNumber.startsWith("1Z") &&
+        !trackingNumber.startsWith("TBA")
+      ) {
+        trackingNumber = trackingNumber.slice(-22);
+      }
+
+      const order = await VTOrder.findOne({
+        trackingNumber: { $in: [trackingNumber] },
+      });
+
+      if (!order) {
+        results.push({
+          trackingNumber,
+          status: "not_found",
+          message: "Order not found",
+        });
+        continue;
+      }
+
+      const { OrderId: orderId } = order;
+      let existingScan = await TrackScan.findOne({ orderId });
+      if (role === "packer") {
+        if (!existingScan || !existingScan.packed) {
+          results.push({
+            trackingNumber,
+            status: "not_ready",
+            message: "Cannot Pallete before pack",
+          });
+        } else {
+          if (!existingScan.packedTrackingNumbers.includes(trackingNumber)) {
+            results.push({
+              trackingNumber,
+              status: "not_packed",
+              message: "This tracking number wasn't packed",
+            });
+            continue;
+          }
+
+          if (!existingScan.palleteTrackingNumbers)
+            existingScan.palleteTrackingNumbers = [];
+
+          if (existingScan.palleteTrackingNumbers.includes(trackingNumber)) {
+            results.push({
+              trackingNumber,
+              status: "already_Pallete",
+              message: "Already Pallete",
+            });
+          } else {
+            existingScan.palleteTrackingNumbers.push(trackingNumber);
+
+            const allPallete = existingScan.trackingNumber.every((t) =>
+              existingScan.palleteTrackingNumbers.includes(t)
+            );
+
+            if (allPallete) {
+              existingScan.isPalette = true;
+              existingScan.scanStatus = "palette";
+              existingScan.paletteAt = new Date();
+            }
+
+            existingScan.paletterName = userName;
+            existingScan.paletterRole = role;
+            await existingScan.save();
+
+            results.push({
+              trackingNumber,
+              status: "Pallete",
+              message: "Successfully Pallete",
+            });
+          }
+        }
+      } else {
+        results.push({
+          trackingNumber,
+          status: "invalid_role",
+          message: "Invalid role",
+        });
+      }
+    }
+
+    res.status(200).json({ success: true, summary: results });
+
+
+  } catch (error) {
+      console.error("Bulk Scan Error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+})
+
 module.exports = router;

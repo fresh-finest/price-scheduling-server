@@ -1280,7 +1280,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 200;
+    const totalOrders = 300;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -1618,7 +1618,7 @@ router.get("/api/update-status", async (req, res) => {
   try {
     const orders = await Order.find({
       shipmentId: { $exists: true, $ne: "" },
-      status: { $ne: "delivered" },
+      status: { $nin: ["delivered", "resolved"] },
     }).lean();
 
     const bulkOps = [];
@@ -2029,7 +2029,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_r2Qm-AAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk9VXAR95oaapzzIbH_WlktiALFdI_ir-MRwO4N-V-j3TWbvWjYfR_7q74plDhewwXs"; // latest token from correct app
+  "TTP_bAPTkwAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk8fJKNjZlzE2VmP4_aA8YRxw1nBzijD8e_574dBZaOxe6KtifNqbKi9-2nnMDVLUik"; // latest token from correct app
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 

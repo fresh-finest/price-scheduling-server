@@ -13,6 +13,7 @@ const FBMUser = require("../../model/fbmUser");
 const sendIssueAlertEmail = require("../../service/IssueEmailService");
 const CaseScan = require("../../model/CaseScan");
 const ProductUpc = require("../../model/ProductUpc");
+const Order = require("../../model/Order");
 
 router.post("/api/upload/products", async (req, res) => {
   try {
@@ -1060,5 +1061,58 @@ router.post("/api/bulk/pallete-scan",async(req,res)=>{
     res.status(500).json({ error: "Internal server error" });
   }
 })
+
+router.put("/api/update/status/:trackingNumber", async (req, res) => {
+  const { trackingNumber } = req.params;
+ const { status,email, password } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ message: "Status is required" });
+  }
+
+  try {
+
+     if (
+      !email ||
+      !password
+    ) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+     const user = await FBMUser.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword)
+      return res.status(401).json({ error: "Invalid password" });
+    const backUpResult = await Order.findOneAndUpdate(
+      { trackingNumber: { $in: [trackingNumber] } },
+      { status },
+      { new: true }
+    );
+
+    const backUpVTResult = await VTOrder.findOneAndUpdate(
+      { trackingNumber: { $in: [trackingNumber] } },
+      { status },
+      { new: true }
+    );
+
+    if (!backUpResult && !backUpVTResult) {
+      return res.status(404).json({
+        message: `No product found with trackingNumber: ${trackingNumber}`,
+      });
+    }
+
+    res.json({
+      message: "Status updated successfully",
+      updatedIn: {
+        Order: backUpResult ? "Updated" : "Not Found",
+        VTOrder: backUpVTResult ? "Updated" : "Not Found",
+      },
+    });
+  } catch (error) {
+    console.error("Error updating status:", error);
+    res.status(500).json({ message: "Failed to update status", error: error.message });
+  }
+});
 
 module.exports = router;

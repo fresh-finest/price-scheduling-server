@@ -490,13 +490,13 @@ router.get("/api/product-scan/:upc", async (req, res) => {
     if (!backUpScan) {
       return res
         .status(404)
-        .json({ message: "No Scan found for this tracking number." });
+        .json({ message: "Not Picked Yet!." });
     }
 
     // 3. Prevent duplicate UPC scan
     if (backUpScan.packedUPC?.includes(upc)) {
       return res.status(400).json({
-        message: `This UPC already scanned for this tracking number.`,
+        message: `This UPC already scanned!.`,
       });
     }
 
@@ -518,7 +518,7 @@ router.get("/api/product-scan/:upc", async (req, res) => {
     if (!foundProduct) {
       return res
         .status(404)
-        .json({ message: "UPC not matched in any SKU's reserve." });
+        .json({ message: "UPC not matched!." });
     }
 
     backUpScan.packedUPC = backUpScan.packedUPC || [];

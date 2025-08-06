@@ -1280,7 +1280,137 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 300;
+    const totalOrders = 500;
+    const totalPages = Math.ceil(totalOrders / pageSize);
+    const allOrders = [];
+
+    // Retry helper for TikTok API
+    // const fetchTikTokSummary = async (orderId, retries = 7) => {
+    //   const url = `http://localhost:3000/api/order/${orderId}/summary`;
+
+    //   for (let i = 0; i < retries; i++) {
+    //     try {
+    //       const res = await axios.get(url);
+    //       return res.data;
+    //     } catch (err) {
+    //       console.warn(`Retry ${i + 1} failed for ${orderId}`);
+    //       if (i === retries - 1) throw err;
+    //       await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1s
+    //     }
+    //   }
+    // };
+
+    for (let page = 1; page <= totalPages; page++) {
+      const response = await axios.get(VEEQO_API_URL, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": VEEQO_API_KEY,
+        },
+        params: {
+          page,
+          page_size: pageSize,
+          status: "shipped",
+        },
+      });
+
+      const rawOrders = response.data;
+
+      for (const order of rawOrders) {
+        const allocations = order.allocations || [];
+
+        const trackingNumbers = allocations
+          .map((a) => a?.shipment?.tracking_number?.tracking_number)
+          .filter(Boolean);
+
+        const tags = (order.tags || []).map((tag) => ({
+          name: tag.name || "",
+        }));
+
+        const structuredOrder = {
+          id: String(order.id),
+          OrderId: String(order.number),
+          created_at: order.shipped_at || "",
+          shipped_at: order.shipped_at || "",
+          carrier_name:
+            order.allocations?.[0]?.shipment?.service_carrier_name || "",
+          customerName: order.customer?.full_name || "",
+          address: order.customer?.billing_address?.address1 || "",
+          trackingNumber: trackingNumbers,
+          shipmentId:
+            order.allocations?.[0]?.shipment?.tracking_number?.shipment_id ||
+            "",
+          trackingUrl: order.allocations?.[0]?.shipment?.tracking_url || "",
+          status:
+            order.allocations?.[0]?.shipment?.tracking_number?.status || "",
+          tags,
+          channelCode: order.channel?.type_code || "",
+          channelName: order.channel?.name || "",
+          items: (order.allocations?.[0]?.line_items || []).map((item) => {
+            const sellable = item.sellable || {};
+            return {
+              sku: sellable.sku_code || "",
+              quantity: item.quantity || 0,
+              title: sellable.product_title || sellable.title || "",
+              image: sellable.image_url || sellable.main_thumbnail_url || "",
+            };
+          }),
+        };
+
+        // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
+        // const tiktokTag = tags.find((t) => t.name.startsWith("TikTokOrderID:"));
+        // if (tiktokTag) {
+        //   const tiktokOrderId = tiktokTag.name.split(":")[1];
+        //   try {
+        //     const tik = await fetchTikTokSummary(tiktokOrderId);
+        //     structuredOrder.tiktokId = tik.order_id || tiktokOrderId;
+
+        //     structuredOrder.trackingNumber = tik.tracking_numbers || [];
+        //     structuredOrder.warehouseId=tik.warehouse_id;
+        //     structuredOrder.status = "created";
+        //   } catch (err) {
+        //     console.warn(`⚠️ TikTok summary fetch failed for ${tiktokOrderId}`);
+        //   }
+        // }
+
+        // allOrders.push(structuredOrder);
+        if (trackingNumbers.length > 0) {
+          allOrders.push(structuredOrder);
+        }
+      }
+    }
+
+    // Only insert new ones
+    const existingOrders = await Order.find({
+      OrderId: { $in: allOrders.map((o) => o.OrderId) },
+    }).select("OrderId");
+
+    const existingOrderIds = new Set(existingOrders.map((o) => o.OrderId));
+    const newOrders = allOrders.filter(
+      (order) => !existingOrderIds.has(order.OrderId)
+    );
+
+    if (newOrders.length > 0) {
+      await Order.insertMany(newOrders);
+    }
+
+    console.log(`Inserted ${newOrders.length} new orders.`);
+    res.status(200).json({
+      message: "New orders inserted",
+      insertedCount: newOrders.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Error inserting orders:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({ error: "Failed to insert orders" });
+  }
+});
+
+router.get("/api/orders/store/each-day", async (req, res) => {
+  try {
+    const pageSize = 100;
+    const totalOrders = 600;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -2464,13 +2594,8 @@ router.post("/api/orders", async (req, res) => {
           id: order.order_id,
           shipped_at: order.shipped_time || "",
           carrier_name: order.shipping_provider || "",
-          customerName: sanitizeStringStore(
-            order.recipient_address?.name || ""
-          ),
-          address: sanitizeStringStore(
-            order.recipient_address?.full_address || ""
-          ),
-
+          customerName:  "",
+          address: "",
           trackingNumber: trackingNumbers,
           tags: order.is_sample_order
             ? [{ name: "sample" }]

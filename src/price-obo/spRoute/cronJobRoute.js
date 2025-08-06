@@ -182,6 +182,19 @@ cron.schedule("*/15 * * * *", async () => {
 });
 
 
+cron.schedule("40 16 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job to fetch/store orders...");
+
+    await axios.get("http://localhost:3000/api/orders/store/each-day");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+ }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
 cron.schedule("*/15 * * * *", async () => {
   try {
     console.log("⏳ Running cron tiktok store orders...");
@@ -202,6 +215,45 @@ cron.schedule("*/40 * * * *", async () => {
   } catch (error) {
     console.error("Cron job failed:", error.response?.data || error.message);
   }
+});
+
+cron.schedule("50 16 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
+
+    await axios.get("http://localhost:3000/api/merge/order");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("30 22 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
+
+    await axios.get("http://localhost:3000/api/merge/order");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("0 22 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
+
+    await axios.get("http://localhost:3000/api/merge/order");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
 
 cron.schedule("0 18 * * *", async () => {

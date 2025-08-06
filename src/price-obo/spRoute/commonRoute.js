@@ -1953,6 +1953,7 @@ router.get("/api/orders-list", async (req, res) => {
         palleteTrackingNumbers:scan?.palleteTrackingNumbers || [],
         packedProduct: scan?.packedProduct || [],
         packedUPC: scan?.packedUPC || [],
+        packNote:scan?.packNote || null
       };
     });
 

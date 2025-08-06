@@ -14,6 +14,7 @@ const sendIssueAlertEmail = require("../../service/IssueEmailService");
 const CaseScan = require("../../model/CaseScan");
 const ProductUpc = require("../../model/ProductUpc");
 const Order = require("../../model/Order");
+const TikTokOrder = require("../../model/TikTokOrder");
 
 router.post("/api/upload/products", async (req, res) => {
   try {
@@ -1145,6 +1146,11 @@ router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
     for (const doc of oldTikTokOrders) {
       (doc.trackingNumber || []).forEach(tn => tn && trackingSet.add(String(tn)));
     }
+      for (const doc of oldVTOrders) {
+      (doc.trackingNumber || []).forEach(
+        (tn) => tn && trackingSet.add(String(tn))
+      );
+    }
     const trackingNumbers = Array.from(trackingSet);
 
     // 3) Delete from all 4 collections
@@ -1221,6 +1227,42 @@ router.get("/api/products/:trackingId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching packed products:", error);
     res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.put("/api/scan/note/:trackingId", async (req, res) => {
+  let { trackingId } = req.params;
+  const { packNote } = req.body;
+
+  if (!packNote) {
+    return res.status(400).json({ error: "packNote is required" });
+  }
+
+  try {
+     if (!trackingId) {
+      return res.status(400).json({ error: "Tracking ID is required." });
+    }
+
+    trackingId = trackingId.trim();
+
+    if (!trackingId.startsWith("1Z") && !trackingId.startsWith("TBA")) {
+      trackingId = trackingId.replace(/\D/g, "").slice(-22);
+    }
+
+    const updatedScan = await TrackScan.findOneAndUpdate(
+      { packedTrackingNumbers: trackingId },
+      { $set: { packNote } },
+      { new: true }
+    );
+
+    if (!updatedScan) {
+      return res.status(404).json({ message: "Not found Tracking ID" });
+    }
+
+    res.json({ message: "packNote updated successfully", data: updatedScan });
+  } catch (error) {
+    console.error("Error updating packNote:", error);
+    res.status(500).json({ error: "Failed to update packNote" });
   }
 });
 

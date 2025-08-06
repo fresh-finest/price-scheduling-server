@@ -1115,4 +1115,113 @@ router.put("/api/update/status/:trackingNumber", async (req, res) => {
   }
 });
 
+router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
+  const cutoffISO = moment().subtract(30, "days").toISOString();
+
+  try {
+    // 1) Find candidate orders in BackUp, BackUpVTOrder, TikTokOrder
+    //    We only need BackUp + TikTokOrder tracking numbers for BackUpScan matching,
+    //    but we also delete old delivered orders from BackUpVTOrder as well.
+    const [oldBackups, oldVTOrders, oldTikTokOrders] = await Promise.all([
+      Order.find(
+        { status: "delivered", shipped_at: { $lte: cutoffISO } },
+        { OrderId: 1, trackingNumber: 1 }
+      ).lean(),
+      VTOrder.find(
+        { status: "delivered", shipped_at: { $lte: cutoffISO } },
+        { OrderId: 1 }
+      ).lean(),
+      TikTokOrder.find(
+        { status: "delivered", shipped_at: { $lte: cutoffISO } },
+        { OrderId: 1, trackingNumber: 1 }
+      ).lean(),
+    ]);
+
+    // 2) Build a unique set of tracking numbers from BackUp + TikTokOrder
+    const trackingSet = new Set();
+    for (const doc of oldBackups) {
+      (doc.trackingNumber || []).forEach(tn => tn && trackingSet.add(String(tn)));
+    }
+    for (const doc of oldTikTokOrders) {
+      (doc.trackingNumber || []).forEach(tn => tn && trackingSet.add(String(tn)));
+    }
+    const trackingNumbers = Array.from(trackingSet);
+
+    // 3) Delete from all 4 collections
+    const [
+      backUpDeleteResult,
+      backUpVTDeleteResult,
+      tikTokDeleteResult,
+      backUpScanDeleteResult,
+    ] = await Promise.all([
+      Order.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
+      VTOrder.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
+      TikTokOrder.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
+      // BackUpScan: delete where any pickedTrackingNumbers match collected trackingNumbers
+      trackingNumbers.length
+        ? TrackScan.deleteMany({ packedTrackingNumbers: { $in: trackingNumbers } })
+        : { deletedCount: 0 },
+    ]);
+
+    return res.status(200).json({
+      message: "Deleted delivered orders older than 30 days across all sections.",
+      cutoffISO,
+      deleted: {
+        Order: backUpDeleteResult.deletedCount || 0,
+        VTOrder: backUpVTDeleteResult.deletedCount || 0,
+        TikTokOrder: tikTokDeleteResult.deletedCount || 0,
+        TrackScan: backUpScanDeleteResult.deletedCount || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error deleting delivered orders:", error);
+    return res.status(500).json({ error: "Failed to delete delivered orders." });
+  }
+});
+
+router.get("/api/orders/items/:tractingId", async (req, res) => {
+  const { tractingId } = req.params;
+  console.log(tractingId);
+  try {
+    let trackingNumber = tractingId.trim();
+    console.log(trackingNumber);
+    if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    }
+    const order = await VTOrder.find({ trackingNumber });
+    const items = order[0]?.items;
+    res.json({ items });
+  } catch (error) {
+    res.json({ error });
+  }
+});
+
+//get product scan status
+
+router.get("/api/products/:trackingId", async (req, res) => {
+  try {
+    let { trackingId } = req.params;
+
+    if (!trackingId) {
+      return res.status(400).json({ error: "Tracking ID is required." });
+    }
+
+    trackingId = trackingId.trim();
+
+    if (!trackingId.startsWith("1Z") && !trackingId.startsWith("TBA")) {
+      trackingId = trackingId.replace(/\D/g, "").slice(-22);
+    }
+
+    const products = await TrackScan.find(
+      { pickedTrackingNumbers: trackingId },
+      "packedProduct"
+    );
+
+    res.json({ packedProduct: products.map((p) => p.packedProduct).flat() }); 
+  } catch (error) {
+    console.error("Error fetching packed products:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 module.exports = router;

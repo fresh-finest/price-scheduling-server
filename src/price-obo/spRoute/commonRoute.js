@@ -1884,6 +1884,9 @@ router.get("/api/orders-list", async (req, res) => {
           case "tiktok":
             matchesTag = channelNames && channelNames.includes("tiktok");
             break;
+           case "walmart":
+            matchesTag = channelNames && channelNames.includes("Walmart");
+            break;
           case "temu":
             matchesTag =
               hasTags && tagNames.some((name) => name.includes("temu"));

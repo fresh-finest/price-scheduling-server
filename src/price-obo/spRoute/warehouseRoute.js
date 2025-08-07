@@ -124,7 +124,7 @@ router.get("/api/reserve-products", async (req, res) => {
       filter.$or = [
         { sku: { $regex: search, $options: "i" } },
         { "products.product": { $regex: search, $options: "i" } },
-        { "products.upc": { $regex: search, $options: "i" } }
+        { "products.upc": { $regex: search, $options: "i" } },
       ];
     }
 
@@ -134,14 +134,10 @@ router.get("/api/reserve-products", async (req, res) => {
         {
           products: {
             $elemMatch: {
-              $or: [
-                { upc: "" },
-                { upc: { $exists: false } },
-                { upc: null }
-              ]
-            }
-          }
-        }
+              $or: [{ upc: "" }, { upc: { $exists: false } }, { upc: null }],
+            },
+          },
+        },
       ];
     }
 
@@ -215,32 +211,37 @@ router.put("/api/reserve-product/:product/update", async (req, res) => {
   }
 });
 
-router.put("/api/reserve-product/:sku/sku/:product/update", async (req, res) => {
-  const { sku, product } = req.params;
-  const { qty, upc, product: newProduct } = req.body;
-  console.log(sku,product);
-  try {
-    const result = await ReserveProduct.updateOne(
-      { sku, "products.product": product },
-      {
-        $set: {
-          ...(qty !== undefined && { "products.$.qty": qty }),
-          ...(upc && { "products.$.upc": upc }),
-          ...(newProduct && { "products.$.product": newProduct })
+router.put(
+  "/api/reserve-product/:sku/sku/:product/update",
+  async (req, res) => {
+    const { sku, product } = req.params;
+    const { qty, upc, product: newProduct } = req.body;
+    console.log(sku, product);
+    try {
+      const result = await ReserveProduct.updateOne(
+        { sku, "products.product": product },
+        {
+          $set: {
+            ...(qty !== undefined && { "products.$.qty": qty }),
+            ...(upc && { "products.$.upc": upc }),
+            ...(newProduct && { "products.$.product": newProduct }),
+          },
         }
+      );
+
+      if (result.modifiedCount === 0) {
+        return res
+          .status(404)
+          .json({ message: "Product not found or no changes made." });
       }
-    );
 
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ message: "Product not found or no changes made." });
+      res.json({ message: "Product updated successfully.", result });
+    } catch (error) {
+      console.error("Update error:", error);
+      res.status(500).json({ error: "Internal server error." });
     }
-
-    res.json({ message: "Product updated successfully.", result });
-  } catch (error) {
-    console.error("Update error:", error);
-    res.status(500).json({ error: "Internal server error." });
   }
-});
+);
 
 router.post("/api/sku-to-product", async (req, res) => {
   try {
@@ -261,15 +262,17 @@ router.post("/api/sku-to-product", async (req, res) => {
         bulkOps.push({
           updateOne: {
             filter: { product },
-            update: { $set: { upc, qty } }, 
-            upsert: true
-          }
+            update: { $set: { upc, qty } },
+            upsert: true,
+          },
         });
       }
     }
 
     if (bulkOps.length === 0) {
-      return res.status(200).json({ message: "No unique products found to upsert." });
+      return res
+        .status(200)
+        .json({ message: "No unique products found to upsert." });
     }
 
     const result = await ProductUpc.bulkWrite(bulkOps);
@@ -277,7 +280,7 @@ router.post("/api/sku-to-product", async (req, res) => {
     res.json({
       message: "Successfully synced!",
       upserts: result.upsertedCount,
-      modified: result.modifiedCount
+      modified: result.modifiedCount,
     });
   } catch (error) {
     console.error("Sync error:", error);
@@ -294,16 +297,20 @@ router.post("/api/product-upc/upload", async (req, res) => {
 
   try {
     // Extract unique products from incoming data
-    const incomingProducts = [...new Set(data.map(item => item.product).filter(Boolean))];
+    const incomingProducts = [
+      ...new Set(data.map((item) => item.product).filter(Boolean)),
+    ];
 
     // Check if any of those products already exist
-    const existing = await ProductUpc.find({ product: { $in: incomingProducts } });
+    const existing = await ProductUpc.find({
+      product: { $in: incomingProducts },
+    });
 
     if (existing.length > 0) {
-      const existingNames = existing.map(p => p.product);
+      const existingNames = existing.map((p) => p.product);
       return res.status(400).json({
         message: "One or more products already exist.",
-        existingProducts: existingNames
+        existingProducts: existingNames,
       });
     }
 
@@ -317,8 +324,8 @@ router.post("/api/product-upc/upload", async (req, res) => {
         updateOne: {
           filter: { product, upc },
           update: { $setOnInsert: { product, upc } },
-          upsert: true
-        }
+          upsert: true,
+        },
       });
     });
 
@@ -326,14 +333,13 @@ router.post("/api/product-upc/upload", async (req, res) => {
 
     res.json({
       message: "Added successful!",
-      result
+      result,
     });
   } catch (error) {
     console.error("Bulk upload error:", error);
     res.status(500).json({ message: "Bulk upload failed", error });
   }
 });
-
 
 router.get("/api/product-upc", async (req, res) => {
   try {
@@ -345,7 +351,7 @@ router.get("/api/product-upc", async (req, res) => {
       // Search in both `product` and `upc` fields using OR
       filter.$or = [
         { product: { $regex: search, $options: "i" } },
-        { upc: { $regex: search, $options: "i" } }
+        { upc: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -361,13 +367,12 @@ router.get("/api/product-upc/product/:product", async (req, res) => {
   try {
     const { product } = req.params;
 
-
-    const result = await ProductUpc.findOne({product});
-    const upc= result?.upc;
-    if(!upc){
-      return res.json({message:"Product not found!"})
+    const result = await ProductUpc.findOne({ product });
+    const upc = result?.upc;
+    if (!upc) {
+      return res.json({ message: "Product not found!" });
     }
-    if(upc){
+    if (upc) {
       res.json({ upc });
     }
   } catch (error) {
@@ -375,20 +380,20 @@ router.get("/api/product-upc/product/:product", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data." });
   }
 });
-router.delete("/api/product-upc/product/:product",async(req,res)=>{
+router.delete("/api/product-upc/product/:product", async (req, res) => {
   try {
-    const {product} = req.params;
-    const result = await ProductUpc.findOneAndDelete({product});
-    res.json({message:"Deleted!"});
+    const { product } = req.params;
+    const result = await ProductUpc.findOneAndDelete({ product });
+    res.json({ message: "Deleted!" });
   } catch (error) {
-    res.json({error});
+    res.json({ error });
   }
-})
+});
 router.put("/api/product-upc/:product/product", async (req, res) => {
   const { product } = req.params;
-  const { upc} = req.body;
+  const { upc } = req.body;
 
-  if (!product || !upc ) {
+  if (!product || !upc) {
     return res.status(400).json({ error: "Missing product, upc" });
   }
 
@@ -411,7 +416,7 @@ router.put("/api/product-upc/:product/product", async (req, res) => {
       { product },
       {
         $set: {
-          upc
+          upc,
         },
       }
     );
@@ -427,26 +432,33 @@ router.put("/api/product-upc/:product/product", async (req, res) => {
   }
 });
 
+router.delete(
+  "/api/reserve-product/:sku/sku/:product/delete",
+  async (req, res) => {
+    const { sku, product } = req.params;
 
-router.delete("/api/reserve-product/:sku/sku/:product/delete", async (req, res) => {
-  const { sku, product } = req.params;
+    try {
+      const result = await ReserveProduct.updateOne(
+        { sku },
+        { $pull: { products: { product } } }
+      );
 
-  try {
-    const result = await ReserveProduct.updateOne(
-      { sku },
-      { $pull: { products: { product } } }
-    );
+      if (result.modifiedCount === 0) {
+        return res
+          .status(404)
+          .json({ message: "No matching product found to delete." });
+      }
 
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ message: "No matching product found to delete." });
+      res.json({
+        message: "Product removed successfully from the array.",
+        result,
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+      res.status(500).json({ error: "Internal server error." });
     }
-
-    res.json({ message: "Product removed successfully from the array.", result });
-  } catch (error) {
-    console.error("Delete error:", error);
-    res.status(500).json({ error: "Internal server error." });
   }
-});
+);
 
 router.delete("/api/reserve-product/sku/:sku/delete", async (req, res) => {
   const { sku } = req.params;
@@ -455,7 +467,9 @@ router.delete("/api/reserve-product/sku/:sku/delete", async (req, res) => {
     const result = await ReserveProduct.deleteOne({ sku });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "No document found with this SKU." });
+      return res
+        .status(404)
+        .json({ message: "No document found with this SKU." });
     }
 
     res.json({ message: `SKU '${sku}' deleted successfully.`, result });
@@ -489,9 +503,7 @@ router.get("/api/product-scan/:upc", async (req, res) => {
     });
 
     if (!backUpScan) {
-      return res
-        .status(404)
-        .json({ message: "Not Picked Yet!." });
+      return res.status(404).json({ message: "Not Picked Yet!." });
     }
 
     // 3. Prevent duplicate UPC scan
@@ -517,9 +529,7 @@ router.get("/api/product-scan/:upc", async (req, res) => {
     }
 
     if (!foundProduct) {
-      return res
-        .status(404)
-        .json({ message: "UPC not matched!." });
+      return res.status(404).json({ message: "UPC not matched!." });
     }
 
     backUpScan.packedUPC = backUpScan.packedUPC || [];
@@ -768,7 +778,7 @@ router.put("/api/product/stock-check/:sku/sku/:id", async (req, res) => {
 
 router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   const { trackingId } = req.params;
-   const {userName} = req.body;
+  const { userName } = req.body;
   if (!trackingId) {
     return res.status(400).json({ error: "Tracking ID is required" });
   }
@@ -777,8 +787,8 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
     trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
   }
- if(!userName){
-    return res.status(404).json({error:"User not found!"})
+  if (!userName) {
+    return res.status(404).json({ error: "User not found!" });
   }
   try {
     // Find VTOrder by trackingNumber
@@ -829,7 +839,7 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
       trackingNumber: order.trackingNumber,
       items,
       products: allProducts, // ← Inject here
-      caseUser:userName || "Unknown"
+      caseUser: userName || "Unknown",
     });
 
     await issueDoc.save();
@@ -892,18 +902,17 @@ router.put("/api/product-scan/:_id/issue/:product", async (req, res) => {
   }
 });
 
-// pallete scan 
+// pallete scan
 
-router.get("/api/pallete-scan",async(req,res)=>{
-
-   const { query, role, userName } = req.query;
+router.get("/api/pallete-scan", async (req, res) => {
+  const { query, role, userName } = req.query;
 
   try {
     let trackingNumber = query.trim();
-  console.log(trackingNumber);
-  if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
-  }
+    console.log(trackingNumber);
+    if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    }
 
     const order1 = await VTOrder.findOne({ trackingNumber });
 
@@ -912,10 +921,10 @@ router.get("/api/pallete-scan",async(req,res)=>{
       return res.status(404).json({ error: "Order not found!" });
     }
 
-     const { OrderId: orderId } = order1;
+    const { OrderId: orderId } = order1;
 
     let existingScan = await TrackScan.findOne({ orderId });
-     if (role === "packer") {
+    if (role === "packer") {
       // Packer can only scan after picker
       if (!existingScan || !existingScan.packed) {
         return res.status(400).json({ error: "Cannot Pallete before pack" });
@@ -939,19 +948,15 @@ router.get("/api/pallete-scan",async(req,res)=>{
     }
 
     return res.status(400).json({ error: "Invalid user Role" });
-
-
   } catch (error) {
-     console.error("Scan error:", error.response?.data || error.message);
+    console.error("Scan error:", error.response?.data || error.message);
     return res.status(500).json({ error: "Failed to process scan" });
-
   }
-})
+});
 
-router.post("/api/bulk/pallete-scan",async(req,res)=>{
+router.post("/api/bulk/pallete-scan", async (req, res) => {
   try {
-     const { email, password, userName, role, trackingNumbers = [] } = req.body;
-    
+    const { email, password, userName, role, trackingNumbers = [] } = req.body;
 
     if (
       !email ||
@@ -962,7 +967,7 @@ router.post("/api/bulk/pallete-scan",async(req,res)=>{
     ) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-     const user = await FBMUser.findOne({ email });
+    const user = await FBMUser.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const validPassword = await bcrypt.compare(password, user.password);
@@ -970,7 +975,7 @@ router.post("/api/bulk/pallete-scan",async(req,res)=>{
       return res.status(401).json({ error: "Invalid password" });
 
     const results = [];
-   for (let rawTracking of trackingNumbers) {
+    for (let rawTracking of trackingNumbers) {
       let trackingNumber = rawTracking.trim();
 
       if (
@@ -1055,31 +1060,25 @@ router.post("/api/bulk/pallete-scan",async(req,res)=>{
     }
 
     res.status(200).json({ success: true, summary: results });
-
-
   } catch (error) {
-      console.error("Bulk Scan Error:", error.message);
+    console.error("Bulk Scan Error:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
-})
+});
 
 router.put("/api/update/status/:trackingNumber", async (req, res) => {
   const { trackingNumber } = req.params;
- const { status,email, password } = req.body;
+  const { status, email, password } = req.body;
 
   if (!status) {
     return res.status(400).json({ message: "Status is required" });
   }
 
   try {
-
-     if (
-      !email ||
-      !password
-    ) {
+    if (!email || !password) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-     const user = await FBMUser.findOne({ email });
+    const user = await FBMUser.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const validPassword = await bcrypt.compare(password, user.password);
@@ -1097,7 +1096,13 @@ router.put("/api/update/status/:trackingNumber", async (req, res) => {
       { new: true }
     );
 
-    if (!backUpResult && !backUpVTResult) {
+    const ttResult = await TikTokOrder.findOneAndUpdate(
+      { trackingNumber: { $in: [trackingNumber] } },
+      { status },
+      { new: true }
+    );
+
+    if (!backUpResult && !backUpVTResult && !ttResult) {
       return res.status(404).json({
         message: `No product found with trackingNumber: ${trackingNumber}`,
       });
@@ -1108,11 +1113,14 @@ router.put("/api/update/status/:trackingNumber", async (req, res) => {
       updatedIn: {
         Order: backUpResult ? "Updated" : "Not Found",
         VTOrder: backUpVTResult ? "Updated" : "Not Found",
+        TikTokOrder: ttResult ? "Updated" : "Not Found",
       },
     });
   } catch (error) {
     console.error("Error updating status:", error);
-    res.status(500).json({ message: "Failed to update status", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update status", error: error.message });
   }
 });
 
@@ -1141,12 +1149,16 @@ router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
     // 2) Build a unique set of tracking numbers from BackUp + TikTokOrder
     const trackingSet = new Set();
     for (const doc of oldBackups) {
-      (doc.trackingNumber || []).forEach(tn => tn && trackingSet.add(String(tn)));
+      (doc.trackingNumber || []).forEach(
+        (tn) => tn && trackingSet.add(String(tn))
+      );
     }
     for (const doc of oldTikTokOrders) {
-      (doc.trackingNumber || []).forEach(tn => tn && trackingSet.add(String(tn)));
+      (doc.trackingNumber || []).forEach(
+        (tn) => tn && trackingSet.add(String(tn))
+      );
     }
-      for (const doc of oldVTOrders) {
+    for (const doc of oldVTOrders) {
       (doc.trackingNumber || []).forEach(
         (tn) => tn && trackingSet.add(String(tn))
       );
@@ -1160,17 +1172,29 @@ router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
       tikTokDeleteResult,
       backUpScanDeleteResult,
     ] = await Promise.all([
-      Order.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
-      VTOrder.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
-      TikTokOrder.deleteMany({ status: "delivered", shipped_at: { $lte: cutoffISO } }),
+      Order.deleteMany({
+        status: "delivered",
+        shipped_at: { $lte: cutoffISO },
+      }),
+      VTOrder.deleteMany({
+        status: "delivered",
+        shipped_at: { $lte: cutoffISO },
+      }),
+      TikTokOrder.deleteMany({
+        status: "delivered",
+        shipped_at: { $lte: cutoffISO },
+      }),
       // BackUpScan: delete where any pickedTrackingNumbers match collected trackingNumbers
       trackingNumbers.length
-        ? TrackScan.deleteMany({ packedTrackingNumbers: { $in: trackingNumbers } })
+        ? TrackScan.deleteMany({
+            packedTrackingNumbers: { $in: trackingNumbers },
+          })
         : { deletedCount: 0 },
     ]);
 
     return res.status(200).json({
-      message: "Deleted delivered orders older than 30 days across all sections.",
+      message:
+        "Deleted delivered orders older than 30 days across all sections.",
       cutoffISO,
       deleted: {
         Order: backUpDeleteResult.deletedCount || 0,
@@ -1181,7 +1205,9 @@ router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting delivered orders:", error);
-    return res.status(500).json({ error: "Failed to delete delivered orders." });
+    return res
+      .status(500)
+      .json({ error: "Failed to delete delivered orders." });
   }
 });
 
@@ -1223,7 +1249,7 @@ router.get("/api/products/:trackingId", async (req, res) => {
       "packedProduct"
     );
 
-    res.json({ packedProduct: products.map((p) => p.packedProduct).flat() }); 
+    res.json({ packedProduct: products.map((p) => p.packedProduct).flat() });
   } catch (error) {
     console.error("Error fetching packed products:", error);
     res.status(500).json({ error: "Internal server error." });
@@ -1239,7 +1265,7 @@ router.put("/api/scan/note/:trackingId", async (req, res) => {
   }
 
   try {
-     if (!trackingId) {
+    if (!trackingId) {
       return res.status(400).json({ error: "Tracking ID is required." });
     }
 

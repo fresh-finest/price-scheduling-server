@@ -2163,7 +2163,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_bAPTkwAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk8fJKNjZlzE2VmP4_aA8YRxw1nBzijD8e_574dBZaOxe6KtifNqbKi9-2nnMDVLUik"; // latest token from correct app
+  "TTP_qMskYAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_a3xYGM3TAyAPOx8KgEkQq9HvmCjljOz1W2jlV3ANvSGxmu4li3x6YodSyqaHgR88"; 
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 
@@ -2308,7 +2308,7 @@ router.get("/api/tiktokorder/update-status", async (req, res) => {
     // });
 
     const orders = await TikTokOrder.find({
-      status: { $ne: "delivered" },
+      status: { $nin: ["delivered", "resolved"] },
     }).lean();
 
     let updatedCount = 0;

@@ -293,4 +293,29 @@ cron.schedule("30 18 * * *", async () => {
 });
 
 // Export the function
+
+// 6 hours update for carrier
+
+cron.schedule("0 */6 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for carrier status...");
+
+    await axios.get("http://localhost:3000/api/tiktokorder/update-status");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
+
+cron.schedule("0 */6 * * *", async () => {
+  try {
+    console.log("⏳ Running cron for carrier status...");
+
+    await axios.get("http://localhost:3000/api/update-status");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
+
 module.exports = { scheduleCronJobs };

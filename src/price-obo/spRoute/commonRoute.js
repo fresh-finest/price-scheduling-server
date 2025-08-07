@@ -1345,15 +1345,17 @@ router.get("/api/orders/store", async (req, res) => {
           tags,
           channelCode: order.channel?.type_code || "",
           channelName: order.channel?.name || "",
-          items: (order.allocations?.[0]?.line_items || []).map((item) => {
-            const sellable = item.sellable || {};
-            return {
-              sku: sellable.sku_code || "",
-              quantity: item.quantity || 0,
-              title: sellable.product_title || sellable.title || "",
-              image: sellable.image_url || sellable.main_thumbnail_url || "",
-            };
-          }),
+          items: (order.allocations || [])
+            .flatMap((allocation) => allocation.line_items || [])
+            .map((item) => {
+              const sellable = item.sellable || {};
+              return {
+                sku: sellable.sku_code || "",
+                quantity: item.quantity || 0,
+                title: sellable.product_title || sellable.title || "",
+                image: sellable.image_url || sellable.main_thumbnail_url || "",
+              };
+            }),
         };
 
         // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
@@ -1475,15 +1477,17 @@ router.get("/api/orders/store/each-day", async (req, res) => {
           tags,
           channelCode: order.channel?.type_code || "",
           channelName: order.channel?.name || "",
-          items: (order.allocations?.[0]?.line_items || []).map((item) => {
-            const sellable = item.sellable || {};
-            return {
-              sku: sellable.sku_code || "",
-              quantity: item.quantity || 0,
-              title: sellable.product_title || sellable.title || "",
-              image: sellable.image_url || sellable.main_thumbnail_url || "",
-            };
-          }),
+          items: (order.allocations || [])
+            .flatMap((allocation) => allocation.line_items || [])
+            .map((item) => {
+              const sellable = item.sellable || {};
+              return {
+                sku: sellable.sku_code || "",
+                quantity: item.quantity || 0,
+                title: sellable.product_title || sellable.title || "",
+                image: sellable.image_url || sellable.main_thumbnail_url || "",
+              };
+            }),
         };
 
         // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
@@ -1605,15 +1609,17 @@ router.get("/api/shipped/store", async (req, res) => {
           tags,
           channelCode: order.channel?.type_code || "",
           channelName: order.channel?.name || "",
-          items: (order.allocations?.[0]?.line_items || []).map((item) => {
-            const sellable = item.sellable || {};
-            return {
-              sku: sellable.sku_code || "",
-              quantity: item.quantity || 0,
-              title: sellable.product_title || sellable.title || "",
-              image: sellable.image_url || sellable.main_thumbnail_url || "",
-            };
-          }),
+          items: (order.allocations || [])
+            .flatMap((allocation) => allocation.line_items || [])
+            .map((item) => {
+              const sellable = item.sellable || {};
+              return {
+                sku: sellable.sku_code || "",
+                quantity: item.quantity || 0,
+                title: sellable.product_title || sellable.title || "",
+                image: sellable.image_url || sellable.main_thumbnail_url || "",
+              };
+            }),
         };
 
         // ✅ Enrich TikTok data (if TikTokOrderID tag exists)
@@ -1884,7 +1890,7 @@ router.get("/api/orders-list", async (req, res) => {
           case "tiktok":
             matchesTag = channelNames && channelNames.includes("tiktok");
             break;
-           case "walmart":
+          case "walmart":
             matchesTag = channelNames && channelNames.includes("Walmart");
             break;
           case "temu":
@@ -1937,7 +1943,7 @@ router.get("/api/orders-list", async (req, res) => {
         ...order,
         picked: scan?.picked || false,
         packed: scan?.packed || false,
-        isPalette:scan?.isPalette || false,
+        isPalette: scan?.isPalette || false,
         scanStatus: scan?.scanStatus || "pending",
         pickerName: scan?.pickerName || null,
         pickerRole: scan?.pickerRole || null,
@@ -1947,13 +1953,13 @@ router.get("/api/orders-list", async (req, res) => {
         paletterRole: scan?.paletterRole || null,
         pickedAt: scan?.pickedAt || null,
         packedAt: scan?.packedAt || null,
-        paletteAt:scan?.paletteAt || null,
+        paletteAt: scan?.paletteAt || null,
         pickedTrackingNumbers: scan?.pickedTrackingNumbers || [],
         packedTrackingNumbers: scan?.packedTrackingNumbers || [],
-        palleteTrackingNumbers:scan?.palleteTrackingNumbers || [],
+        palleteTrackingNumbers: scan?.palleteTrackingNumbers || [],
         packedProduct: scan?.packedProduct || [],
         packedUPC: scan?.packedUPC || [],
-        packNote:scan?.packNote || null
+        packNote: scan?.packNote || null,
       };
     });
 
@@ -2163,7 +2169,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_qMskYAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_a3xYGM3TAyAPOx8KgEkQq9HvmCjljOz1W2jlV3ANvSGxmu4li3x6YodSyqaHgR88"; 
+  "TTP_qMskYAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_a3xYGM3TAyAPOx8KgEkQq9HvmCjljOz1W2jlV3ANvSGxmu4li3x6YodSyqaHgR88";
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 
@@ -2598,7 +2604,7 @@ router.post("/api/orders", async (req, res) => {
           id: order.order_id,
           shipped_at: order.shipped_time || "",
           carrier_name: order.shipping_provider || "",
-          customerName:  "",
+          customerName: "",
           address: "",
           trackingNumber: trackingNumbers,
           tags: order.is_sample_order

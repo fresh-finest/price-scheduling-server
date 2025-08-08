@@ -481,7 +481,7 @@ router.delete("/api/reserve-product/sku/:sku/delete", async (req, res) => {
 
 router.get("/api/product-scan/:upc", async (req, res) => {
   const upc = req.params.upc;
-  const trackingNumber = req.query.trackingNumber;
+  let trackingNumber = req.query.trackingNumber;
 
   if (!trackingNumber) {
     return res
@@ -489,9 +489,15 @@ router.get("/api/product-scan/:upc", async (req, res) => {
       .json({ message: "Tracking Number is required in query." });
   }
 
+  trackingNumber = trackingNumber.trim();
+
+  if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
+    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+  }
+
   try {
     const vtOrder = await VTOrder.findOne({ trackingNumber });
-    console.log(vtOrder);
+   
     if (!vtOrder || !vtOrder.items || vtOrder.items.length === 0) {
       return res
         .status(404)

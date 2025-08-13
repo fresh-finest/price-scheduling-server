@@ -1412,7 +1412,7 @@ router.get("/api/orders/store", async (req, res) => {
 router.get("/api/orders/store/each-day", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 600;
+    const totalOrders = 700;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -2169,7 +2169,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_qMskYAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_a3xYGM3TAyAPOx8KgEkQq9HvmCjljOz1W2jlV3ANvSGxmu4li3x6YodSyqaHgR88";
+  "TTP_Kicg0QAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk8_Qw2ppyaPjCQrJrdi_CJtqYNucWcldtDoyewc0xOnTwiAtx-gZ8mHBdmD2RehgdY";
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 

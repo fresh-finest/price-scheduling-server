@@ -230,6 +230,20 @@ cron.schedule("50 16 * * *", async () => {
   timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
 
+
+cron.schedule("30 16 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
+
+    await axios.get("http://localhost:3000/api/merge/order");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
 cron.schedule("30 22 * * *", async () => {
   try {
     console.log("⏳ Running cron job for merging...");
@@ -292,6 +306,18 @@ cron.schedule("30 18 * * *", async () => {
   timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
 
+
+cron.schedule("35 16 * * *", async () => {
+  try {
+    console.log("⏳ Running daily 6:00 PM BST cron job to fetch/store orders...");
+
+    await axios.get("http://localhost:3000/api/tiktokorder/status");
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
 // Export the function
 
 // 6 hours update for carrier

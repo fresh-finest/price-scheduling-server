@@ -1911,7 +1911,7 @@ router.get("/api/orders-list", async (req, res) => {
             matchesTag = channelNames && channelNames.includes("phone");
             break;
           case "syruvia":
-            const knownTags = ["target", "temu", "flip"];
+            const knownTags = ["target", "temu"];
             const knownChannels = ["tiktok", "amazon", "ebay", "phone"];
             matchesTag = !(
               (hasTags &&

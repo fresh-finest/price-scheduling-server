@@ -1280,7 +1280,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 500;
+    const totalOrders = 1000;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 

@@ -217,7 +217,7 @@ cron.schedule("*/40 * * * *", async () => {
   }
 });
 
-cron.schedule("50 16 * * *", async () => {
+cron.schedule("20 17 * * *", async () => {
   try {
     console.log("⏳ Running cron job for merging...");
 

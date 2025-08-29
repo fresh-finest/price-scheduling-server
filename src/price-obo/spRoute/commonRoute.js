@@ -2169,7 +2169,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_9TjO6QAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk985erSkrr93I2W1FXR-Xf03Bf1xTXh8sVI-SXNKjsLs4YKxkeyrS80VKZK0EkpPdk";
+  "TTP_0eZOGAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk88r2Ybr5MYujJROuCZt_HaXNjSe1BRtBZ2vN36tw1NRVFV4GDGymc1gI281xJ_4Qw";
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 

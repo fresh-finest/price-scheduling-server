@@ -1280,7 +1280,7 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
 router.get("/api/orders/store", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 1000;
+    const totalOrders = 1500;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -1412,7 +1412,7 @@ router.get("/api/orders/store", async (req, res) => {
 router.get("/api/orders/store/each-day", async (req, res) => {
   try {
     const pageSize = 100;
-    const totalOrders = 1000;
+    const totalOrders = 1500;
     const totalPages = Math.ceil(totalOrders / pageSize);
     const allOrders = [];
 
@@ -2169,7 +2169,7 @@ router.post("/api/tiktok/orders", async (req, res) => {
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 const ACCESS_TOKEN =
-  "TTP_0eZOGAAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk88r2Ybr5MYujJROuCZt_HaXNjSe1BRtBZ2vN36tw1NRVFV4GDGymc1gI281xJ_4Qw";
+  "TTP__LvuowAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk_tBCo6p-11u7uCdnGIWnjeyxT_vOiVYB38rIgeJnXmdLC3PN_VSHXnTtOcZeXl3Wk";
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 

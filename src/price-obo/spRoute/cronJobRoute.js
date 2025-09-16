@@ -344,4 +344,69 @@ cron.schedule("0 */6 * * *", async () => {
   }
 });
 
+
+cron.schedule("57 13 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job deleting...");
+
+    await axios.delete("http://localhost:3000/api/orders/delivered-last-30-days");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("05 14 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job deleting...");
+
+    await axios.delete("http://localhost:3000/api/orders/delivered-last-30-days");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("17 14 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job deleting...");
+
+    await axios.delete("http://localhost:3000/api/orders/delivered-last-30-days");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("37 14 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job deleting...");
+
+    await axios.delete("http://localhost:3000/api/orders/delivered-last-30-days");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
+cron.schedule("57 14 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job deleting...");
+
+    await axios.delete("http://localhost:3000/api/orders/delivered-last-30-days");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
 module.exports = { scheduleCronJobs };

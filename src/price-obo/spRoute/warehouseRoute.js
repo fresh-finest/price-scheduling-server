@@ -1131,7 +1131,7 @@ router.put("/api/update/status/:trackingNumber", async (req, res) => {
 });
 
 router.delete("/api/orders/delivered-last-30-days", async (req, res) => {
-  const cutoffISO = moment().subtract(30, "days").toISOString();
+  const cutoffISO = moment().subtract(28, "days").toISOString();
 
   try {
     // 1) Find candidate orders in BackUp, BackUpVTOrder, TikTokOrder

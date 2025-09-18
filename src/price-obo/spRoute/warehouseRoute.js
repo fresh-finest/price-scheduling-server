@@ -492,12 +492,16 @@ router.get("/api/product-scan/:upc", async (req, res) => {
   trackingNumber = trackingNumber.trim();
 
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    if (trackingNumber.length < 34) {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    } else {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+    }
   }
 
   try {
     const vtOrder = await VTOrder.findOne({ trackingNumber });
-   
+
     if (!vtOrder || !vtOrder.items || vtOrder.items.length === 0) {
       return res
         .status(404)
@@ -791,7 +795,11 @@ router.post("/api/product-scan/:trackingId/case", async (req, res) => {
   let trackingNumber = trackingId.trim();
 
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    if (trackingNumber.length < 34) {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    } else {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+    }
   }
   if (!userName) {
     return res.status(404).json({ error: "User not found!" });
@@ -917,7 +925,11 @@ router.get("/api/pallete-scan", async (req, res) => {
     let trackingNumber = query.trim();
     console.log(trackingNumber);
     if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+      if (trackingNumber.length < 34) {
+        trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+      } else {
+        trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+      }
     }
 
     const order1 = await VTOrder.findOne({ trackingNumber });
@@ -988,7 +1000,11 @@ router.post("/api/bulk/pallete-scan", async (req, res) => {
         !trackingNumber.startsWith("1Z") &&
         !trackingNumber.startsWith("TBA")
       ) {
-        trackingNumber = trackingNumber.slice(-22);
+        if (trackingNumber.length < 34) {
+          trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+        } else {
+          trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+        }
       }
 
       const order = await VTOrder.findOne({
@@ -1224,7 +1240,11 @@ router.get("/api/orders/items/:tractingId", async (req, res) => {
     let trackingNumber = tractingId.trim();
     console.log(trackingNumber);
     if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+      if (trackingNumber.length < 34) {
+        trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+      } else {
+        trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+      }
     }
     const order = await VTOrder.find({ trackingNumber });
     const items = order[0]?.items;
@@ -1247,7 +1267,13 @@ router.get("/api/products/:trackingId", async (req, res) => {
     trackingId = trackingId.trim();
 
     if (!trackingId.startsWith("1Z") && !trackingId.startsWith("TBA")) {
-      trackingId = trackingId.replace(/\D/g, "").slice(-22);
+      if(trackingId.length<34){
+          trackingId = trackingId.replace(/\D/g, "").slice(-22);
+      }
+      else {
+         trackingId = trackingId.replace(/\D/g, "").slice(-12);
+      }
+     
     }
 
     const products = await TrackScan.find(
@@ -1278,7 +1304,13 @@ router.put("/api/scan/note/:trackingId", async (req, res) => {
     trackingId = trackingId.trim();
 
     if (!trackingId.startsWith("1Z") && !trackingId.startsWith("TBA")) {
-      trackingId = trackingId.replace(/\D/g, "").slice(-22);
+      if(trackingId.length<34){
+         trackingId = trackingId.replace(/\D/g, "").slice(-22);
+      }
+      else {
+        trackingId = trackingId.replace(/\D/g, "").slice(-12);
+      }
+      
     }
 
     const updatedScan = await TrackScan.findOneAndUpdate(

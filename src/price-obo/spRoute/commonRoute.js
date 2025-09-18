@@ -1035,7 +1035,6 @@ router.get("/api/orders", async (req, res) => {
 router.get("/api/orders/scan", async (req, res) => {
   const { query, role, userName } = req.query;
 
-  console.log("Scan request received with query:", query, "and role:", role);
 
   if (!query || !role) {
     return res.status(400).json({ error: "query and user role are required" });
@@ -1043,7 +1042,12 @@ router.get("/api/orders/scan", async (req, res) => {
 
   let trackingNumber = query.trim();
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-    trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+   if(trackingNumber.length<34){
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    }
+    else {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+    }
   }
 
   try {
@@ -1157,7 +1161,12 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
         !trackingNumber.startsWith("1Z") &&
         !trackingNumber.startsWith("TBA")
       ) {
-        trackingNumber = trackingNumber.slice(-22);
+        if(trackingNumber.length<34){
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+    }
+    else {
+      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+    }
       }
 
       const order = await VTOrder.findOne({

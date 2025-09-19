@@ -1858,20 +1858,33 @@ router.get("/api/orders-list", async (req, res) => {
         }
       }
 
-      const matchesQuery = query
-        ? (typeof order.OrderId === "string" &&
-            order.OrderId.toLowerCase().includes(query.toLowerCase())) ||
-          (Array.isArray(order.trackingNumber) &&
-            order.trackingNumber.some((num) =>
-              typeof num === "string"
-                ? num.toLowerCase().includes(query.toLowerCase())
-                : false
-            )) ||
-          (typeof order.trackingNumber === "string" &&
-            order.trackingNumber.toLowerCase().includes(query.toLowerCase())) ||
-          (typeof order.tiktokId === "string" &&
-            order.tiktokId.toLowerCase().includes(query.toLowerCase()))
-        : true;
+      // const matchesQuery = query
+      //   ? (typeof order.OrderId === "string" &&
+      //       order.OrderId.toLowerCase().includes(query.toLowerCase())) ||
+      //     (Array.isArray(order.trackingNumber) &&
+      //       order.trackingNumber.some((num) =>
+      //         typeof num === "string"
+      //           ? num.toLowerCase().includes(query.toLowerCase())
+      //           : false
+      //       )) ||
+      //     (typeof order.trackingNumber === "string" &&
+      //       order.trackingNumber.toLowerCase().includes(query.toLowerCase())) ||
+      //     (typeof order.tiktokId === "string" &&
+      //       order.tiktokId.toLowerCase().includes(query.toLowerCase()))
+      //   : true;
+
+        const q = (query ?? "").toLowerCase().trim();
+      const includesQ = (v) =>
+        typeof v === "string" && v.toLowerCase().includes(q);
+
+      const matchesQuery =
+        q === ""
+          ? true
+          : includesQ(order.OrderId) ||
+            (Array.isArray(order.trackingNumber)
+              ? order.trackingNumber.some(includesQ)
+              : includesQ(order.trackingNumber)) ||
+            includesQ(order.tiktokId);
 
       let matchesDateRange = true;
       if (startDate || endDate) {
@@ -2175,6 +2188,75 @@ router.post("/api/tiktok/orders", async (req, res) => {
   }
 });
 
+const GenerateToken = async () => {
+  try {
+    const response = await axios.post(
+      "https://auth.tiktok-shops.com/api/token/refreshToken",
+      {
+        app_key: "6gi3nino9sia3",
+        app_secret: "18da778e456044d348a5ae6639dd519893d2db59",
+        refresh_token:
+          "TTP_GYCc4wAAAADp659S0_yAhV8ZtBKPc7lS_toUjKDKABO1EgnDbgeavzlZLrGxE4zDNap5CauWwss",
+        grant_type: "refresh_token",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const data = response?.data.data;
+    console.log(data);
+    const accessTokenExpireAt = new Date(data.access_token_expire_in * 1000);
+    const refreshTokenExpireAt = new Date(data.refresh_token_expire_in * 1000);
+   await TikTokAuth.findOneAndUpdate(
+      { open_id: data.open_id },
+      {
+        $set: {
+          seller_name: data.seller_name,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          access_token_expire_at: accessTokenExpireAt,
+          refresh_token_expire_at: refreshTokenExpireAt,
+          shop_region: data.seller_base_region,
+          user_type: data.user_type
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+  } catch (err) {
+    console.error(
+      "❌ Token refresh failed:",
+      err.response?.data || err.message
+    );
+  }
+};
+
+async function loadTokenFromDb() {
+   const record = await TikTokAuth.find();
+  if (!record) throw new Error("No TikTokAuth record found");
+  
+  tokenCache = {
+    access_token: record[0].access_token,
+    refresh_token: record[0].refresh_token,
+    access_token_expire_at: record[0].access_token_expire_at,
+    open_id: record[0].open_id
+  };
+
+  return tokenCache.access_token;
+}
+
+router.get("/api/acchess-token",async(req,res)=>{
+  try {
+    
+    await GenerateToken();
+    res.json({message:"Success!"})
+  } catch (error) {
+    res.json({error:error.message});
+  }
+
+})
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 // const ACCESS_TOKEN =

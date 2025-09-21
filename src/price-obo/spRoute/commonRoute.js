@@ -2262,7 +2262,7 @@ const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 // const ACCESS_TOKEN =
 //   "TTP_ZV7O1gAAAAD0V4LL0M3BWwJ_BqxZWi3IUVozPrZtWmPSkeBNCLsvsf0RqNBThN8K3hAJTkJfYk-G20xRM2zSD_pFwwo0lqXxV9r1x9akx7GeQdvLHtEelNNOIx8tgOQZf9Kp5EBSdSg";
 
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+// const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 const BASE_URL = "https://open-api.tiktokglobalshop.com";
 // const BASE_URL = "https://open-api.tiktokshop.com";
 
@@ -2462,6 +2462,7 @@ router.get("/api/tiktokorder/update-status", async (req, res) => {
 });
 
 router.get("/api/order/:orderId/summary", async (req, res) => {
+  const ACCESS_TOKEN = await loadTokenFromDb();
   const orderId = req.params.orderId;
   if (!orderId) return res.status(400).json({ error: "Missing orderId" });
 
@@ -2548,6 +2549,8 @@ const sanitizeStringStore = (value) => {
 };
 
 router.post("/api/orders", async (req, res) => {
+  const ACCESS_TOKEN = await loadTokenFromDb();
+  console.log("ACC",ACCESS_TOKEN);
   try {
     let allOrders = [];
     let fullDetails = [];

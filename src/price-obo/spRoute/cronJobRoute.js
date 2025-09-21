@@ -409,4 +409,18 @@ cron.schedule("57 14 * * *", async () => {
 }, {
   timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
+
+cron.schedule("10 14 * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for token..");
+
+    await axios.get("http://localhost:3000/api/acchess-token");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+   }
+}, {
+  timezone: "Asia/Dhaka" // Set to Bangladesh time
+});
+
 module.exports = { scheduleCronJobs };

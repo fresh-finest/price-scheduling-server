@@ -1035,17 +1035,15 @@ router.get("/api/orders", async (req, res) => {
 router.get("/api/orders/scan", async (req, res) => {
   const { query, role, userName } = req.query;
 
-
   if (!query || !role) {
     return res.status(400).json({ error: "query and user role are required" });
   }
 
   let trackingNumber = query.trim();
   if (!trackingNumber.startsWith("1Z") && !trackingNumber.startsWith("TBA")) {
-   if(trackingNumber.length<34){
+    if (trackingNumber.length < 34) {
       trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
-    }
-    else {
+    } else {
       trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
     }
   }
@@ -1129,6 +1127,35 @@ router.get("/api/orders/scan", async (req, res) => {
   }
 });
 
+async function fetchOrderBundle(trackingNumber, baseUrl) {
+  const url = `${baseUrl}/api/orders/items/${encodeURIComponent(
+    trackingNumber
+  )}`;
+  const { data } = await axios.get(url);
+  // your API returns { items: [...], order: [...] } — normalize to an object
+  const items = data?.items || data?.order?.[0]?.items || [];
+  const order = Array.isArray(data?.order) ? data.order[0] : data?.order || {};
+  return { items, order };
+}
+
+// helper: fetch reserve mappings for a sku
+async function fetchSkuMappings(sku, baseUrl) {
+  const url = `${baseUrl}/api/reserve-product/${encodeURIComponent(sku)}/sku`;
+  const { data } = await axios.get(url);
+  // expects data.result[0].products = [{product, upc, qty}, ...]
+  return data?.result?.[0]?.products || [];
+}
+
+// helper: post one decrease
+async function postDecrease({ baseUrl, itemName, reason, amountToDecrease }) {
+  const url = `${baseUrl}/api/items-decrease`;
+  return axios.post(url, {
+    itemName,
+    reason: String(reason),
+    amountToDecrease: Number(amountToDecrease),
+  });
+}
+
 router.post("/api/orders/bulk/scan", async (req, res) => {
   try {
     const { email, password, userName, role, trackingNumbers = [] } = req.body;
@@ -1161,12 +1188,11 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
         !trackingNumber.startsWith("1Z") &&
         !trackingNumber.startsWith("TBA")
       ) {
-        if(trackingNumber.length<34){
-      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
-    }
-    else {
-      trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
-    }
+        if (trackingNumber.length < 34) {
+          trackingNumber = trackingNumber.replace(/\D/g, "").slice(-22);
+        } else {
+          trackingNumber = trackingNumber.replace(/\D/g, "").slice(-12);
+        }
       }
 
       const order = await VTOrder.findOne({
@@ -1247,6 +1273,80 @@ router.post("/api/orders/bulk/scan", async (req, res) => {
               message: "Already Packed",
             });
           } else {
+            const { deduct } = req.body;
+            let deductionSummary = [];
+
+            if (deduct) {
+              try {
+                const baseUrl = `http://localhost:3000`;
+                // 1) fetch order bundle
+                const { items: orderItems, order: orderDoc } =
+                  await fetchOrderBundle(trackingNumber, baseUrl);
+
+                const orderId =
+                  orderDoc?.OrderId ||
+                  order?.OrderId ||
+                  order?.orderId ||
+                  "orderId";
+
+                // 2) for each item.sku → get mappings → post decreases
+                const perItemPromises = orderItems.map(async (item) => {
+                  const sku = item?.sku;
+                  const orderedQty = Number(item?.quantity) || 0;
+                  if (!sku || orderedQty <= 0) return [];
+
+                  const mappings = await fetchSkuMappings(sku, baseUrl);
+                  // mappings: [{product, upc, qty}, ...]
+                  const decreasePromises = mappings.map((m) => {
+                    const productQty = Number(m?.qty) || 0;
+                    const amountToDecrease = orderedQty * productQty; // <<=== CORE RULE
+                    if (!m?.product || amountToDecrease <= 0)
+                      return Promise.resolve(null);
+
+                    return postDecrease({
+                      baseUrl,
+                      itemName: m.product,
+                      reason: orderId,
+                      amountToDecrease,
+                    })
+                      .then((r) => ({
+                        sku,
+                        itemName: m.product,
+                        amountToDecrease,
+                        status: "ok",
+                      }))
+                      .catch((err) => ({
+                        sku,
+                        itemName: m.product,
+                        amountToDecrease,
+                        status: "failed",
+                        error: err?.response?.data || err?.message,
+                      }));
+                  });
+
+                  const r = await Promise.allSettled(decreasePromises);
+                  // flatten/normalize settled results
+                  return r
+                    .map((s) => (s.value ? s.value : null))
+                    .filter(Boolean);
+                });
+
+                const settled = await Promise.all(perItemPromises);
+                deductionSummary = settled.flat();
+              } catch (deductErr) {
+                // log but do not block packing
+                console.error(
+                  "[Bulk Deduct] Error for",
+                  trackingNumber,
+                  deductErr?.message || deductErr
+                );
+                deductionSummary.push({
+                  status: "failed",
+                  message: "Deduction process encountered an error",
+                });
+              }
+            }
+
             existingScan.packedTrackingNumbers.push(trackingNumber);
 
             const allPacked = existingScan.trackingNumber.every((t) =>
@@ -1873,7 +1973,7 @@ router.get("/api/orders-list", async (req, res) => {
       //       order.tiktokId.toLowerCase().includes(query.toLowerCase()))
       //   : true;
 
-        const q = (query ?? "").toLowerCase().trim();
+      const q = (query ?? "").toLowerCase().trim();
       const includesQ = (v) =>
         typeof v === "string" && v.toLowerCase().includes(q);
 
@@ -2209,7 +2309,7 @@ const GenerateToken = async () => {
     console.log(data);
     const accessTokenExpireAt = new Date(data.access_token_expire_in * 1000);
     const refreshTokenExpireAt = new Date(data.refresh_token_expire_in * 1000);
-   await TikTokAuth.findOneAndUpdate(
+    await TikTokAuth.findOneAndUpdate(
       { open_id: data.open_id },
       {
         $set: {
@@ -2219,12 +2319,11 @@ const GenerateToken = async () => {
           access_token_expire_at: accessTokenExpireAt,
           refresh_token_expire_at: refreshTokenExpireAt,
           shop_region: data.seller_base_region,
-          user_type: data.user_type
-        }
+          user_type: data.user_type,
+        },
       },
       { upsert: true, new: true }
     );
-
   } catch (err) {
     console.error(
       "❌ Token refresh failed:",
@@ -2234,29 +2333,27 @@ const GenerateToken = async () => {
 };
 
 async function loadTokenFromDb() {
-   const record = await TikTokAuth.find();
+  const record = await TikTokAuth.find();
   if (!record) throw new Error("No TikTokAuth record found");
-  
+
   tokenCache = {
     access_token: record[0].access_token,
     refresh_token: record[0].refresh_token,
     access_token_expire_at: record[0].access_token_expire_at,
-    open_id: record[0].open_id
+    open_id: record[0].open_id,
   };
 
   return tokenCache.access_token;
 }
 
-router.get("/api/acchess-token",async(req,res)=>{
+router.get("/api/acchess-token", async (req, res) => {
   try {
-    
     await GenerateToken();
-    res.json({message:"Success!"})
+    res.json({ message: "Success!" });
   } catch (error) {
-    res.json({error:error.message});
+    res.json({ error: error.message });
   }
-
-})
+});
 const APP_KEY = "6gi3nino9sia3";
 const APP_SECRET = "18da778e456044d348a5ae6639dd519893d2db59";
 // const ACCESS_TOKEN =
@@ -2550,7 +2647,7 @@ const sanitizeStringStore = (value) => {
 
 router.post("/api/orders", async (req, res) => {
   const ACCESS_TOKEN = await loadTokenFromDb();
-  console.log("ACC",ACCESS_TOKEN);
+  console.log("ACC", ACCESS_TOKEN);
   try {
     let allOrders = [];
     let fullDetails = [];

@@ -1248,7 +1248,7 @@ router.get("/api/orders/items/:tractingId", async (req, res) => {
     }
     const order = await VTOrder.find({ trackingNumber });
     const items = order[0]?.items;
-    res.json({ items });
+    res.json({ items, order});
   } catch (error) {
     res.json({ error });
   }

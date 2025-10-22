@@ -626,6 +626,7 @@ exports.getFilteredProduct = async (req, res) => {
         salesCondition,
         uid,
         tags,
+        buybox,
         page = 1,
         limit = 50,
       } = req.query;
@@ -651,7 +652,8 @@ exports.getFilteredProduct = async (req, res) => {
           stockCondition: parsedStockCondition,
           salesCondition: parsedSalesCondition,
           uid,
-          tags:parsedTags
+          tags:parsedTags,
+          buybox
         },
         parseInt(page, 10),
         parseInt(limit, 10)

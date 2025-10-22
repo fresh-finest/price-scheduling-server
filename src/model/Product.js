@@ -33,6 +33,8 @@ const productSchema = new mongoose.Schema(
       },
     ],
 
+    offerPrice:{type:String},
+    buybox:{type:Boolean},
     isFavourite: { type: Boolean, default: false },
     isHide: { type: Boolean, default: false },
   },

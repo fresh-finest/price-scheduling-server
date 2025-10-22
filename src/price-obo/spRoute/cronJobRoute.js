@@ -10,6 +10,7 @@ const Product = require('../../model/Product');
 const { fetchFbaInventorySummaries, mergeAndSaveFbaData } = require('../../merge-service/stockMergingToProduct');
 const { mergeImageToProduct } = require('../../merge-service/imageMergingToProduct');
 const { mergeSaleUnitoProduct } = require('../../merge-service/saleUnitMergetoProduct');
+const { mergeBuyBoxToProduct } = require('../../merge-service/buyBoxMergeToProduct');
 
 const scheduleCronJobs=()=>{
 
@@ -29,6 +30,7 @@ const scheduleCronJobs=()=>{
      await mergeAndSaveFbaData(listings, inventorySummaries);
      await mergeImageToProduct(listings);
      await mergeSaleUnitoProduct(listings);
+     await mergeBuyBoxToProduct(listings);
   }, {
     timezone: "Asia/Dhaka"
   });

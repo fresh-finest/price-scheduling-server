@@ -290,7 +290,7 @@ exports.filterSortAndPaginateProduct = async (
 };
 
 exports.filteProductService = async (
-  { fulfillmentChannel, stockCondition, salesCondition, uid, tags },
+  { fulfillmentChannel, stockCondition, salesCondition, uid, tags, buybox },
   page = 1,
   limit = 50
 ) => {
@@ -307,6 +307,14 @@ exports.filteProductService = async (
     }
 
     // const trimmedUid = uid ? uid.replace(/^\s+/, "") : "";
+
+     if (buybox !== undefined && buybox !== null && buybox !== "") {
+      const buyboxBool =
+        typeof buybox === "boolean"
+          ? buybox
+          : String(buybox).toLowerCase() === "true";
+      query.buybox = buyboxBool;
+    }
 
 
     const trimmedUid = uid ? uid.trim() : "";

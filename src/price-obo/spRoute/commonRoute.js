@@ -89,6 +89,7 @@ const TikTokOrder = require("../../model/TikTokOrder");
 const VTOrder = require("../../model/VTOrder");
 const VTMergeOrder = require("../../model/VTMergeOrder");
 const ReserveProduct = require("../../model/ReserveProduct");
+const { mergeBuyBoxToProduct } = require("../../merge-service/buyBoxMergeToProduct");
 
 const app = express();
 
@@ -179,6 +180,22 @@ router.get("/image-merge-to-porduct", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch, merge, and save data" });
   }
 });
+
+router.get("/buybox-merge-to-porduct", async (req, res) => {
+  try {
+    const listings = await Product.find();
+    console.log(`Fetched ${listings.length} listings from MongoDB.`);
+    const mergedData = await mergeBuyBoxToProduct(listings);
+    res.json({
+      message: "Data merged and saved successfully.",
+      result: mergedData,
+    });
+  } catch (error) {
+    console.error("Error during manual data processing:", error);
+    res.status(500).json({ error: "Failed to fetch, merge, and save data" });
+  }
+});
+
 router.get("/fetch-and-merge-sales", async (req, res) => {
   try {
     const listings = await Stock.find();

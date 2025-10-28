@@ -425,4 +425,41 @@ cron.schedule("10 14 * * *", async () => {
   timezone: "Asia/Dhaka" // Set to Bangladesh time
 });
 
+
+cron.schedule("*/40 * * * *", async () => {
+  try {
+    console.log("⏳ Running cron job for merging...");
+
+    await axios.get("http://localhost:3000/api/faire-merge");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
+
+cron.schedule("*/25 * * * *", async () => {
+  try {
+    console.log("⏳ Running cron job to fetch/store orders...");
+
+    await axios.get("http://localhost:3000/api/get-faire-orders?save=true");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
+
+
+cron.schedule("0 */6 * * *", async () => {
+  try {
+    console.log("⏳ Running cron for carrier status...");
+
+    await axios.post("http://localhost:3000/api/faire-order/update");
+
+  } catch (error) {
+    console.error("Cron job failed:", error.response?.data || error.message);
+  }
+});
+
+
+
 module.exports = { scheduleCronJobs };

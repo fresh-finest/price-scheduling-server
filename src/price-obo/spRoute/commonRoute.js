@@ -2043,6 +2043,9 @@ router.get("/api/orders-list", async (req, res) => {
           case "amazon":
             matchesTag = channelNames && channelNames.includes("amazon");
             break;
+          case "faire":
+            matchesTag = channelNames && channelNames.includes("faire");
+            break;
           case "ebay":
             matchesTag = channelNames && channelNames.includes("ebay");
             break;

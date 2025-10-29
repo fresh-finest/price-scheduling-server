@@ -30,9 +30,22 @@ const scheduleCronJobs=()=>{
      await mergeAndSaveFbaData(listings, inventorySummaries);
      await mergeImageToProduct(listings);
      await mergeSaleUnitoProduct(listings);
-     await mergeBuyBoxToProduct(listings);
+    //  await mergeBuyBoxToProduct(listings);
   }, {
     timezone: "Asia/Dhaka"
+  });
+
+   cron.schedule('0 9 * * *', async () => {
+    console.log('Running scheduled task to fetch and merge sales data.');
+    try {
+      const response = await axios.get('http://localhost:3000/store-in-buybox');
+      console.log('Scheduled task completed:', response.data);
+    } catch (error) { 
+
+      console.error('Error in scheduled task:', error);
+    }
+  }, {
+    timezone: 'Asia/Dhaka'  
   });
 
   cron.schedule('0 6 * * *', async () => {

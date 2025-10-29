@@ -185,7 +185,7 @@ router.get("/api/get-faire-orders", async (req, res) => {
     if (cursor) baseParams.cursor = cursor;
   
     const now = new Date();
-      now.setUTCDate(now.getUTCDate() - 1);
+      now.setUTCDate(now.getUTCDate() - 3);
  
     const created_at_min= now.toISOString();
     // const created_at_min='2025-10-25T00:00:00.000Z'

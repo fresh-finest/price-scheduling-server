@@ -20,6 +20,7 @@ const commonRoutes = require("./src/price-obo/spRoute/commonRoute");
 const warehouseRoutes = require("./src/price-obo/spRoute/warehouseRoute")
 const nineyardRoutes = require("./src/price-obo/spRoute/nineyard")
 const faireRoute = require("./src/price-obo/spRoute/faire")
+const buyBoxRoute= require("./src/price-obo/spRoute/buyBox")
 const autoPriceRoute = require("./src/price-obo/spRoute/autoPriceRoute");
 const rotateClientSecret = require("./src/price-obo/rotateClientSecret");
 const { scheduleCronJobs } = require("./src/price-obo/spRoute/cronJobRoute");
@@ -234,6 +235,7 @@ app.use(routes);
 app.use(commonRoutes);
 app.use(nineyardRoutes);
 app.use(faireRoute);
+app.use(buyBoxRoute);
 app.use(warehouseRoutes);
 app.use(autoPriceRoute);
 scheduleCronJobs();

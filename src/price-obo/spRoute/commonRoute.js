@@ -1937,7 +1937,7 @@ router.get("/api/update-status", async (req, res) => {
   }
 });
 
-router.get("/api/orders-list", async (req, res) => {
+/*  router.get("/api/orders-list", async (req, res) => {
   try {
     const {
       status,
@@ -2188,7 +2188,424 @@ router.get("/api/orders-list", async (req, res) => {
     console.error("Error fetching orders list:", error.message);
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
-});
+});  */
+
+router.get("/api/orders-list", async (req, res) => {
+  try {
+    const {
+      status,
+      scanStatus,
+      query,
+      page = 1,
+      limit = 100,
+      startDate,
+      endDate,
+      tagType, // target | tiktok | temu | flip | amazon | faire | ebay | phone | walmart | syruvia
+    } = req.query;
+
+    const p = Math.max(parseInt(page, 10) || 1, 1);
+    const l = Math.max(1, Math.min(parseInt(limit, 10) || 100, 200));
+    const q = (query ?? "").toLowerCase().trim();
+
+    const isSearchOrDateFilter = Boolean(query || startDate || endDate || tagType);
+
+    // ---- Common helpers for $match stages ----
+    const statusMatch = (() => {
+      if (!status) return null;
+
+      if (status === "tracking_issue") {
+        const issues = [
+          "delayed",
+          "cancelled",
+          "contact_support",
+          "recipient_refused",
+          "returned_to_sender",
+        ];
+        return {
+          $expr: {
+            $in: [{ $toLower: { $ifNull: ["$status", ""] } }, issues],
+          },
+        };
+      }
+      return {
+        $expr: {
+          $eq: [{ $toLower: { $ifNull: ["$status", ""] } }, status.toLowerCase()],
+        },
+      };
+    })();
+
+    const queryMatch = (() => {
+      if (!q) return null;
+      const regex = new RegExp(q, "i");
+      return {
+        $or: [
+          { OrderId: regex },
+          // trackingNumber can be array or string in your data
+          { trackingNumber: { $elemMatch: { $regex: regex } } },
+          { trackingNumber: { $regex: regex } },
+          { tiktokId: regex },
+        ],
+      };
+    })();
+
+    const dateMatch = (() => {
+      if (!startDate && !endDate) return null;
+      const start =
+        startDate && new Date(`${startDate}T00:00:00.000Z`);
+      const end = endDate && new Date(`${endDate}T23:59:59.999Z`);
+
+      const expr = {};
+      if (start) expr.$gte = [{ $toDate: "$shipped_at" }, start];
+      if (end) expr.$lte = [{ $toDate: "$shipped_at" }, end];
+
+      // Convert to $and of $gte/$lte expressions
+      const and = [];
+      if (expr.$gte) and.push({ $expr: { $gte: expr.$gte } });
+      if (expr.$lte) and.push({ $expr: { $lte: expr.$lte } });
+      return and.length ? { $and: and } : null;
+    })();
+
+    const buildTagMatchExpr = (typeLower) => {
+      // Prepare lower-cased helpers inside $expr
+      // hasTags = size(tags) > 0
+      // tag hit: any tag.name contains substring
+      const tagContains = (substr) => ({
+        $gt: [
+          {
+            $size: {
+              $filter: {
+                input: {
+                  $map: {
+                    input: { $ifNull: ["$tags", []] },
+                    as: "t",
+                    in: { $toLower: { $ifNull: ["$$t.name", ""] } },
+                  },
+                },
+                as: "n",
+                cond: { $regexMatch: { input: "$$n", regex: substr, options: "i" } },
+              },
+            },
+          },
+          0,
+        ],
+      });
+
+      const channelContains = (substr) => ({
+        $regexMatch: {
+          input: { $toLower: { $ifNull: ["$channelName", ""] } },
+          regex: substr,
+          options: "i",
+        },
+      });
+
+      // Known sets for "syruvia"
+      const knownTags = ["target", "temu"];
+      const knownChannels = ["tiktok", "amazon", "ebay", "phone"];
+
+      const hasTags = {
+        $gt: [{ $size: { $ifNull: ["$tags", []] } }, 0],
+      };
+
+      // base condition per tagType
+      let base;
+      switch (typeLower) {
+        case "target":
+          base = tagContains("target");
+          break;
+        case "temu":
+          base = tagContains("temu");
+          break;
+        case "flip":
+          base = tagContains("flip");
+          break;
+        case "tiktok":
+          base = channelContains("tiktok");
+          break;
+        case "walmart":
+          base = channelContains("walmart");
+          break;
+        case "amazon":
+          base = channelContains("amazon");
+          break;
+        case "faire":
+          base = channelContains("faire");
+          break;
+        case "ebay":
+          base = channelContains("ebay");
+          break;
+        case "phone":
+          base = channelContains("phone");
+          break;
+        case "syruvia":
+          base = {
+            $not: {
+              $or: [
+                // any tag in knownTags
+                {
+                  $gt: [
+                    {
+                      $size: {
+                        $filter: {
+                          input: {
+                            $map: {
+                              input: { $ifNull: ["$tags", []] },
+                              as: "t",
+                              in: { $toLower: { $ifNull: ["$$t.name", ""] } },
+                            },
+                          },
+                          as: "n",
+                          cond: {
+                            $or: knownTags.map((t) => ({
+                              $regexMatch: { input: "$$n", regex: t, options: "i" },
+                            })),
+                          },
+                        },
+                      },
+                    },
+                    0,
+                  ],
+                },
+                // channel in knownChannels
+                {
+                  $or: knownChannels.map((c) => channelContains(c)),
+                },
+              ],
+            },
+          };
+          break;
+        default:
+          base = true; // no restriction; will apply fallback below if no tags
+      }
+
+      // Fallback from your code:
+      // if (!hasTags && channelName) -> channel includes tagType
+      const fallback = channelContains(typeLower);
+
+      return {
+        $cond: [
+          hasTags,
+          base,
+          fallback,
+        ],
+      };
+    };
+
+    const tagMatch = (() => {
+      if (!tagType) return null;
+      return {
+        $expr: buildTagMatchExpr(tagType.toLowerCase()),
+      };
+    })();
+
+    // Build the $match for the FILTERED pipeline (status/query/date/tag)
+    const filteredBaseMatch = {};
+    [statusMatch, queryMatch, dateMatch, tagMatch]
+      .filter(Boolean)
+      .forEach((cond) => Object.assign(filteredBaseMatch, { $and: [ ...(filteredBaseMatch.$and || []), cond ] }));
+
+    // $lookup TrackScan and flatten 1 doc
+    const lookupScan = [
+      {
+        $lookup: {
+          from: TrackScan.collection.name,
+          let: { oid: "$OrderId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$orderId", "$$oid"] } } },
+            { $sort: { _id: -1 } }, // if ever duplicates, get latest
+            { $limit: 1 },
+          ],
+          as: "scan",
+        },
+      },
+      { $unwind: { path: "$scan", preserveNullAndEmptyArrays: true } },
+      // Normalize computed fields + ensure arrays
+      {
+        $addFields: {
+          picked: { $ifNull: ["$scan.picked", false] },
+          packed: { $ifNull: ["$scan.packed", false] },
+          isPalette: { $ifNull: ["$scan.isPalette", false] },
+          scanStatus: { $ifNull: ["$scan.scanStatus", "pending"] },
+          pickerName: { $ifNull: ["$scan.pickerName", null] },
+          pickerRole: { $ifNull: ["$scan.pickerRole", null] },
+          packerName: { $ifNull: ["$scan.packerName", null] },
+          packerRole: { $ifNull: ["$scan.packerRole", null] },
+          paletterName: { $ifNull: ["$scan.paletterName", null] },
+          paletterRole: { $ifNull: ["$scan.paletterRole", null] },
+          pickedAt: { $ifNull: ["$scan.pickedAt", null] },
+          packedAt: { $ifNull: ["$scan.packedAt", null] },
+          paletteAt: { $ifNull: ["$scan.paletteAt", null] },
+          pickedTrackingNumbers: { $ifNull: ["$scan.pickedTrackingNumbers", []] },
+          packedTrackingNumbers: { $ifNull: ["$scan.packedTrackingNumbers", []] },
+          palleteTrackingNumbers: { $ifNull: ["$scan.palleteTrackingNumbers", []] },
+          packedProduct: { $ifNull: ["$scan.packedProduct", []] },
+          packedUPC: { $ifNull: ["$scan.packedUPC", []] },
+          packNote: { $ifNull: ["$scan.packNote", null] },
+
+          // Normalize trackingNumber to array for counting/filters
+          _trackingArr: {
+            $cond: [
+              { $isArray: "$trackingNumber" },
+              "$trackingNumber",
+              {
+                $cond: [
+                  { $and: [{ $ne: ["$trackingNumber", null] }, { $ne: ["$trackingNumber", ""] }] },
+                  ["$trackingNumber"],
+                  [],
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ];
+
+    // Optional scanStatus filter AFTER merge (and only count when tracking numbers exist)
+    const scanStatusMatch = (() => {
+      if (!scanStatus) return null;
+      return {
+        $expr: {
+          $and: [
+            { $eq: ["$scanStatus", scanStatus] },
+            { $gt: [{ $size: "$_trackingArr" }, 0] },
+          ],
+        },
+      };
+    })();
+
+    // --- Pipeline A: FILTERED set (status/query/date/tag + optional scanStatus), sorted + paginated
+    const pipelineFiltered = [
+      ...(Object.keys(filteredBaseMatch).length ? [{ $match: filteredBaseMatch }] : []),
+      // Always sort by shipped_at desc (convert to date to be precise)
+      { $addFields: { _shippedAtDate: { $toDate: "$shipped_at" } } },
+      { $sort: { _shippedAtDate: -1 } },
+      ...lookupScan,
+      ...(scanStatusMatch ? [{ $match: scanStatusMatch }] : []),
+      {
+        $facet: {
+          data: [
+            { $skip: (p - 1) * l },
+            { $limit: l },
+            // Shape result to match your merged object
+            {
+              $project: {
+                _shippedAtDate: 0,
+                scan: 0,
+                _trackingArr: 0,
+              },
+            },
+          ],
+          totalFiltered: [{ $count: "count" }],
+          // Counts over the FILTERED set (when isSearchOrDateFilter === true we’ll use these)
+          scanCounts: [
+            // Only count if tracking numbers exist (your original rule)
+            { $match: { $expr: { $gt: [{ $size: "$_trackingArr" }, 0] } } },
+            { $group: { _id: "$scanStatus", c: { $sum: 1 } } },
+          ],
+          statusCounts: [
+            {
+              $group: {
+                _id: {
+                  $toLower: { $ifNull: ["$status", ""] },
+                },
+                c: { $sum: 1 },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    // --- Pipeline B: UNFILTERED baseline (for totals + counters when isSearchOrDateFilter === false)
+    const pipelineAll = [
+      // No status/query/date/tag filters on purpose
+      { $addFields: { _shippedAtDate: { $toDate: "$shipped_at" } } },
+      ...lookupScan,
+      {
+        $facet: {
+          totalAll: [{ $count: "count" }],
+          scanCountsAll: [
+            { $match: { $expr: { $gt: [{ $size: "$_trackingArr" }, 0] } } },
+            { $group: { _id: "$scanStatus", c: { $sum: 1 } } },
+          ],
+          statusCountsAll: [
+            {
+              $group: {
+                _id: {
+                  $toLower: { $ifNull: ["$status", ""] },
+                },
+                c: { $sum: 1 },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const [aggFiltered, aggAll] = await Promise.all([
+      VTOrder.aggregate(pipelineFiltered),
+      VTOrder.aggregate(pipelineAll),
+    ]);
+
+    const filteredBlock = aggFiltered[0] || {};
+    const allBlock = aggAll[0] || {};
+
+    const paginatedOrders = filteredBlock.data || [];
+
+    // Total logic: if search/date/tag, use filtered total; else use ALL total
+    const totalFiltered =
+      (filteredBlock.totalFiltered && filteredBlock.totalFiltered[0]?.count) || 0;
+    const totalAll =
+      (allBlock.totalAll && allBlock.totalAll[0]?.count) || 0;
+
+    const total = isSearchOrDateFilter ? totalFiltered : totalAll;
+
+    // Build counters into your fixed keys
+    const buildStatusCounters = (groups) => {
+      const map = new Map(groups.map((g) => [g._id, g.c]));
+      const trackingIssues = [
+        "delayed",
+        "cancelled",
+        "contact_support",
+        "recipient_refused",
+        "returned_to_sender",
+      ];
+      return {
+        awaiting_collection: map.get("awaiting_collection") || 0,
+        in_transit: map.get("in_transit") || 0,
+        delivered: map.get("delivered") || 0,
+        created: map.get("created") || 0,
+        out_for_delivery: map.get("out_for_delivery") || 0,
+        tracking_issue:
+          trackingIssues.reduce((sum, key) => sum + (map.get(key) || 0), 0),
+      };
+    };
+
+    const buildScanCounters = (groups) => {
+      const out = {};
+      for (const g of groups || []) out[g._id || "pending"] = g.c || 0;
+      return out;
+    };
+
+    const totalByStatus = isSearchOrDateFilter
+      ? buildStatusCounters(filteredBlock.statusCounts || [])
+      : buildStatusCounters(allBlock.statusCountsAll || []);
+
+    const totalByScanStatus = isSearchOrDateFilter
+      ? buildScanCounters(filteredBlock.scanCounts || [])
+      : buildScanCounters(allBlock.scanCountsAll || []);
+
+    res.status(200).json({
+      total,
+      totalByScanStatus,
+      totalByStatus,
+      products: paginatedOrders.length,
+      result: paginatedOrders,
+    });
+  } catch (error) {
+    console.error("Error fetching orders list:", error);
+    res.status(500).json({ error: "Failed to fetch orders list" });
+  }
+}); 
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;

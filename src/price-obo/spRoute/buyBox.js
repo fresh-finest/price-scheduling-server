@@ -259,15 +259,12 @@ router.get("/api/buy-box", async (req, res) => {
     const limitRaw = parseInt(req.query.limit ?? "50", 10) || 50;
     const limit = Math.max(1, Math.min(limitRaw, 200));
     const skip = (page - 1) * limit;
-   
-    console.log(req.query);
-    // seller: fresh | others | all
+
     const sellerParam = (req.query.seller || "all").toLowerCase();
     const sellerFilter =
       sellerParam === "fresh" ? "fresh" :
       sellerParam === "others" ? "others" : "all";
 
-    // buybox: true | false | all
     const bbParam = (req.query.buybox || "all").toLowerCase();
     const bbFilter =
       bbParam === "true" ? true :
@@ -291,14 +288,19 @@ router.get("/api/buy-box", async (req, res) => {
     // -------- Pipeline --------
     const pipeline = [];
 
-    // 1) Search/existence
+    // 1) Search / existence
     pipeline.push({ $match: match });
 
-    // 2) Optionally filter array elements by IsBuyBox
+    // 2) Build view arrays based on buybox filter (keep originals intact)
     const bbCondExpr = bbFilter === null ? null : { $eq: ["$$s.IsBuyBox", bbFilter] };
     pipeline.push({
       $addFields: {
-        fresFinest_filtered: bbFilter === null
+        // originals stay (no change)
+        fresFinest: { $ifNull: ["$fresFinest", []] },
+        otherSeller: { $ifNull: ["$otherSeller", []] },
+
+        // view arrays (respect buybox)
+        fresFinest_view: bbFilter === null
           ? { $ifNull: ["$fresFinest", []] }
           : {
               $filter: {
@@ -307,7 +309,7 @@ router.get("/api/buy-box", async (req, res) => {
                 cond: bbCondExpr,
               },
             },
-        otherSeller_filtered: bbFilter === null
+        otherSeller_view: bbFilter === null
           ? { $ifNull: ["$otherSeller", []] }
           : {
               $filter: {
@@ -319,22 +321,22 @@ router.get("/api/buy-box", async (req, res) => {
       },
     });
 
-    // 3) Counts (post-filter)
+    // 3) Counts from the *view* arrays (post-buybox)
     pipeline.push({
       $addFields: {
-        fresCount: { $size: { $ifNull: ["$fresFinest_filtered", []] } },
-        othersCount: { $size: { $ifNull: ["$otherSeller_filtered", []] } },
+        fresCount:   { $size: { $ifNull: ["$fresFinest_view", []] } },
+        othersCount: { $size: { $ifNull: ["$otherSeller_view", []] } },
       },
     });
 
-    // 4) If seller=..., keep only docs with data on that side
+    // 4) If seller=..., keep only docs with data on that side (using view counts)
     if (sellerFilter === "fresh") {
       pipeline.push({ $match: { fresCount: { $gt: 0 } } });
     } else if (sellerFilter === "others") {
       pipeline.push({ $match: { othersCount: { $gt: 0 } } });
     }
 
-    // 5) Project (no exclusion!) — blank opposite side via $cond
+    // 5) Project everything you need (keep originals + views)
     pipeline.push({
       $project: {
         asin: 1,
@@ -345,18 +347,26 @@ router.get("/api/buy-box", async (req, res) => {
         competitivePrice: 1,
         updatedAt: 1,
         createdAt: 1,
+
+        // counts (from views)
         fresCount: 1,
         othersCount: 1,
-        fresFinest: {
-          $cond: [{ $eq: [sellerFilter, "others"] }, [], "$fresFinest_filtered"]
-        },
-        otherSeller: {
-          $cond: [{ $eq: [sellerFilter, "fresh"] }, [], "$otherSeller_filtered"]
-        },
+
+        // originals (unmodified)
+        fresFinest: 1,
+        otherSeller: 1,
+
+        // view arrays (filtered by buybox)
+        fresFinest_view: 1,
+        otherSeller_view: 1,
+
+        // helper for UI if you want
+        activeSellerSide: { $literal: sellerFilter },
+        buyboxFilter: { $literal: (bbFilter === null ? "all" : bbFilter) },
       },
     });
 
-    // 6) Sort + paginate + total in one go
+    // 6) Sort + paginate + total
     pipeline.push({ $sort: { updatedAt: -1, _id: -1 } });
     pipeline.push({
       $facet: {
@@ -386,6 +396,7 @@ router.get("/api/buy-box", async (req, res) => {
     res.status(500).json({ ok: false, error: error.message });
   }
 });
+
 
 
 

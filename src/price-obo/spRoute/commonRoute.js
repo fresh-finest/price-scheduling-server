@@ -1937,7 +1937,7 @@ router.get("/api/update-status", async (req, res) => {
   }
 });
 
-/*  router.get("/api/orders-list", async (req, res) => {
+ router.get("/api/orders-list", async (req, res) => {
   try {
     const {
       status,
@@ -2188,9 +2188,9 @@ router.get("/api/update-status", async (req, res) => {
     console.error("Error fetching orders list:", error.message);
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
-});  */
-
-router.get("/api/orders-list", async (req, res) => {
+});  
+ 
+/*  router.get("/api/orders-list", async (req, res) => {
   try {
     const {
       status,
@@ -2605,7 +2605,7 @@ router.get("/api/orders-list", async (req, res) => {
     console.error("Error fetching orders list:", error);
     res.status(500).json({ error: "Failed to fetch orders list" });
   }
-}); 
+});  */ 
 
 router.get("/tiktok/callback", async (req, res) => {
   const { code, shop_region, locale } = req.query;

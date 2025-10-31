@@ -26,13 +26,15 @@ const buyBoxSchema = new mongoose.Schema({
          seller_id:{type:String},
          IsBuyBox:{type:Boolean},
          listingPrice:{type:String},
+         IsFulfilledByAmazon:{type:Boolean}
        }
     ],
     otherSeller:[
         {
             seller_id:{type:String},
             IsBuyBox:{type:Boolean},
-            listingPrice:{type:String}
+            listingPrice:{type:String},
+            IsFulfilledByAmazon:{type:Boolean}
         }
     ]
 })
